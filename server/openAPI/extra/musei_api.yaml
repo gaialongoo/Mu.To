@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: API Musei
+  version: 1.0.0
+  description: API per ottenere informazioni sui musei e i loro oggetti
+
+servers:
+  - url: https://api.musei.example.com
+    description: Server di esempio
+
+paths:
+  /musei:
+    get:
+      summary: Ottieni tutti i musei
+      description: Restituisce la lista completa dei musei con i loro oggetti e descrizioni
+      responses:
+        '200':
+          description: Lista dei musei
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MuseiResponse'
+
+components:
+  schemas:
+    MuseiResponse:
+      type: object
+      properties:
+        musei:
+          type: array
+          items:
+            $ref: '#/components/schemas/Museo'
+
+    Museo:
+      type: object
+      properties:
+        nome:
+          type: string
+          example: Uffizi
+        citta:
+          type: string
+          example: Firenze
+        oggetti:
+          type: array
+          items:
+            $ref: '#/components/schemas/Oggetto'
+
+    Oggetto:
+      type: object
+      properties:
+        indice:
+          type: integer
+          example: 0
+        nome:
+          type: string
+          example: statua
+        stanza:
+          type: string
+          example: sala A
+        connessi:
+          type: array
+          items:
+            type: string
+          example: []
+        descrizioni:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          example: [["", "", ""], ["", "", ""], ["", "", ""], ["", "", ""]]

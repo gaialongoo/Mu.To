@@ -1,0 +1,23 @@
+# Nome dell'eseguibile
+TARGET = uploadJSONtoMongoDB
+
+# File sorgente
+SRC = uploadJSONtoMongoDB.cpp
+
+# Compilatore e flags
+CXX = g++
+CXXFLAGS = -std=c++17 \
+           -I/usr/local/include/mongocxx/v_noabi \
+           -I/usr/local/include/bsoncxx/v_noabi
+
+LDFLAGS = -L/usr/local/lib -lmongocxx -lbsoncxx -lpthread -lssl -lcrypto
+
+# Regola di default
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+
+# Pulisce i file generati
+clean:
+	rm -f $(TARGET)
