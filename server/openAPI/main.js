@@ -1,3 +1,4 @@
+//esempio di main per il testing del parser dei musei
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
 
 // Carico il file JSON dei musei
