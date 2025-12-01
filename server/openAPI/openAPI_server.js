@@ -1,3 +1,4 @@
+//server base in js per la openAPI dei musei
 const express = require('express');
 const fs = require('fs');
 const app = express();
