@@ -412,7 +412,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Lista di oggetti separati da virgola, es: "T-Rex,Velociraptor,Triceratopo"
+          description: 'Lista di oggetti separati da virgola, es: "T-Rex,Velociraptor,Triceratopo"'
       responses:
         '200':
           description: Percorso trovato
