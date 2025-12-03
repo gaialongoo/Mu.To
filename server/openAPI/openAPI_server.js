@@ -2,22 +2,53 @@ const express = require("express");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
 const { upsertMuseo } = require("./mongo_upload.js");
 const fs = require("fs");
+require('dotenv').config({ path: __dirname + '/.env' });
+//console.log("Chiave API caricata:", process.env.API_KEY);
+
+// --- 🔧 CONFIGURAZIONE SICUREZZA ---
+const SOLO_LOCALHOST = true; // true = solo localhost, false = ascolta su tutte le interfacce
+const RICHIESTA_API_KEY = true; // true = obbligo API key, false = accesso libero (solo localhost)
+const VALID_API_KEYS = [process.env.API_KEY]; // letta da .env
+
+const PORT = 3000;
+const path = require('path');
+const FILE_JSON = path.join(__dirname, 'musei.json');
 
 const app = express();
-const PORT = 3000;
-const FILE_JSON = "musei.json";
+app.use(express.json());
 
-// Carica il sistema dei musei all'avvio
-console.log("Caricamento musei da file:", FILE_JSON);
-const sistema = caricaMuseiDaJSON(FILE_JSON);
-console.log(`Caricati ${sistema.musei.size} musei`);
 
-// Middleware per log richieste
+// --- 🔒 Middleware per sicurezza ---
+if (RICHIESTA_API_KEY) {
+  app.use((req, res, next) => {
+    const apiKey = req.header("X-API-Key");
+    if (!apiKey) return res.status(401).json({ error: "API key mancante" });
+    if (!VALID_API_KEYS.includes(apiKey)) return res.status(403).json({ error: "API key non valida" });
+    next();
+  });
+}
+
+// Disabilita header che espongono info
+app.disable("x-powered-by");
+app.disable("etag");
+
+// Blocca richieste CORS dall’esterno (solo se necessario)
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "null");
+  next();
+});
+
+// --- Middleware log richieste ---
 app.use(express.json());
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
+
+// --- Caricamento sistema musei ---
+console.log("Caricamento musei da file:", FILE_JSON);
+const sistema = caricaMuseiDaJSON(FILE_JSON);
+console.log(`Caricati ${sistema.musei.size} musei`);
 
 // --- 1️⃣ Lista musei ---
 app.get("/musei", (req, res) => {
@@ -264,8 +295,11 @@ app.delete("/musei/:nome_museo/oggetti/:oggetto", async (req, res) => {
   res.json({ message: `Oggetto '${oggetto.nome}' eliminato con successo` });
 });
 
-// --- Avvio server ---
-app.listen(PORT, () => {
-  console.log(`Server Musei in ascolto su http://localhost:${PORT}`);
-});
+// --- Avvio server sicuro ---
+const HOST = SOLO_LOCALHOST ? "127.0.0.1" : undefined;
 
+app.listen(PORT, HOST, () => {
+  console.log(`Server Musei in ascolto su http://${HOST || "0.0.0.0"}:${PORT}`);
+  if (SOLO_LOCALHOST) console.log("🔒 Accesso limitato a localhost");
+  if (RICHIESTA_API_KEY) console.log("🔑 API key richiesta per tutte le richieste");
+});
