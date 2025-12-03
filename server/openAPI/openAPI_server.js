@@ -1,3 +1,4 @@
+const https = require("https");
 const express = require("express");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
 const { upsertMuseo } = require("./mongo_upload.js");
@@ -7,7 +8,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 
 // --- 🔧 CONFIGURAZIONE SICUREZZA ---
 const SOLO_LOCALHOST = true; // true = solo localhost, false = ascolta su tutte le interfacce
-const RICHIESTA_API_KEY = true; // true = obbligo API key, false = accesso libero (solo localhost)
+const RICHIESTA_API_KEY = false; // true = obbligo API key, false = accesso libero (solo localhost)
 const VALID_API_KEYS = [process.env.API_KEY]; // letta da .env
 
 const PORT = 3000;
@@ -295,11 +296,26 @@ app.delete("/musei/:nome_museo/oggetti/:oggetto", async (req, res) => {
   res.json({ message: `Oggetto '${oggetto.nome}' eliminato con successo` });
 });
 
-// --- Avvio server sicuro ---
 const HOST = SOLO_LOCALHOST ? "127.0.0.1" : undefined;
+const certPath = path.join(__dirname, "cert", "server.crt");
+const keyPath = path.join(__dirname, "cert", "server.key");
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server Musei in ascolto su http://${HOST || "0.0.0.0"}:${PORT}`);
-  if (SOLO_LOCALHOST) console.log("🔒 Accesso limitato a localhost");
-  if (RICHIESTA_API_KEY) console.log("🔑 API key richiesta per tutte le richieste");
+// Verifica certificati
+let options;
+try {
+  options = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath)
+  };
+  console.log("Certificati TLS caricati correttamente");
+} catch (err) {
+  console.error("Errore caricando certificati TLS:", err.message);
+  process.exit(1); // esci se non riesce a leggere i certificati
+}
+
+// Avvio server HTTPS
+https.createServer(options, app).listen(PORT, HOST, () => {
+  console.log(`Server Musei in ascolto su https://${HOST || "0.0.0.0"}:${PORT}`);
+  if (SOLO_LOCALHOST) console.log("Accesso limitato a localhost");
+  if (RICHIESTA_API_KEY) console.log("API key richiesta per tutte le richieste");
 });
