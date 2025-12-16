@@ -1,0 +1,22 @@
+{
+  "Uffizi": {
+    "grid": {
+      "IN": { "row": 0, "col": 0, "tipo": "ingresso" },
+      "sala A": { "row": 1, "col": 0 },
+      "sala B": { "row": 1, "col": 1 },
+      "sala C": { "row": 2, "col": 0 },
+      "OUT": { "row": 2, "col": 1, "tipo": "uscita" }
+    }
+  },
+  "Museo di Torino": {
+    "grid": {
+      "IN": { "row": 0, "col": 1, "tipo": "ingresso" },
+      "stanza 1": { "row": 1, "col": 1 },
+      "stanza 2": { "row": 2, "col": 1 },
+      "stanza 3": { "row": 3, "col": 1 },
+      "WC": { "row": 2, "col": 2, "tipo": "bagno" },
+      "SHOP": { "row": 3, "col": 2, "tipo": "servizio" },
+      "OUT": { "row": 4, "col": 1, "tipo": "uscita" }
+    }
+  }
+}

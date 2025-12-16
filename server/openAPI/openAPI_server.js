@@ -1,19 +1,20 @@
 const https = require("https");
 const express = require("express");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
-const { upsertMuseo } = require("./mongo_upload.js");
-const fs = require("fs");
+const { upsertMuseo, syncMuseiSuMongo } = require("./mongo_upload.js");const fs = require("fs");
+const { syncLayoutSuMongo } = require("./layout_upload.js");
 require('dotenv').config({ path: __dirname + '/.env' });
 //console.log("Chiave API caricata:", process.env.API_KEY);
 
 // --- 🔧 CONFIGURAZIONE SICUREZZA ---
 const SOLO_LOCALHOST = true; // true = solo localhost, false = ascolta su tutte le interfacce
-const RICHIESTA_API_KEY = false; // true = obbligo API key, false = accesso libero (solo localhost)
+const RICHIESTA_API_KEY = true; // true = obbligo API key, false = accesso libero (solo localhost)
 const VALID_API_KEYS = [process.env.API_KEY]; // letta da .env
 
 const PORT = 3000;
 const path = require('path');
 const FILE_JSON = path.join(__dirname, 'musei.json');
+const LAYOUT_FILE = path.join(__dirname, "layout.json");
 
 const app = express();
 app.use(express.json());
@@ -49,7 +50,15 @@ app.use((req, res, next) => {
 // --- Caricamento sistema musei ---
 console.log("Caricamento musei da file:", FILE_JSON);
 const sistema = caricaMuseiDaJSON(FILE_JSON);
+
+// 🔥 Sync logica musei
+syncMuseiSuMongo(sistema);
+
+// 🔥 Sync layout grafici
+syncLayoutSuMongo(LAYOUT_FILE);
+
 console.log(`Caricati ${sistema.musei.size} musei`);
+
 
 // --- 1️⃣ Lista musei ---
 app.get("/musei", (req, res) => {

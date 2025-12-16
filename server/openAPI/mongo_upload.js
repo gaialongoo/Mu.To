@@ -2,8 +2,9 @@
 const { MongoClient } = require("mongodb");
 
 const uri = "mongodb://localhost:27017";
-const dbName = "musei_db";
-const collectionName = "musei";
+const dbName = "musei";
+const collectionName = "musei_db";
+
 
 async function upsertMuseo(museo) {
   const client = new MongoClient(uri);
@@ -40,5 +41,25 @@ async function upsertOggetto(nomeMuseo, oggetto) {
   }
 }
 
-module.exports = { upsertMuseo, upsertOggetto };
+function syncMuseiSuMongo(sistema) {
+  console.log("Sincronizzazione iniziale musei su MongoDB...");
+
+  for (const museo of sistema.musei.values()) {
+    const payload = {
+      nome: museo.nome,
+      citta: museo.citta,
+      oggetti: Array.from(museo.oggetti.values())
+    };
+
+    upsertMuseo(payload)
+      .then(() => {
+        console.log(`✔ Museo '${museo.nome}' sincronizzato su MongoDB`);
+      })
+      .catch(err => {
+        console.error(`❌ Errore sync museo '${museo.nome}':`, err);
+      });
+  }
+}
+
+module.exports = { upsertMuseo, upsertOggetto, syncMuseiSuMongo };
 

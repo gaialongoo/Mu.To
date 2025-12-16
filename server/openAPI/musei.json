@@ -7,81 +7,88 @@
         {
           "nome": "statua",
           "stanza": "sala A",
-          "connessi": [],
+          "connessi": [
+            "dipinto"
+          ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Statua in marmo bianco raffigurante una figura umana",
+              "Questa statua rappresenta una figura elegante scolpita nel marmo",
+              "Osservando la statua si notano proporzioni armoniche e dettagli curati"
             ],
             [
-              "",
-              "",
-              ""
+              "Statua classica di epoca rinascimentale",
+              "La statua è riconducibile allo stile rinascimentale fiorentino",
+              "Le forme equilibrate richiamano i canoni artistici del Rinascimento"
             ],
             [
-              "",
-              "",
-              ""
+              "Scultura rinascimentale in marmo",
+              "Questa scultura mostra l’influenza dell’arte classica antica",
+              "La lavorazione del marmo evidenzia grande abilità tecnica"
             ],
             [
-              "",
-              "",
-              ""
+              "Capolavoro scultoreo del Rinascimento italiano",
+              "La statua è un esempio significativo dell’arte rinascimentale",
+              "L’opera testimonia la ricerca di perfezione formale e anatomica"
             ]
           ]
         },
         {
           "nome": "dipinto",
           "stanza": "sala B",
-          "connessi": [],
+          "connessi": [
+            "statua",
+            "anfora"
+          ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Dipinto dai colori vivaci raffigurante una scena storica",
+              "Il dipinto utilizza colori accesi e una composizione equilibrata",
+              "La scena rappresentata racconta un episodio significativo"
             ],
             [
-              "",
-              "",
-              ""
+              "Dipinto rinascimentale su tavola",
+              "L’opera pittorica mostra l’uso della prospettiva",
+              "I personaggi sono disposti secondo uno schema armonico"
             ],
             [
-              "",
-              "",
-              ""
+              "Opera pittorica del Rinascimento italiano",
+              "Questo dipinto evidenzia la padronanza della luce e delle ombre",
+              "La resa dei volti suggerisce un forte realismo"
             ],
             [
-              "",
-              "",
-              ""
+              "Dipinto rinascimentale di grande valore artistico",
+              "L’opera rappresenta una sintesi di tecnica e narrazione",
+              "Il dipinto è considerato un esempio fondamentale della pittura rinascimentale"
             ]
           ]
         },
         {
           "nome": "anfora",
           "stanza": "sala C",
-          "connessi": [],
+          "connessi": [
+            "dipinto"
+          ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Anfora in ceramica con decorazioni geometriche",
+              "Questa anfora presenta motivi semplici ma eleganti",
+              "L’oggetto era probabilmente utilizzato per contenere liquidi"
             ],
             [
-              "",
-              "",
-              ""
+              "Anfora decorata di epoca antica",
+              "Le decorazioni suggeriscono un’origine mediterranea",
+              "La forma è tipica delle anfore utilizzate nell’antichità"
             ],
             [
-              "",
-              "",
-              ""
+              "Anfora antica con motivi ornamentali",
+              "L’anfora mostra segni di lavorazione artigianale",
+              "Le decorazioni raccontano scene simboliche"
             ],
             [
-              "",
-              "",
-              ""
+              "Anfora storica di rilevanza archeologica",
+              "Questo reperto fornisce informazioni sugli usi quotidiani antichi",
+              "L’anfora rappresenta un importante esempio di ceramica storica"
             ]
           ]
         }
@@ -100,23 +107,23 @@
           "descrizioni": [
             [
               "Un grande sarcofago con strani disegni",
-              "Questo sarcofago sembra molto misterioso e antico...",
-              "Nel sarcofago vediamo figure antiche..."
+              "Questo sarcofago sembra molto misterioso e antico",
+              "Nel sarcofago vediamo figure antiche incise sulla superficie"
             ],
             [
               "Sarcofago antico con decorazioni",
-              "Questo sarcofago è decorato con figure...",
-              "Il sarcofago mostra scene di vita antica..."
+              "Questo sarcofago è decorato con figure simboliche",
+              "Il sarcofago mostra scene di vita e rituali antichi"
             ],
             [
               "Sarcofago decorato del periodo egizio",
-              "Un sarcofago del periodo egizio con geroglifici...",
-              "Questo sarcofago egizio presenta scene rituali..."
+              "Un sarcofago del periodo egizio con geroglifici",
+              "Questo sarcofago egizio presenta scene rituali e religiose"
             ],
             [
               "Sarcofago egizio con iconografia funeraria complessa",
-              "Il sarcofago mostra un’iconografia funeraria articolata...",
-              "L’analisi del sarcofago rivela una complessa simbologia..."
+              "Il sarcofago mostra un’iconografia funeraria articolata",
+              "L’analisi del sarcofago rivela una complessa simbologia religiosa"
             ]
           ]
         },
@@ -130,23 +137,23 @@
           "descrizioni": [
             [
               "Collana luccicante con perline colorate",
-              "Questa collana è tutta colorata e scintilla...",
-              "La collana brilla con tanti colori..."
+              "Questa collana è tutta colorata e scintilla",
+              "La collana brilla con tanti colori diversi"
             ],
             [
               "Collana con perle e pietre preziose",
-              "Una collana elegante con perle e pietre...",
-              "La collana ha perle e pietre colorate..."
+              "Una collana elegante con perle e pietre",
+              "La collana ha perle e pietre finemente lavorate"
             ],
             [
               "Collana di epoca rinascimentale",
-              "Una collana rinascimentale con perle e pietre...",
-              "Questa collana rinascimentale mostra l’abilità..."
+              "Una collana rinascimentale con perle e pietre",
+              "Questa collana rinascimentale mostra grande abilità artigianale"
             ],
             [
               "Collana rinascimentale con lavorazione elaborata",
-              "Collana storica rinascimentale, con perle e gemme...",
-              "L’oggetto rappresenta la maestria artigianale rinascimentale..."
+              "Collana storica rinascimentale con perle e gemme",
+              "L’oggetto rappresenta la maestria artigianale del Rinascimento"
             ]
           ]
         },
@@ -159,24 +166,24 @@
           ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Scettro decorato con motivi simbolici",
+              "Questo scettro appare come un oggetto di potere",
+              "Lo scettro è ornato con dettagli raffinati"
             ],
             [
-              "",
-              "",
-              ""
+              "Scettro cerimoniale antico",
+              "L’oggetto era probabilmente usato in cerimonie ufficiali",
+              "La decorazione suggerisce un uso rituale"
             ],
             [
-              "",
-              "",
-              ""
+              "Scettro storico di valore simbolico",
+              "Questo scettro rappresenta l’autorità e il comando",
+              "La forma e i materiali indicano un oggetto prestigioso"
             ],
             [
-              "",
-              "",
-              ""
+              "Scettro cerimoniale di grande rilevanza storica",
+              "Lo scettro è un simbolo di potere politico o religioso",
+              "L’oggetto testimonia l’importanza delle cerimonie ufficiali"
             ]
           ]
         },
@@ -188,24 +195,24 @@
           ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Maschera decorativa con tratti stilizzati",
+              "La maschera presenta un volto fortemente espressivo",
+              "I dettagli suggeriscono un significato simbolico"
             ],
             [
-              "",
-              "",
-              ""
+              "Maschera rituale antica",
+              "Questa maschera potrebbe essere stata usata in rituali",
+              "La lavorazione indica un uso cerimoniale"
             ],
             [
-              "",
-              "",
-              ""
+              "Maschera storica con funzione simbolica",
+              "La maschera rappresenta una figura mitologica",
+              "L’oggetto era probabilmente usato in contesti religiosi"
             ],
             [
-              "",
-              "",
-              ""
+              "Maschera rituale di alto valore culturale",
+              "Questa maschera è un importante reperto antropologico",
+              "L’oggetto fornisce informazioni sulle credenze dell’epoca"
             ]
           ]
         },
@@ -218,24 +225,24 @@
           ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Mummia avvolta in bende antiche",
+              "La mummia è conservata in discrete condizioni",
+              "Le bende mostrano segni di grande antichità"
             ],
             [
-              "",
-              "",
-              ""
+              "Mummia di epoca egizia",
+              "Questa mummia risale probabilmente all’antico Egitto",
+              "Il corpo è stato trattato secondo rituali funerari"
             ],
             [
-              "",
-              "",
-              ""
+              "Mummia egizia ben conservata",
+              "La mummia mostra tecniche avanzate di imbalsamazione",
+              "L’oggetto offre importanti informazioni archeologiche"
             ],
             [
-              "",
-              "",
-              ""
+              "Mummia egizia di straordinario valore storico",
+              "Questo reperto è fondamentale per lo studio dei riti funerari",
+              "La mummia rappresenta una testimonianza unica della civiltà egizia"
             ]
           ]
         }
