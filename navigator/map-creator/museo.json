@@ -1,0 +1,21 @@
+{
+  "nome": "Museo delle Civiltà Perdute",
+
+  "oggetti": [
+    { "nome": "Totem Mesopotamico", "stanza": "Sala A", "connessi": ["Stele Incisa"] },
+    { "nome": "Stele Incisa",       "stanza": "Sala B", "connessi": ["Totem Mesopotamico", "Maschera Funeraria"] },
+    { "nome": "Maschera Funeraria",  "stanza": "Sala C", "connessi": ["Stele Incisa", "Sarcofago"] },
+
+    { "nome": "Sarcofago",           "stanza": "Sala D", "connessi": ["Maschera Funeraria", "Papiro Reale"] },
+    { "nome": "Papiro Reale",        "stanza": "Sala E", "connessi": ["Sarcofago", "Statua Orante"] },
+    { "nome": "Statua Orante",       "stanza": "Sala F", "connessi": ["Papiro Reale", "Elmo Cerimoniale"] },
+
+    { "nome": "Elmo Cerimoniale",    "stanza": "Sala G", "connessi": ["Statua Orante", "Altare Sacro"] },
+    { "nome": "Altare Sacro",        "stanza": "Sala G", "connessi": ["Elmo Cerimoniale"] },
+
+    { "nome": "IN",   "stanza": "IN",   "connessi": [], "visibile": false },
+    { "nome": "WC",   "stanza": "WC",   "connessi": [], "visibile": false },
+    { "nome": "SHOP", "stanza": "SHOP", "connessi": [], "visibile": false },
+    { "nome": "OUT",  "stanza": "OUT",  "connessi": [], "visibile": false }
+  ]
+}
