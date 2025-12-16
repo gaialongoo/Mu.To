@@ -5,70 +5,34 @@ from svg_writer import svg_header, svg_footer, draw
 
 # ============================================================
 # LEGENDA EDGE_MODE / EDGE_FOCUS
+#
+# EDGE_MODE = "all"      → tutte le frecce
+# EDGE_MODE = "none"     → nessuna freccia
+# EDGE_MODE = "services" → solo frecce nere (IN/OUT/WC/SHOP)
+# EDGE_MODE = "path"     → UN SOLO percorso tra due oggetti
+#
+# EDGE_FOCUS serve SOLO con EDGE_MODE = "path"
+#   EDGE_FOCUS = ["Altare Sacro", "OUT"]
 # ============================================================
-#
-# EDGE_MODE controlla QUALI percorsi vengono disegnati nello SVG
-#
-# ───────────────────────────────────────────────────────────
-# EDGE_MODE = "all"
-# ───────────────────────────────────────────────────────────
-# Mostra TUTTE le frecce del museo:
-#   - frecce ROSSE  → connessioni reali tra oggetti
-#   - frecce NERE   → percorsi di servizio (IN / OUT / WC / SHOP)
-#
-# In questa modalità EDGE_FOCUS viene IGNORATO.
-# È utile per:
-#   - debug
-#   - analisi del grafo
-#   - progettazione del layout
-#
-# Esempio:
-#   EDGE_MODE = "all"
-#   EDGE_FOCUS = ["Altare Sacro", "OUT"]  # ignorato
-#
-# ───────────────────────────────────────────────────────────
-# EDGE_MODE = "path"
-# ───────────────────────────────────────────────────────────
-# Mostra UN SOLO percorso minimo tra DUE oggetti specificati
-# in EDGE_FOCUS.
-#
-# EDGE_FOCUS DEVE essere una lista di DUE nomi:
-#   EDGE_FOCUS = ["Oggetto A", "Oggetto B"]
-#
-# Il colore del percorso è:
-#   - ROSSO se entrambi sono oggetti normali
-#   - NERO  se almeno uno è un servizio (IN / OUT / WC / SHOP)
-#
-# Esempi:
-#   EDGE_MODE = "path"
-#   EDGE_FOCUS = ["Altare Sacro", "OUT"]              # percorso nero
-#
-#   EDGE_MODE = "path"
-#   EDGE_FOCUS = ["Altare Sacro", "Totem Mesopotamico"]  # percorso rosso
-#
-# ───────────────────────────────────────────────────────────
-# EDGE_MODE = "services"
-# ───────────────────────────────────────────────────────────
-# Mostra SOLO le frecce nere verso i servizi
-# (IN / OUT / WC / SHOP).
-#
-# EDGE_FOCUS viene ignorato.
-#
-# ───────────────────────────────────────────────────────────
-# EDGE_MODE = "none"
-# ───────────────────────────────────────────────────────────
-# Non mostra NESSUNA freccia.
-# Solo stanze, corridoi e oggetti.
-#
-# ============================================================
+
 EDGE_MODE = "path"
-EDGE_FOCUS = ["Altare Sacro", "OUT"]
+EDGE_FOCUS = ["mummia", "collana"]
+# EDGE_MODE = "path"
+# EDGE_FOCUS = ["Altare Sacro", "OUT"]
+
+# ------------------------------------------------------------
+# CARICAMENTO JSON
+# ------------------------------------------------------------
 
 with open("layout.json") as f:
     layout = json.load(f)
 
 with open("museo.json") as f:
     data = json.load(f)
+
+# ------------------------------------------------------------
+# CREAZIONE STANZE
+# ------------------------------------------------------------
 
 stanze = {}
 for nome, info in layout["grid"].items():
@@ -78,27 +42,69 @@ for nome, info in layout["grid"].items():
     s.tipo = info.get("tipo", "normale")
     stanze[nome] = s
 
+# ------------------------------------------------------------
+# CREAZIONE OGGETTI REALI (solo museo.json)
+# ------------------------------------------------------------
+
 oggetti = []
+
 for o in data["oggetti"]:
+    if o["stanza"] not in stanze:
+        raise ValueError(f"Stanza '{o['stanza']}' non definita in layout.json")
+
     s = stanze[o["stanza"]]
     obj = Oggetto(o["nome"], s, o["connessi"])
     obj.visibile = o.get("visibile", True)
     s.oggetti.append(obj)
     oggetti.append(obj)
 
+# ------------------------------------------------------------
+# CREAZIONE AUTOMATICA OGGETTI DI SERVIZIO
+# (IN / OUT / WC / SHOP)
+# ------------------------------------------------------------
+
+for s in stanze.values():
+    if s.tipo in ("ingresso", "uscita", "bagno", "servizio"):
+        obj = Oggetto(s.nome, s, [])
+        obj.visibile = False
+        s.oggetti.append(obj)
+        oggetti.append(obj)
+
+# ------------------------------------------------------------
+# LAYOUT STANZE + CORRIDOI
+# ------------------------------------------------------------
+
 corridoi = build_layout(list(stanze.values()))
+
+# ------------------------------------------------------------
+# CENTRA OGGETTI DI SERVIZIO NELLA STANZA
+# ------------------------------------------------------------
 
 for o in oggetti:
     if o.stanza.tipo in ("ingresso", "uscita", "bagno", "servizio"):
         s = o.stanza
-        o.pos = (s.x + s.w/2, s.y + s.h/2)
+        o.pos = (s.x + s.w / 2, s.y + s.h / 2)
+
+# ------------------------------------------------------------
+# DIMENSIONI SVG
+# ------------------------------------------------------------
 
 w = max(s.x + s.w for s in stanze.values()) + 200
 h = max(s.y + s.h for s in stanze.values()) + 200
 
+# ------------------------------------------------------------
+# GENERAZIONE SVG
+# ------------------------------------------------------------
+
 svg = svg_header(data["nome"], w, h)
-svg = draw(svg, list(stanze.values()), corridoi, oggetti,
-           edge_mode=EDGE_MODE, edge_focus=EDGE_FOCUS)
+svg = draw(
+    svg,
+    list(stanze.values()),
+    corridoi,
+    oggetti,
+    edge_mode=EDGE_MODE,
+    edge_focus=EDGE_FOCUS
+)
 svg += svg_footer()
 
 with open("museo.svg", "w") as f:

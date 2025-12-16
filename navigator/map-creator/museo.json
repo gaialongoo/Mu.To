@@ -1,21 +1,154 @@
 {
-  "nome": "Museo delle Civiltà Perdute",
-
-  "oggetti": [
-    { "nome": "Totem Mesopotamico", "stanza": "Sala A", "connessi": ["Stele Incisa"] },
-    { "nome": "Stele Incisa",       "stanza": "Sala B", "connessi": ["Totem Mesopotamico", "Maschera Funeraria"] },
-    { "nome": "Maschera Funeraria",  "stanza": "Sala C", "connessi": ["Stele Incisa", "Sarcofago"] },
-
-    { "nome": "Sarcofago",           "stanza": "Sala D", "connessi": ["Maschera Funeraria", "Papiro Reale"] },
-    { "nome": "Papiro Reale",        "stanza": "Sala E", "connessi": ["Sarcofago", "Statua Orante"] },
-    { "nome": "Statua Orante",       "stanza": "Sala F", "connessi": ["Papiro Reale", "Elmo Cerimoniale"] },
-
-    { "nome": "Elmo Cerimoniale",    "stanza": "Sala G", "connessi": ["Statua Orante", "Altare Sacro"] },
-    { "nome": "Altare Sacro",        "stanza": "Sala G", "connessi": ["Elmo Cerimoniale"] },
-
-    { "nome": "IN",   "stanza": "IN",   "connessi": [], "visibile": false },
-    { "nome": "WC",   "stanza": "WC",   "connessi": [], "visibile": false },
-    { "nome": "SHOP", "stanza": "SHOP", "connessi": [], "visibile": false },
-    { "nome": "OUT",  "stanza": "OUT",  "connessi": [], "visibile": false }
-  ]
-}
+      "nome": "Museo di Torino",
+      "citta": "Torino",
+      "oggetti": [
+        {
+          "nome": "sarcofago",
+          "stanza": "stanza 1",
+          "connessi": [
+            "mummia"
+          ],
+          "descrizioni": [
+            [
+              "Un grande sarcofago con strani disegni",
+              "Questo sarcofago sembra molto misterioso e antico...",
+              "Nel sarcofago vediamo figure antiche..."
+            ],
+            [
+              "Sarcofago antico con decorazioni",
+              "Questo sarcofago è decorato con figure...",
+              "Il sarcofago mostra scene di vita antica..."
+            ],
+            [
+              "Sarcofago decorato del periodo egizio",
+              "Un sarcofago del periodo egizio con geroglifici...",
+              "Questo sarcofago egizio presenta scene rituali..."
+            ],
+            [
+              "Sarcofago egizio con iconografia funeraria complessa",
+              "Il sarcofago mostra un’iconografia funeraria articolata...",
+              "L’analisi del sarcofago rivela una complessa simbologia..."
+            ]
+          ]
+        },
+        {
+          "nome": "collana",
+          "stanza": "stanza 2",
+          "connessi": [
+            "mummia",
+            "scettro"
+          ],
+          "descrizioni": [
+            [
+              "Collana luccicante con perline colorate",
+              "Questa collana è tutta colorata e scintilla...",
+              "La collana brilla con tanti colori..."
+            ],
+            [
+              "Collana con perle e pietre preziose",
+              "Una collana elegante con perle e pietre...",
+              "La collana ha perle e pietre colorate..."
+            ],
+            [
+              "Collana di epoca rinascimentale",
+              "Una collana rinascimentale con perle e pietre...",
+              "Questa collana rinascimentale mostra l’abilità..."
+            ],
+            [
+              "Collana rinascimentale con lavorazione elaborata",
+              "Collana storica rinascimentale, con perle e gemme...",
+              "L’oggetto rappresenta la maestria artigianale rinascimentale..."
+            ]
+          ]
+        },
+        {
+          "nome": "scettro",
+          "stanza": "stanza 2",
+          "connessi": [
+            "collana",
+            "maschera"
+          ],
+          "descrizioni": [
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ]
+          ]
+        },
+        {
+          "nome": "maschera",
+          "stanza": "stanza 3",
+          "connessi": [
+            "scettro"
+          ],
+          "descrizioni": [
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ]
+          ]
+        },
+        {
+          "nome": "mummia",
+          "stanza": "stanza 1",
+          "connessi": [
+            "sarcofago",
+            "collana"
+          ],
+          "descrizioni": [
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ]
+          ]
+        }
+      ]
+    }

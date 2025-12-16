@@ -1,20 +1,42 @@
 {
   "grid": {
-    "IN":      { "row": 0, "col": 1, "tipo": "ingresso" },
+    "IN": {
+      "row": 0,
+      "col": 1,
+      "tipo": "ingresso"
+    },
 
-    "Sala A":  { "row": 1, "col": 0 },
-    "Sala B":  { "row": 1, "col": 1 },
-    "Sala C":  { "row": 1, "col": 2 },
+    "stanza 1": {
+      "row": 1,
+      "col": 1
+    },
 
-    "Sala D":  { "row": 2, "col": 0 },
-    "Sala E":  { "row": 2, "col": 1 },
-    "Sala F":  { "row": 2, "col": 2 },
+    "stanza 2": {
+      "row": 2,
+      "col": 1
+    },
 
-    "Sala G":  { "row": 3, "col": 1 },
+    "stanza 3": {
+      "row": 3,
+      "col": 1
+    },
 
-    "WC":      { "row": 2, "col": 3, "tipo": "bagno" },
-    "SHOP":    { "row": 3, "col": 2, "tipo": "servizio" },
+    "WC": {
+      "row": 2,
+      "col": 2,
+      "tipo": "bagno"
+    },
 
-    "OUT":     { "row": 4, "col": 1, "tipo": "uscita" }
+    "SHOP": {
+      "row": 3,
+      "col": 2,
+      "tipo": "servizio"
+    },
+
+    "OUT": {
+      "row": 4,
+      "col": 1,
+      "tipo": "uscita"
+    }
   }
 }

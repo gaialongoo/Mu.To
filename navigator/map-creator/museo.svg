@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 1540 1780" width="1540" height="1780">
+    viewBox="0 0 1200 1780" width="1200" height="1780">
   <defs>
     <style>
       .stanza { fill:#fff; stroke:#2c3e50; stroke-width:3; }
@@ -45,53 +45,33 @@
 
 <rect x="440" y="120" width="220" height="180" rx="8" class="stanza ingresso"/>
 <text x="550.0" y="114" class="stanza-label" text-anchor="middle">IN</text>
-<rect x="100" y="440" width="220" height="180" rx="8" class="stanza"/>
-<text x="210.0" y="434" class="stanza-label" text-anchor="middle">Sala A</text>
 <rect x="440" y="440" width="220" height="180" rx="8" class="stanza"/>
-<text x="550.0" y="434" class="stanza-label" text-anchor="middle">Sala B</text>
-<rect x="780" y="440" width="220" height="180" rx="8" class="stanza"/>
-<text x="890.0" y="434" class="stanza-label" text-anchor="middle">Sala C</text>
-<rect x="100" y="760" width="220" height="180" rx="8" class="stanza"/>
-<text x="210.0" y="754" class="stanza-label" text-anchor="middle">Sala D</text>
+<text x="550.0" y="434" class="stanza-label" text-anchor="middle">stanza 1</text>
 <rect x="440" y="760" width="220" height="180" rx="8" class="stanza"/>
-<text x="550.0" y="754" class="stanza-label" text-anchor="middle">Sala E</text>
-<rect x="780" y="760" width="220" height="180" rx="8" class="stanza"/>
-<text x="890.0" y="754" class="stanza-label" text-anchor="middle">Sala F</text>
+<text x="550.0" y="754" class="stanza-label" text-anchor="middle">stanza 2</text>
 <rect x="440" y="1080" width="220" height="180" rx="8" class="stanza"/>
-<text x="550.0" y="1074" class="stanza-label" text-anchor="middle">Sala G</text>
-<rect x="1120" y="760" width="220" height="180" rx="8" class="stanza bagno"/>
-<text x="1230.0" y="754" class="stanza-label" text-anchor="middle">WC</text>
+<text x="550.0" y="1074" class="stanza-label" text-anchor="middle">stanza 3</text>
+<rect x="780" y="760" width="220" height="180" rx="8" class="stanza bagno"/>
+<text x="890.0" y="754" class="stanza-label" text-anchor="middle">WC</text>
 <rect x="780" y="1080" width="220" height="180" rx="8" class="stanza servizio"/>
 <text x="890.0" y="1074" class="stanza-label" text-anchor="middle">SHOP</text>
 <rect x="440" y="1400" width="220" height="180" rx="8" class="stanza uscita"/>
 <text x="550.0" y="1394" class="stanza-label" text-anchor="middle">OUT</text>
 <rect x="530.0" y="300" width="40" height="140" class="corridoio"/>
-<rect x="320" y="510.0" width="120" height="40" class="corridoio"/>
-<rect x="190.0" y="620" width="40" height="140" class="corridoio"/>
-<rect x="660" y="510.0" width="120" height="40" class="corridoio"/>
 <rect x="530.0" y="620" width="40" height="140" class="corridoio"/>
-<rect x="870.0" y="620" width="40" height="140" class="corridoio"/>
-<rect x="320" y="830.0" width="120" height="40" class="corridoio"/>
 <rect x="660" y="830.0" width="120" height="40" class="corridoio"/>
 <rect x="530.0" y="940" width="40" height="140" class="corridoio"/>
-<rect x="1000" y="830.0" width="120" height="40" class="corridoio"/>
-<rect x="870.0" y="940" width="40" height="140" class="corridoio"/>
 <rect x="660" y="1150.0" width="120" height="40" class="corridoio"/>
 <rect x="530.0" y="1260" width="40" height="140" class="corridoio"/>
-<circle cx="264.0" cy="530.0" r="10" class="oggetto"/>
-<text x="264.0" y="533.0" class="oggetto-label">Totem Mesopotamico</text>
+<rect x="870.0" y="940" width="40" height="140" class="corridoio"/>
 <circle cx="604.0" cy="530.0" r="10" class="oggetto"/>
-<text x="604.0" y="533.0" class="oggetto-label">Stele Incisa</text>
-<circle cx="944.0" cy="530.0" r="10" class="oggetto"/>
-<text x="944.0" y="533.0" class="oggetto-label">Maschera Funeraria</text>
-<circle cx="264.0" cy="850.0" r="10" class="oggetto"/>
-<text x="264.0" y="853.0" class="oggetto-label">Sarcofago</text>
+<text x="604.0" y="533.0" class="oggetto-label">sarcofago</text>
 <circle cx="604.0" cy="850.0" r="10" class="oggetto"/>
-<text x="604.0" y="853.0" class="oggetto-label">Papiro Reale</text>
-<circle cx="944.0" cy="850.0" r="10" class="oggetto"/>
-<text x="944.0" y="853.0" class="oggetto-label">Statua Orante</text>
+<text x="604.0" y="853.0" class="oggetto-label">collana</text>
+<circle cx="496.0" cy="850.0" r="10" class="oggetto"/>
+<text x="496.0" y="853.0" class="oggetto-label">scettro</text>
 <circle cx="604.0" cy="1170.0" r="10" class="oggetto"/>
-<text x="604.0" y="1173.0" class="oggetto-label">Elmo Cerimoniale</text>
-<circle cx="496.0" cy="1170.0" r="10" class="oggetto"/>
-<text x="496.0" y="1173.0" class="oggetto-label">Altare Sacro</text>
-<path d="M 496.0 1170.0 L 550.0 1260.0 L 550.0 1330.0 L 550.0 1400.0 L 550.0 1490.0" class="conn-obj-debug"/></svg>
+<text x="604.0" y="1173.0" class="oggetto-label">maschera</text>
+<circle cx="496.0" cy="530.0" r="10" class="oggetto"/>
+<text x="496.0" y="533.0" class="oggetto-label">mummia</text>
+<path d="M 496.0 530.0 L 550.0 620.0 L 550.0 690.0 L 550.0 760.0 L 604.0 850.0" class="conn-obj"/></svg>
