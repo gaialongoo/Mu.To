@@ -1,0 +1,142 @@
+/* =========================
+   RESET + MOBILE SAFE AREA
+   ========================= */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0f1115;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* =========================
+   APP LAYOUT
+   ========================= */
+
+.app-root {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* iOS safe areas */
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* card centrale */
+.viewer-shell {
+  width: min(96vw, 460px);
+  height: min(92svh, 820px);
+
+  background: #ffffff;
+  border-radius: 22px;
+
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+
+  overflow: hidden;
+  display: flex;
+}
+
+/* desktop: più grande */
+@media (min-width: 900px) {
+  .viewer-shell {
+    width: min(80vw, 900px);
+    height: min(85vh, 800px);
+  }
+}
+
+/* =========================
+   SVG HOST
+   ========================= */
+
+#svg-host {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #f7f8fa;
+}
+
+/* SVG */
+#svg-host svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  /* Safari / WebKit */
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* =========================
+   STANZE / CORRIDOI
+   ========================= */
+
+rect.stanza {
+  transition: opacity 0.25s ease;
+}
+
+rect.corridoio {
+  opacity: 0.08;
+}
+
+/* =========================
+   FRECCE (UNICODE)
+   ========================= */
+
+#nav-layer text {
+  font-size: 26px;
+  font-weight: 700;
+  fill: #111;
+  cursor: pointer;
+
+  /* touch feedback */
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* il testo resta pulito: niente transform qui */
+.nav-arrow-img {
+  cursor: pointer;
+}
+
+.nav-arrow-group:hover .nav-arrow-img {
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.35));
+}
+
+/* Se vuoi feedback al click senza muovere/ruotare */
+.nav-arrow-group:active .nav-arrow-img {
+  filter: drop-shadow(0 0 10px rgba(0,0,0,0.45));
+}
+
+
+
+#nav-layer text:active {
+  transform: scale(0.9);
+  opacity: 0.6;
+}
+
+/* =========================
+   MOBILE POLISH
+   ========================= */
+
+@media (hover: hover) {
+  #nav-layer text:hover {
+    transform: scale(1.15);
+  }
+}

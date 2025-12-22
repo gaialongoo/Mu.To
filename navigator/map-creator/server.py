@@ -1,4 +1,5 @@
 from flask import Flask, Response, jsonify
+from flask_cors import CORS, cross_origin
 import json
 import requests
 import sys
@@ -18,7 +19,7 @@ from svg_writer import svg_header, svg_footer, draw
 # CONFIG
 # ============================================================
 
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 3001
 
 JSON_SERVER = "https://127.0.0.1:3000"
@@ -138,7 +139,7 @@ wait_for_node_server()
 # ============================================================
 
 app = Flask(__name__)
-
+CORS(app)
 log(f"SVG SERVER avviato su http://{HOST}:{PORT}")
 log(f"JSON SERVER -> {JSON_SERVER}")
 
@@ -220,9 +221,14 @@ def favicon():
     return "", 204
 
 
-@app.route("/<nome_museo>", defaults={"edge_mode": None, "f1": None, "f2": None})
-@app.route("/<nome_museo>/<edge_mode>", defaults={"f1": None, "f2": None})
-@app.route("/<nome_museo>/<edge_mode>/<f1>/<f2>")
+@app.route("/<nome_museo>", defaults={"edge_mode": None, "f1": None, "f2": None}, methods=["GET", "OPTIONS"])
+@app.route("/<nome_museo>/<edge_mode>", defaults={"f1": None, "f2": None}, methods=["GET", "OPTIONS"])
+@app.route("/<nome_museo>/<edge_mode>/<f1>/<f2>", methods=["GET", "OPTIONS"])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "X-API-KEY"],
+    methods=["GET", "OPTIONS"]
+)
 def museo_svg(nome_museo, edge_mode, f1, f2):
     edge_mode = edge_mode or EDGE_MODE_DEFAULT
     edge_focus = [f1, f2] if f1 and f2 else EDGE_FOCUS_DEFAULT
@@ -264,4 +270,4 @@ def museo_svg(nome_museo, edge_mode, f1, f2):
 # ============================================================
 
 if __name__ == "__main__":
-    app.run(host=HOST, port=PORT, debug=True)
+    app.run(host=HOST, port=PORT, debug=False)
