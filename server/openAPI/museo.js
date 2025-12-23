@@ -7,7 +7,10 @@ class Museo {
     this.citta = citta;
     this.mappa_oggetti = new Graph();
     this.oggetti = new Map();
+
+    this.percorsi = [];
   }
+
 
   aggiungi_oggetto(oggetto) {
     this.oggetti.set(oggetto.nome, oggetto);

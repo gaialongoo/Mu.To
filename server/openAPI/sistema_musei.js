@@ -7,12 +7,18 @@ class SistemaMusei {
   }
 
   aggiungi_museo(museoData) {
-    const museo = new Museo(museoData.nome, museoData.citta);
-    for (const oggetto of museoData.oggetti || []) {
-      museo.aggiungi_oggetto(oggetto);
-    }
-    this.musei.set(museo.nome, museo);
+  const museo = new Museo(museoData.nome, museoData.citta);
+
+  // ✅ FIX: carica i percorsi dal JSON
+  museo.percorsi = museoData.percorsi || [];
+
+  for (const oggetto of museoData.oggetti || []) {
+    museo.aggiungi_oggetto(oggetto);
   }
+
+  this.musei.set(museo.nome, museo);
+}
+
 
   get_museo(nome) {
     return this.musei.get(nome) || null;
@@ -36,8 +42,10 @@ class SistemaMusei {
           stanza: ogg.stanza,
           connessi: ogg.connessi || [],
           descrizioni: ogg.descrizioni || []
-        }))
+        })),
+        percorsi: museo.percorsi || []
       };
+
       jsonMusei.push(museoJson);
     }
     return { musei: jsonMusei };

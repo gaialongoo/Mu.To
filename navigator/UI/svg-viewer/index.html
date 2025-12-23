@@ -1,13 +1,248 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>svg-viewer</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mu.To – Navigator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 40px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    select, input, button {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ================= BOOTSTRAP SCELTA MUSEO + PERCORSO ================= -->
+  <div id="bootstrap">
+    <h1>Seleziona museo e percorso</h1>
+
+    <div class="box">
+      <label for="museo">Museo</label>
+      <select id="museo">
+        <option value="">— seleziona museo —</option>
+      </select>
+
+      <label for="percorso">Percorso</label>
+      <select id="percorso" disabled>
+        <option value="">— seleziona percorso —</option>
+      </select>
+
+      <button id="apri">Apri</button>
+    </div>
+  </div>
+
+  <!-- ================= ROOT REACT ================= -->
+  <div id="root" class="hidden"></div>
+
+  <script>
+    /* ============================================================
+       COOKIE SESSION
+       ============================================================ */
+
+    const COOKIE_NAME = "museo_session";
+    const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
+
+    function setSession(session, days = 1) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie =
+        COOKIE_NAME + "=" + encodeURIComponent(JSON.stringify(session)) +
+        "; expires=" + expires + "; path=/; SameSite=Lax";
+    }
+
+    function getSession() {
+      const match = document.cookie.match(
+        new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)")
+      );
+      if (!match) return null;
+      try {
+        return JSON.parse(decodeURIComponent(match[2]));
+      } catch {
+        return null;
+      }
+    }
+
+    function isSessionValid(session) {
+      if (!session) return false;
+      if (typeof session.museo !== "string" || !session.museo) return false;
+      if (!Array.isArray(session.percorso) || session.percorso.length < 2) return false;
+      if (!session.createdAt) return false;
+
+      const age = Date.now() - session.createdAt;
+      return age >= 0 && age <= SESSION_MAX_AGE;
+    }
+
+    function clearSession() {
+      document.cookie =
+        COOKIE_NAME + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+    }
+
+    /* ============================================================
+       BOOTSTRAP LOGIC
+       ============================================================ */
+
+    const API_BASE = "https://localhost:3000";
+
+    const bootstrap = document.getElementById("bootstrap");
+    const root = document.getElementById("root");
+
+    const museoSelect = document.getElementById("museo");
+    const percorsoSelect = document.getElementById("percorso");
+    const btnApri = document.getElementById("apri");
+
+    const session = getSession();
+
+    if (isSessionValid(session)) {
+      // 👉 sessione valida → carica subito React
+      bootstrap.remove();
+      root.classList.remove("hidden");
+
+      const script = document.createElement("script");
+      script.type = "module";
+      script.src = "/src/main.tsx";
+      document.body.appendChild(script);
+
+    } else {
+      // 👉 sessione assente/scaduta → scelta museo + percorso
+      clearSession();
+
+      // Carica musei
+      fetch(`${API_BASE}/musei`)
+        .then(r => r.json())
+        .then(data => {
+          museoSelect.innerHTML = '<option value="">— seleziona museo —</option>';
+          data.musei.forEach(nome => {
+            const opt = document.createElement("option");
+            opt.value = nome;
+            opt.textContent = nome;
+            museoSelect.appendChild(opt);
+          });
+        })
+        .catch(() => alert("Errore caricamento musei"));
+
+      // Quando cambia museo → carica percorsi
+      museoSelect.addEventListener("change", () => {
+        const museo = museoSelect.value;
+
+        percorsoSelect.innerHTML = '<option value="">— seleziona percorso —</option>';
+        percorsoSelect.disabled = true;
+
+        if (!museo) return;
+
+        fetch(`${API_BASE}/musei/${encodeURIComponent(museo)}/percorsi`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.percorsi || data.percorsi.length === 0) {
+              const opt = document.createElement("option");
+              opt.value = "";
+              opt.textContent = "— nessun percorso disponibile —";
+              percorsoSelect.appendChild(opt);
+              return;
+            }
+
+            data.percorsi.forEach(p => {
+              const opt = document.createElement("option");
+              opt.value = p.nome;
+              opt.textContent = p.nome;
+              percorsoSelect.appendChild(opt);
+            });
+
+            percorsoSelect.disabled = false;
+          })
+          .catch(() => alert("Errore caricamento percorsi"));
+      });
+
+      // Click Apri
+      btnApri.addEventListener("click", () => {
+        const museo = museoSelect.value;
+        const percorso = percorsoSelect.value;
+
+        if (!museo || !percorso) {
+          alert("Seleziona museo e percorso");
+          return;
+        }
+
+        clearSession();
+
+        fetch(
+          `${API_BASE}/musei/${encodeURIComponent(museo)}` +
+          `/percorsi/${encodeURIComponent(percorso)}`
+        )
+
+        .then(r => r.json())
+        .then(data => {
+          if (!Array.isArray(data.oggetti)) {
+            throw new Error("Formato percorso non valido");
+          }
+
+          const percorsoCompleto = [
+            "IN",
+            ...data.oggetti,
+            "OUT"
+          ];
+
+          setSession({
+            museo,
+            percorso: percorsoCompleto,
+            createdAt: Date.now()
+          });
+
+          // 👉 passa al navigator SENZA reload
+          bootstrap.remove();
+  root.classList.remove("hidden");
+
+
+            const script = document.createElement("script");
+            script.type = "module";
+            script.src = "/src/main.tsx";
+            document.body.appendChild(script);
+          })
+          .catch(() => {
+            alert("Errore caricamento percorso");
+          });
+      });
+
+
+    }
+  </script>
+
+</body>
 </html>

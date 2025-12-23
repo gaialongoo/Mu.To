@@ -92,6 +92,30 @@
             ]
           ]
         }
+      ],
+      "percorsi": [
+        {
+          "nome": "Percorso rapido",
+          "oggetti": [
+            "statua",
+            "dipinto"
+          ]
+        },
+        {
+          "nome": "Percorso completo",
+          "oggetti": [
+            "statua",
+            "dipinto",
+            "anfora"
+          ]
+        },
+        {
+          "nome": "Percorso archeologico",
+          "oggetti": [
+            "dipinto",
+            "anfora"
+          ]
+        }
       ]
     },
     {
@@ -244,6 +268,41 @@
               "Questo reperto è fondamentale per lo studio dei riti funerari",
               "La mummia rappresenta una testimonianza unica della civiltà egizia"
             ]
+          ]
+        }
+      ],
+      "percorsi": [
+        {
+          "nome": "Percorso essenziale",
+          "oggetti": [
+            "sarcofago",
+            "mummia"
+          ]
+        },
+        {
+          "nome": "Percorso egizio",
+          "oggetti": [
+            "sarcofago",
+            "mummia",
+            "collana"
+          ]
+        },
+        {
+          "nome": "Percorso del potere",
+          "oggetti": [
+            "collana",
+            "scettro",
+            "maschera"
+          ]
+        },
+        {
+          "nome": "Percorso completo",
+          "oggetti": [
+            "sarcofago",
+            "mummia",
+            "collana",
+            "scettro",
+            "maschera"
           ]
         }
       ]

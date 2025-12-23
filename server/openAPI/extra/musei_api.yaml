@@ -1,13 +1,16 @@
 openapi: 3.0.3
+
 info:
   title: Sistema Musei API
   description: API completa per consultare, creare, aggiornare e cancellare musei e oggetti
-  version: 2.0.0
+  version: 2.1.0
+
 servers:
   - url: http://localhost:3000
     description: Server locale di sviluppo
 
 paths:
+
   /musei:
     get:
       summary: Lista dei musei
@@ -25,6 +28,7 @@ paths:
                     items:
                       type: string
                     example: ["Uffizi", "Museo Egizio", "Museo di Torino"]
+
     post:
       summary: Crea un nuovo museo
       description: Aggiunge un nuovo museo al sistema
@@ -63,25 +67,22 @@ paths:
                           type: array
                           items:
                             type: string
+                percorsi:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      oggetti:
+                        type: array
+                        items:
+                          type: string
       responses:
         '201':
           description: Museo creato con successo
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '400':
           description: Errore nei dati inviati o museo già esistente
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
 
   /musei/{nome_museo}:
     get:
@@ -124,15 +125,21 @@ paths:
                             type: array
                             items:
                               type: string
+                  percorsi:
+                    type: array
+                    description: Percorsi statici del museo
+                    items:
+                      type: object
+                      properties:
+                        nome:
+                          type: string
+                        oggetti:
+                          type: array
+                          items:
+                            type: string
         '404':
           description: Museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+
     put:
       summary: Aggiorna un museo
       description: Modifica i dati di un museo esistente
@@ -156,22 +163,9 @@ paths:
       responses:
         '200':
           description: Museo aggiornato con successo
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '404':
           description: Museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+
     delete:
       summary: Cancella un museo
       description: Rimuove un museo e tutti i suoi oggetti
@@ -184,22 +178,8 @@ paths:
       responses:
         '200':
           description: Museo eliminato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '404':
           description: Museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
 
   /musei/{nome_museo}/oggetti:
     post:
@@ -237,31 +217,10 @@ paths:
       responses:
         '201':
           description: Oggetto aggiunto
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '400':
           description: Oggetto già esistente o dati mancanti
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
         '404':
           description: Museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
 
   /musei/{nome_museo}/oggetti/{oggetto}:
     get:
@@ -302,13 +261,7 @@ paths:
                         type: string
         '404':
           description: Oggetto o museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+
     put:
       summary: Aggiorna un oggetto
       description: Modifica un oggetto esistente
@@ -347,22 +300,9 @@ paths:
       responses:
         '200':
           description: Oggetto aggiornato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '404':
           description: Oggetto o museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+
     delete:
       summary: Cancella un oggetto
       description: Rimuove un oggetto da un museo
@@ -380,22 +320,8 @@ paths:
       responses:
         '200':
           description: Oggetto eliminato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '404':
           description: Oggetto o museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
 
   /musei/{nome_museo}/percorso:
     get:
@@ -412,7 +338,94 @@ paths:
           required: true
           schema:
             type: string
-          description: 'Lista di oggetti separati da virgola, es: "T-Rex,Velociraptor,Triceratopo"'
+      responses:
+        '200':
+          description: Percorso trovato
+        '400':
+          description: Parametri query mancanti
+        '404':
+          description: Percorso non trovato o museo non trovato
+
+  /musei/{nome_museo}/percorsi:
+    get:
+      summary: Lista dei percorsi
+      description: Ritorna tutti i percorsi statici del museo
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista percorsi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsi:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nome:
+                          type: string
+                        oggetti:
+                          type: array
+                          items:
+                            type: string
+        '404':
+          description: Museo non trovato
+
+    post:
+      summary: Crea un nuovo percorso
+      description: Aggiunge un percorso statico a un museo
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nome
+                - oggetti
+              properties:
+                nome:
+                  type: string
+                oggetti:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Percorso creato
+        '400':
+          description: Percorso già esistente o dati non validi
+        '404':
+          description: Museo non trovato
+
+  /musei/{nome_museo}/percorsi/{nome_percorso}:
+    get:
+      summary: Dettagli di un percorso
+      description: Ritorna i dettagli di un percorso specifico
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: nome_percorso
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Percorso trovato
@@ -421,41 +434,31 @@ paths:
               schema:
                 type: object
                 properties:
-                  percorso:
+                  nome:
+                    type: string
+                  oggetti:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        nome:
-                          type: string
-                        stanza:
-                          type: string
-                        connessi:
-                          type: array
-                          items:
-                            type: string
-                        descrizioni:
-                          type: array
-                          items:
-                            type: array
-                            items:
-                              type: string
-        '400':
-          description: Parametri query mancanti
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                      type: string
         '404':
-          description: Percorso non trovato o museo non trovato
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          description: Museo o percorso non trovato
 
+    delete:
+      summary: Cancella un percorso
+      description: Elimina un percorso da un museo
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: nome_percorso
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Percorso eliminato
+        '404':
+          description: Museo o percorso non trovato

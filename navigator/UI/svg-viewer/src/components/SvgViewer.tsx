@@ -1,9 +1,43 @@
 import { useEffect, useState } from "react";
 
+/* ===================== SESSION / COOKIE ===================== */
+
+const COOKIE_NAME = "museo_session";
+const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
+
+type Session = {
+  museo: string;
+  percorso: string[];
+  createdAt: number;
+};
+
+function getSession(): Session | null {
+  const match = document.cookie.match(
+    new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)")
+  );
+  if (!match) return null;
+
+  try {
+    return JSON.parse(decodeURIComponent(match[2]));
+  } catch {
+    return null;
+  }
+}
+
+function isSessionValid(session: Session | null): session is Session {
+  if (!session) return false;
+  if (typeof session.museo !== "string") return false;
+  if (!Array.isArray(session.percorso)) return false;
+  if (session.percorso.length < 2) return false;
+  if (!session.createdAt) return false;
+
+  const age = Date.now() - session.createdAt;
+  return age >= 0 && age <= SESSION_MAX_AGE;
+}
+
 /* ===================== CONFIG ===================== */
 
-const BASE_SVG_URL = "http://192.168.1.119:3001/Museo%20di%20Torino";
-const DEFAULT_STANZA = "IN";
+const SVG_SERVER_BASE = "http://192.168.1.119:3001";
 
 /* ===================== TYPES ===================== */
 
@@ -28,40 +62,48 @@ type Link = {
   corridor: Corridor;
 };
 
-/* ===================== URL → SVG ===================== */
-
-function computeSvgUrlFromLocation(): string {
-  const raw = new URLSearchParams(window.location.search).get("stanza");
-  if (!raw) return BASE_SVG_URL;
-
-  const decoded = decodeURIComponent(raw.replace(/\+/g, " "));
-  const parts = decoded.split("/").map((p) => p.trim());
-  const extraPath = parts.slice(1).join("/");
-
-  return extraPath ? `${BASE_SVG_URL}/${extraPath}` : BASE_SVG_URL;
-}
-
 /* ===================== COMPONENT ===================== */
 
 export default function SvgViewer() {
-  const [svgUrl, setSvgUrl] = useState(() =>
-    computeSvgUrlFromLocation()
-  );
+  const [session, setSession] = useState<Session | null>(null);
 
+  // 🔒 carica la sessione
   useEffect(() => {
-    ensureDefaultStanza();
+    const s = getSession();
+    console.log("SESSIONE LETTA DA REACT:", s);
 
+    if (isSessionValid(s)) {
+      setSession(s);
+    }
+  }, []);
+
+  // 🔒 carica SVG
+  useEffect(() => {
+    if (!session) return;
+
+    const svgUrl = `${SVG_SERVER_BASE}/${encodeURIComponent(session.museo)}`;
+    loadSvg(svgUrl);
+  }, [session]);
+  
+  // 🔒 gestisci cambio stanza via popstate
+  useEffect(() => {
+    if (!session) return;
+    
+    ensureDefaultStanza(session);
+    
     const onPop = () => {
-      setSvgUrl(computeSvgUrlFromLocation());
+      const host = document.getElementById("svg-host");
+      const svg = host?.querySelector("svg") as SVGSVGElement | null;
+      if (svg) renderNavigation(svg);
     };
 
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [session]);
 
-  useEffect(() => {
-    loadSvg(svgUrl);
-  }, [svgUrl]);
+  if (!session) {
+    return <div style={{ padding: 20 }}>Caricamento…</div>;
+  }
 
   return (
     <div
@@ -91,20 +133,6 @@ function loadSvg(url: string) {
       const svg = host.querySelector("svg") as SVGSVGElement | null;
       if (!svg) return;
 
-      const ORIGINAL_VIEWBOX =
-        svg.getAttribute("viewBox") ?? "0 0 1200 1780";
-
-      /* ---------- STILE FRECCE (SVG-NATIVE) ---------- */
-
-      const style = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "style"
-      );
-
-      svg.appendChild(style);
-
-      /* ---------- LAYER NAV (SOPRA TUTTO) ---------- */
-
       const navLayer = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "g"
@@ -112,37 +140,7 @@ function loadSvg(url: string) {
       navLayer.setAttribute("id", "nav-layer");
       svg.appendChild(navLayer);
 
-      const rooms = extractRooms(svg);
-      const corridors = extractCorridors(svg);
-
-      function render() {
-        navLayer.innerHTML = "";
-
-        const raw = new URLSearchParams(window.location.search).get("stanza");
-        if (!raw) {
-          svg.setAttribute("viewBox", ORIGINAL_VIEWBOX);
-          return;
-        }
-
-        const decoded = decodeURIComponent(raw.replace(/\+/g, " "));
-        const stanza = decoded.split("/")[0];
-
-        const current = rooms.find(
-          (r) => normalize(r.label) === normalize(stanza)
-        );
-        if (!current) return;
-
-        zoomToRect(svg, current.rect, 60);
-
-        const links = computeLinks(current, rooms, corridors);
-        for (const l of links) {
-          drawArrowText(navLayer, l);
-        }
-        svg.appendChild(navLayer);
-      }
-
-      render();
-      window.addEventListener("popstate", render);
+      renderNavigation(svg);
     })
     .catch((err) => {
       console.error("Errore SVG:", err);
@@ -150,12 +148,47 @@ function loadSvg(url: string) {
     });
 }
 
+/* ===================== RENDER NAVIGATION ===================== */
+
+function renderNavigation(svg: SVGSVGElement) {
+  const navLayer = svg.querySelector("#nav-layer") as SVGGElement;
+  if (!navLayer) return;
+
+  navLayer.innerHTML = "";
+
+  const ORIGINAL_VIEWBOX = svg.getAttribute("viewBox") ?? "0 0 1200 1780";
+
+  const raw = new URLSearchParams(window.location.search).get("stanza");
+  if (!raw) {
+    svg.setAttribute("viewBox", ORIGINAL_VIEWBOX);
+    return;
+  }
+
+  const decoded = decodeURIComponent(raw.replace(/\+/g, " "));
+  const stanza = decoded.split("/")[0];
+
+  const rooms = extractRooms(svg);
+  const corridors = extractCorridors(svg);
+
+  const current = rooms.find(
+    (r) => normalize(r.label) === normalize(stanza)
+  );
+  if (!current) return;
+
+  zoomToRect(svg, current.rect, 60);
+
+  const links = computeLinks(current, rooms, corridors);
+  for (const l of links) {
+    drawArrowText(navLayer, l);
+  }
+}
+
 /* ===================== DEFAULT STANZA ===================== */
 
-function ensureDefaultStanza() {
+function ensureDefaultStanza(session: Session) {
   const url = new URL(window.location.href);
   if (!url.searchParams.has("stanza")) {
-    url.searchParams.set("stanza", DEFAULT_STANZA);
+    url.searchParams.set("stanza", session.percorso[0]);
     window.history.replaceState({}, "", url);
   }
 }
@@ -242,12 +275,12 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
 
-  // Rotazione (PNG base → punta a DESTRA)
+  // PNG base → punta a DESTRA
   let rotation = 0;
   if (corridor.orientation === "vertical") {
-    rotation = dy > 0 ? 90 : -90;   // giù / su
+    rotation = dy > 0 ? 90 : -90;
   } else {
-    rotation = dx > 0 ? 0 : 180;    // destra / sinistra
+    rotation = dx > 0 ? 0 : 180;
   }
 
   const OFFSET = 35;
@@ -256,12 +289,10 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   const x = from.x - (dx / len) * OFFSET;
   const y = from.y - (dy / len) * OFFSET;
 
-  // Wrapper group
   const g = document.createElementNS(ns, "g");
   g.setAttribute("class", "nav-arrow-group");
   g.style.pointerEvents = "all";
 
-  // PNG
   const img = document.createElementNS(ns, "image");
   const SIZE = 40;
   img.setAttribute("href", "/icons/arrow-right.png");
@@ -272,17 +303,11 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   img.setAttribute("class", "nav-arrow-img");
   img.style.pointerEvents = "all";
 
-  // ⭐ Base transform sul GROUP (centro stabile)
-  // 1) vai al punto (x,y)
-  // 2) ruota
-  // 3) porta l'angolo dell'immagine a (-SIZE/2, -SIZE/2) per centrarla
   g.setAttribute(
     "transform",
     `translate(${x}, ${y}) rotate(${rotation}) translate(${-SIZE / 2}, ${-SIZE / 2})`
   );
 
-  // ✅ Animazione “movimento da fermo” (piccolo avanti/indietro)
-  // Siccome il gruppo è già ruotato, traslare su X = “avanti” nella direzione della freccia.
   const animMove = document.createElementNS(ns, "animateTransform");
   animMove.setAttribute("attributeName", "transform");
   animMove.setAttribute("type", "translate");
@@ -291,17 +316,15 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   animMove.setAttribute("dur", "1.6s");
   animMove.setAttribute("repeatCount", "indefinite");
 
-  // (opzionale) piccola pulsazione di opacità, non tocca transform
   const animOpacity = document.createElementNS(ns, "animate");
   animOpacity.setAttribute("attributeName", "opacity");
   animOpacity.setAttribute("values", "1; 0.75; 1");
   animOpacity.setAttribute("dur", "1.6s");
   animOpacity.setAttribute("repeatCount", "indefinite");
 
-  // Eventi touch/click
   const go = (e: Event) => {
-    e.preventDefault?.();
-    e.stopPropagation?.();
+    e.preventDefault();
+    e.stopPropagation();
     goToRoom(link.label);
   };
 
@@ -313,8 +336,6 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   g.appendChild(animOpacity);
   layer.appendChild(g);
 }
-
-
 
 /* ===================== GEOMETRY & UTILS ===================== */
 

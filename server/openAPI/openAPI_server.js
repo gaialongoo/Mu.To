@@ -1,3 +1,4 @@
+const cors = require("cors");
 const https = require("https");
 const express = require("express");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
@@ -7,8 +8,8 @@ require('dotenv').config({ path: __dirname + '/.env' });
 //console.log("Chiave API caricata:", process.env.API_KEY);
 
 // --- 🔧 CONFIGURAZIONE SICUREZZA ---
-const SOLO_LOCALHOST = true; // true = solo localhost, false = ascolta su tutte le interfacce
-const RICHIESTA_API_KEY = true; // true = obbligo API key, false = accesso libero (solo localhost)
+const SOLO_LOCALHOST = false; // true = solo localhost, false = ascolta su tutte le interfacce
+const RICHIESTA_API_KEY = false; // true = obbligo API key, false = accesso libero (solo localhost)
 const VALID_API_KEYS = [process.env.API_KEY]; // letta da .env
 
 const PORT = 3000;
@@ -17,12 +18,17 @@ const FILE_JSON = path.join(__dirname, 'musei.json');
 const LAYOUT_FILE = path.join(__dirname, "layout.json");
 
 const app = express();
-app.use(express.json());
-
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "X-API-Key"]
+}));
 
 // --- 🔒 Middleware per sicurezza ---
 if (RICHIESTA_API_KEY) {
   app.use((req, res, next) => {
+    if (req.method === "OPTIONS") return next(); // 👈 FIX
+
     const apiKey = req.header("X-API-Key");
     if (!apiKey) return res.status(401).json({ error: "API key mancante" });
     if (!VALID_API_KEYS.includes(apiKey)) return res.status(403).json({ error: "API key non valida" });
@@ -30,15 +36,12 @@ if (RICHIESTA_API_KEY) {
   });
 }
 
+
 // Disabilita header che espongono info
 app.disable("x-powered-by");
 app.disable("etag");
 
-// Blocca richieste CORS dall’esterno (solo se necessario)
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "null");
-  next();
-});
+
 
 // --- Middleware log richieste ---
 app.use(express.json());
@@ -79,8 +82,10 @@ app.get("/musei/:nome_museo", (req, res) => {
   const jsonMuseo = {
     nome: museo.nome,
     citta: museo.citta,
-    oggetti: Array.from(museo.oggetti.values())
+    oggetti: Array.from(museo.oggetti.values()),
+    percorsi: museo.percorsi || []
   };
+
   res.json(jsonMuseo);
 });
 
@@ -126,6 +131,121 @@ app.get("/musei/:nome_museo/percorso", (req, res) => {
   res.json({ percorso: oggettiPercorso });
 });
 
+// --- 5️⃣ Lista percorsi di un museo ---
+app.get("/musei/:nome_museo/percorsi", (req, res) => {
+  const museo = sistema.get_museo(req.params.nome_museo);
+  if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+  // Inizializza percorsi se non esistono
+  if (!museo.percorsi) museo.percorsi = [];
+
+  console.log(`Restituisco ${museo.percorsi.length} percorsi del museo '${museo.nome}'`);
+  res.json({ percorsi: museo.percorsi });
+});
+
+// --- 6️⃣ Dettagli di un percorso specifico ---
+app.get("/musei/:nome_museo/percorsi/:nome_percorso", (req, res) => {
+  const museo = sistema.get_museo(req.params.nome_museo);
+  if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+  if (!museo.percorsi) museo.percorsi = [];
+
+  const percorso = museo.percorsi.find(p => p.nome === req.params.nome_percorso);
+  if (!percorso) return res.status(404).json({ error: "Percorso non trovato" });
+
+  console.log(`Restituisco percorso '${percorso.nome}' del museo '${museo.nome}'`);
+  res.json(percorso);
+});
+
+// --- 7️⃣ Creazione nuovo percorso ---
+app.post("/musei/:nome_museo/percorsi", async (req, res) => {
+  const museo = sistema.get_museo(req.params.nome_museo);
+  if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+  const { nome, oggetti } = req.body;
+
+  // Validazioni
+  if (!nome) return res.status(400).json({ error: "Nome percorso obbligatorio" });
+  if (!oggetti || !Array.isArray(oggetti) || oggetti.length === 0) {
+    return res.status(400).json({ error: "Array oggetti obbligatorio e non vuoto" });
+  }
+
+  // Inizializza percorsi se non esistono
+  if (!museo.percorsi) museo.percorsi = [];
+
+  // Verifica unicità nome percorso
+  if (museo.percorsi.find(p => p.nome === nome)) {
+    return res.status(400).json({ error: "Percorso già esistente" });
+  }
+
+  // Verifica che tutti gli oggetti esistano
+  for (const nomeOggetto of oggetti) {
+    if (!museo.get_oggetto(nomeOggetto)) {
+      return res.status(404).json({ 
+        error: `Oggetto '${nomeOggetto}' non trovato nel museo` 
+      });
+    }
+  }
+
+  // Aggiungi il percorso
+  const nuovoPercorso = { nome, oggetti };
+  museo.percorsi.push(nuovoPercorso);
+
+  // Salva su file
+  sistema.salvaSuFile(FILE_JSON);
+  console.log(`Percorso '${nome}' aggiunto al museo '${museo.nome}' e salvato su file`);
+
+  // Sincronizza su MongoDB
+  try {
+    await upsertMuseo({
+      nome: museo.nome,
+      citta: museo.citta,
+      oggetti: Array.from(museo.oggetti.values()),
+      percorsi: museo.percorsi
+    });
+    console.log(`Museo '${museo.nome}' con percorso aggiornato su MongoDB`);
+  } catch (err) {
+    console.error("Errore MongoDB:", err);
+  }
+
+  res.status(201).json({ 
+    message: `Percorso '${nome}' creato con successo`,
+    percorso: nuovoPercorso
+  });
+});
+
+// --- 8️⃣ Cancellazione percorso ---
+app.delete("/musei/:nome_museo/percorsi/:nome_percorso", async (req, res) => {
+  const museo = sistema.get_museo(req.params.nome_museo);
+  if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+  if (!museo.percorsi) museo.percorsi = [];
+
+  const indice = museo.percorsi.findIndex(p => p.nome === req.params.nome_percorso);
+  if (indice === -1) return res.status(404).json({ error: "Percorso non trovato" });
+
+  // Rimuovi il percorso
+  museo.percorsi.splice(indice, 1);
+
+  // Salva su file
+  sistema.salvaSuFile(FILE_JSON);
+  console.log(`Percorso '${req.params.nome_percorso}' eliminato dal museo '${museo.nome}'`);
+
+  // Sincronizza su MongoDB
+  try {
+    await upsertMuseo({
+      nome: museo.nome,
+      citta: museo.citta,
+      oggetti: Array.from(museo.oggetti.values()),
+      percorsi: museo.percorsi
+    });
+    console.log(`Museo '${museo.nome}' aggiornato su MongoDB dopo eliminazione percorso`);
+  } catch (err) {
+    console.error("Errore MongoDB:", err);
+  }
+
+  res.json({ message: `Percorso '${req.params.nome_percorso}' eliminato con successo` });
+});
 // --- Creazione nuovo museo ---
 app.post("/musei", async (req, res) => {
   const { nome, citta, oggetti } = req.body;
@@ -133,7 +253,7 @@ app.post("/musei", async (req, res) => {
 
   if (sistema.get_museo(nome)) return res.status(400).json({ error: "Museo già esistente" });
 
-  const museo = { nome, citta, oggetti: oggetti || [] };
+  const museo = { nome, citta, oggetti: oggetti || [], percorsi: [] };
   sistema.aggiungi_museo(museo);
   sistema.salvaSuFile(FILE_JSON);
   console.log(`Museo '${nome}' aggiunto al file ${FILE_JSON}`);
