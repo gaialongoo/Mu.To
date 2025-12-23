@@ -14,9 +14,7 @@
       padding: 40px;
     }
 
-    h1 {
-      margin-bottom: 20px;
-    }
+    h1 { margin-bottom: 20px; }
 
     .box {
       background: white;
@@ -31,218 +29,137 @@
       font-weight: bold;
     }
 
-    select, input, button {
+    select, button {
       width: 100%;
       padding: 8px;
       margin-top: 5px;
       box-sizing: border-box;
     }
 
-    button {
-      margin-top: 20px;
-      cursor: pointer;
-    }
+    button { margin-top: 20px; cursor: pointer; }
 
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
 
 <body>
 
-  <!-- ================= BOOTSTRAP SCELTA MUSEO + PERCORSO ================= -->
-  <div id="bootstrap">
-    <h1>Seleziona museo e percorso</h1>
+<!-- ================= HOME SELEZIONE ================= -->
+<div id="home">
+  <h1>Seleziona museo e percorso</h1>
 
-    <div class="box">
-      <label for="museo">Museo</label>
-      <select id="museo">
-        <option value="">— seleziona museo —</option>
-      </select>
+  <div class="box">
+    <label>Museo</label>
+    <select id="museo">
+      <option value="">— seleziona museo —</option>
+    </select>
 
-      <label for="percorso">Percorso</label>
-      <select id="percorso" disabled>
-        <option value="">— seleziona percorso —</option>
-      </select>
+    <label>Percorso</label>
+    <select id="percorso" disabled>
+      <option value="">— seleziona percorso —</option>
+    </select>
 
-      <button id="apri">Apri</button>
-    </div>
+    <button id="apri">Apri</button>
   </div>
+</div>
 
-  <!-- ================= ROOT REACT ================= -->
-  <div id="root" class="hidden"></div>
+<!-- ================= ROOT REACT ================= -->
+<div id="root" class="hidden"></div>
 
-  <script>
-    /* ============================================================
-       COOKIE SESSION
-       ============================================================ */
+<script>
+/* ================= SESSION ================= */
 
-    const COOKIE_NAME = "museo_session";
-    const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
+const COOKIE = "museo_session";
+const MAX_AGE = 24 * 60 * 60 * 1000;
+const API = "/api";
 
-    function setSession(session, days = 1) {
-      const expires = new Date(Date.now() + days * 864e5).toUTCString();
-      document.cookie =
-        COOKIE_NAME + "=" + encodeURIComponent(JSON.stringify(session)) +
-        "; expires=" + expires + "; path=/; SameSite=Lax";
-    }
+const home = document.getElementById("home");
+const root = document.getElementById("root");
 
-    function getSession() {
-      const match = document.cookie.match(
-        new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)")
-      );
-      if (!match) return null;
-      try {
-        return JSON.parse(decodeURIComponent(match[2]));
-      } catch {
-        return null;
-      }
-    }
+const museoSel = document.getElementById("museo");
+const percorsoSel = document.getElementById("percorso");
+const btn = document.getElementById("apri");
 
-    function isSessionValid(session) {
-      if (!session) return false;
-      if (typeof session.museo !== "string" || !session.museo) return false;
-      if (!Array.isArray(session.percorso) || session.percorso.length < 2) return false;
-      if (!session.createdAt) return false;
+function getSession() {
+  const m = document.cookie.match(new RegExp("(^| )" + COOKIE + "=([^;]+)"));
+  if (!m) return null;
+  try { return JSON.parse(decodeURIComponent(m[2])); }
+  catch { return null; }
+}
 
-      const age = Date.now() - session.createdAt;
-      return age >= 0 && age <= SESSION_MAX_AGE;
-    }
+function setSession(s) {
+  document.cookie =
+    COOKIE + "=" + encodeURIComponent(JSON.stringify(s)) +
+    "; max-age=" + (MAX_AGE / 1000) + "; path=/; SameSite=Lax";
+}
 
-    function clearSession() {
-      document.cookie =
-        COOKIE_NAME + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
-    }
+function validSession(s) {
+  return s &&
+    typeof s.museo === "string" &&
+    Array.isArray(s.percorso) &&
+    s.percorso.length >= 2 &&
+    Date.now() - s.createdAt <= MAX_AGE;
+}
 
-    /* ============================================================
-       BOOTSTRAP LOGIC
-       ============================================================ */
-
-    const API_BASE = "https://localhost:3000";
-
-    const bootstrap = document.getElementById("bootstrap");
-    const root = document.getElementById("root");
-
-    const museoSelect = document.getElementById("museo");
-    const percorsoSelect = document.getElementById("percorso");
-    const btnApri = document.getElementById("apri");
-
-    const session = getSession();
-
-    if (isSessionValid(session)) {
-      // 👉 sessione valida → carica subito React
-      bootstrap.remove();
-      root.classList.remove("hidden");
-
-      const script = document.createElement("script");
-      script.type = "module";
-      script.src = "/src/main.tsx";
-      document.body.appendChild(script);
-
-    } else {
-      // 👉 sessione assente/scaduta → scelta museo + percorso
-      clearSession();
-
-      // Carica musei
-      fetch(`${API_BASE}/musei`)
-        .then(r => r.json())
-        .then(data => {
-          museoSelect.innerHTML = '<option value="">— seleziona museo —</option>';
-          data.musei.forEach(nome => {
-            const opt = document.createElement("option");
-            opt.value = nome;
-            opt.textContent = nome;
-            museoSelect.appendChild(opt);
-          });
-        })
-        .catch(() => alert("Errore caricamento musei"));
-
-      // Quando cambia museo → carica percorsi
-      museoSelect.addEventListener("change", () => {
-        const museo = museoSelect.value;
-
-        percorsoSelect.innerHTML = '<option value="">— seleziona percorso —</option>';
-        percorsoSelect.disabled = true;
-
-        if (!museo) return;
-
-        fetch(`${API_BASE}/musei/${encodeURIComponent(museo)}/percorsi`)
-          .then(r => r.json())
-          .then(data => {
-            if (!data.percorsi || data.percorsi.length === 0) {
-              const opt = document.createElement("option");
-              opt.value = "";
-              opt.textContent = "— nessun percorso disponibile —";
-              percorsoSelect.appendChild(opt);
-              return;
-            }
-
-            data.percorsi.forEach(p => {
-              const opt = document.createElement("option");
-              opt.value = p.nome;
-              opt.textContent = p.nome;
-              percorsoSelect.appendChild(opt);
-            });
-
-            percorsoSelect.disabled = false;
-          })
-          .catch(() => alert("Errore caricamento percorsi"));
-      });
-
-      // Click Apri
-      btnApri.addEventListener("click", () => {
-        const museo = museoSelect.value;
-        const percorso = percorsoSelect.value;
-
-        if (!museo || !percorso) {
-          alert("Seleziona museo e percorso");
-          return;
-        }
-
-        clearSession();
-
-        fetch(
-          `${API_BASE}/musei/${encodeURIComponent(museo)}` +
-          `/percorsi/${encodeURIComponent(percorso)}`
-        )
-
-        .then(r => r.json())
-        .then(data => {
-          if (!Array.isArray(data.oggetti)) {
-            throw new Error("Formato percorso non valido");
-          }
-
-          const percorsoCompleto = [
-            "IN",
-            ...data.oggetti,
-            "OUT"
-          ];
-
-          setSession({
-            museo,
-            percorso: percorsoCompleto,
-            createdAt: Date.now()
-          });
-
-          // 👉 passa al navigator SENZA reload
-          bootstrap.remove();
+function startReact() {
+  home.classList.add("hidden");
   root.classList.remove("hidden");
+  window.dispatchEvent(new Event("museo-session-ready"));
+}
 
+/* ================= BOOT ================= */
 
-            const script = document.createElement("script");
-            script.type = "module";
-            script.src = "/src/main.tsx";
-            document.body.appendChild(script);
-          })
-          .catch(() => {
-            alert("Errore caricamento percorso");
-          });
+const session = getSession();
+if (validSession(session)) {
+  startReact();
+} else {
+
+  fetch(`${API}/musei`)
+    .then(r => r.json())
+    .then(d => d.musei.forEach(n => {
+      const o = document.createElement("option");
+      o.value = o.textContent = n;
+      museoSel.appendChild(o);
+    }));
+
+  museoSel.onchange = () => {
+    percorsoSel.innerHTML = '<option value="">— seleziona percorso —</option>';
+    percorsoSel.disabled = true;
+    if (!museoSel.value) return;
+
+    fetch(`${API}/musei/${encodeURIComponent(museoSel.value)}/percorsi`)
+      .then(r => r.json())
+      .then(d => {
+        d.percorsi.forEach(p => {
+          const o = document.createElement("option");
+          o.value = o.textContent = p.nome;
+          percorsoSel.appendChild(o);
+        });
+        percorsoSel.disabled = false;
       });
+  };
 
+  btn.onclick = () => {
+    if (!museoSel.value || !percorsoSel.value)
+      return alert("Seleziona museo e percorso");
 
-    }
-  </script>
+    fetch(`${API}/musei/${encodeURIComponent(museoSel.value)}/percorsi/${encodeURIComponent(percorsoSel.value)}`)
+      .then(r => r.json())
+      .then(d => {
+        setSession({
+          museo: museoSel.value,
+          percorso: ["IN", ...d.oggetti, "OUT"],
+          createdAt: Date.now()
+        });
+        startReact();
+      })
+      .catch(() => alert("Errore percorso"));
+  };
+}
+</script>
+
+<!-- React -->
+<script type="module" src="/src/main.tsx"></script>
 
 </body>
 </html>

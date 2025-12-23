@@ -1,10 +1,21 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './styles/svg.css';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+const rootEl = document.getElementById("root")!;
+
+function mount() {
+  ReactDOM.createRoot(rootEl).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+
+// 🔒 se la sessione è già pronta → monta subito
+if (document.cookie.includes("museo_session=")) {
+  mount();
+} else {
+  // ⏳ aspetta la homepage
+  window.addEventListener("museo-session-ready", mount, { once: true });
+}
