@@ -138,7 +138,7 @@ def draw(svg, stanze, corridoi, oggetti, edge_mode="all", edge_focus=None):
     for s in stanze:
         cls = f"stanza {s.tipo}" if s.tipo != "normale" else "stanza"
         svg += f'\n<rect x="{s.x}" y="{s.y}" width="{s.w}" height="{s.h}" rx="8" class="{cls}"/>'
-        svg += f'\n<text x="{s.x + s.w / 2}" y="{s.y - 6}" class="stanza-label" text-anchor="middle">{s.nome}</text>'
+        svg += f'\n<text x="{s.x + s.w / 2}" y="{s.y + 16}" class="stanza-label" text-anchor="middle">{s.nome}</text>'
 
     # ---------- CORRIDOI ----------
     for c in corridoi:

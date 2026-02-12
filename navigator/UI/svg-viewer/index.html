@@ -107,6 +107,7 @@ function startReact() {
   window.dispatchEvent(new Event("museo-session-ready"));
 }
 
+
 /* ================= BOOT ================= */
 
 const session = getSession();
@@ -138,23 +139,37 @@ if (validSession(session)) {
         percorsoSel.disabled = false;
       });
   };
+btn.onclick = () => {
+  if (!museoSel.value || !percorsoSel.value)
+    return alert("Seleziona museo e percorso");
 
-  btn.onclick = () => {
-    if (!museoSel.value || !percorsoSel.value)
-      return alert("Seleziona museo e percorso");
+  fetch(`${API}/musei/${encodeURIComponent(museoSel.value)}/percorsi/${encodeURIComponent(percorsoSel.value)}`)
+    .then(r => r.json())
+    .then(d => {
+      // Salva percorso nei cookie
+      const percorsoArr = ["IN", ...d.oggetti, "OUT"];
+      setSession({
+        museo: museoSel.value,
+        percorso: percorsoArr,
+        createdAt: Date.now()
+      });
 
-    fetch(`${API}/musei/${encodeURIComponent(museoSel.value)}/percorsi/${encodeURIComponent(percorsoSel.value)}`)
-      .then(r => r.json())
-      .then(d => {
-        setSession({
-          museo: museoSel.value,
-          percorso: ["IN", ...d.oggetti, "OUT"],
-          createdAt: Date.now()
-        });
-        startReact();
-      })
-      .catch(() => alert("Errore percorso"));
-  };
+      // Aggiorna URL: ?stanza=IN/path/IN/primoOggetto
+      if (percorsoArr.length >= 2) {
+        const stanza = percorsoArr[0];
+        const primoOggetto = encodeURIComponent(percorsoArr[1]); // solo l'oggetto
+        history.replaceState(
+          null,
+          "",
+          `/?stanza=${stanza}/path/${stanza}/${primoOggetto}`
+        );
+      }
+
+      startReact();
+    })
+    .catch(() => alert("Errore percorso"));
+};
+
 }
 </script>
 

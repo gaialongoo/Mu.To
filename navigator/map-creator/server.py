@@ -33,7 +33,7 @@ EDGE_FOCUS_DEFAULT = ["", ""]
 
 # ---- NODE WAIT ----
 NODE_HEALTH_ENDPOINT = "/musei"
-NODE_WAIT_TIMEOUT = 60      # secondi max
+NODE_WAIT_TIMEOUT = 600      # secondi max
 NODE_WAIT_INTERVAL = 2      # secondi
 
 # ---- MONGO ----

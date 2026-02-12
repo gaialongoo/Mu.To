@@ -163,7 +163,7 @@ export default function SvgViewer() {
         id="svg-host"
         style={{
           width: "100%",
-          height: "100%",
+          height: "100vh",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -185,13 +185,19 @@ export default function SvgViewer() {
 
 function loadSvg(url: string) {
   const host = document.getElementById("svg-host");
+
+
   if (!host) return;
 
   fetch(url)
     .then(r => r.text())
     .then(svgText => {
       host.innerHTML = svgText;
-      const svg = host.querySelector("svg") as SVGSVGElement | null;
+      const svg = host?.querySelector("svg");
+      if (svg) {
+        // sposta tutto il contenuto verso l'alto di 500px
+        svg.style.transform = "translateY(-200px)";
+      }      
       if (!svg) return;
 
       const navLayer = document.createElementNS(
@@ -219,13 +225,13 @@ function renderNavigation(svg: SVGSVGElement) {
 
   const { stanza } = parseStanzaFromUrl(session);
 
-  const rooms = extractRooms(svg);
   const corridors = extractCorridors(svg);
+  const rooms = extractRooms(svg);
 
   const current = rooms.find(r => normalize(r.label) === normalize(stanza));
   if (!current) return;
 
-  zoomToRect(svg, current.rect, 60);
+  zoomToRect(svg, current.rect, 10);
 
   const links = computeLinks(current, rooms, corridors);
   for (const l of links) drawArrowText(navLayer, l);
@@ -240,10 +246,13 @@ function ensureDefaultStanza(session: Session) {
 }
 
 /* ===================== EXTRACTION ===================== */
-
 function extractRooms(svg: SVGSVGElement): Room[] {
   const rooms: Room[] = [];
   let lastRect: SVGRectElement | null = null;
+
+  // Prendi il layer dove vogliamo che le etichette stiano sopra
+  const navLayer = svg.querySelector("#nav-layer") as SVGGElement;
+  if (!navLayer) throw new Error("Nav layer mancante!");
 
   for (const el of Array.from(svg.children)) {
     if (el.tagName === "rect") {
@@ -255,6 +264,9 @@ function extractRooms(svg: SVGSVGElement): Room[] {
     if (el.tagName === "text" && lastRect) {
       const t = el as SVGTextElement;
       if ((t.getAttribute("class") ?? "").includes("stanza-label")) {
+        // Sposta l'etichetta nel navLayer così sta sopra tutto
+        navLayer.appendChild(t);
+
         rooms.push({
           label: t.textContent!.trim(),
           rect: lastRect,
@@ -265,6 +277,7 @@ function extractRooms(svg: SVGSVGElement): Room[] {
   }
   return rooms;
 }
+
 
 function extractCorridors(svg: SVGSVGElement): Corridor[] {
   return Array.from(svg.querySelectorAll("rect.corridoio")).map(r => ({
@@ -356,15 +369,32 @@ function rectCenter(r: SVGRectElement): Point {
   return { x: x + w / 2, y: y + h / 2 };
 }
 
-function zoomToRect(svg: SVGSVGElement, rect: SVGRectElement, pad: number) {
-  svg.setAttribute(
-    "viewBox",
-    `${+rect.getAttribute("x")! - pad}
-     ${+rect.getAttribute("y")! - pad}
-     ${+rect.getAttribute("width")! + pad * 2}
-     ${+rect.getAttribute("height")! + pad * 2}`
-  );
+function zoomToRect(svg: SVGSVGElement, rect: SVGRectElement, basePad = 20) {
+  // dimensioni reali della viewport SVG
+  const svgWidth = svg.clientWidth;
+  const svgHeight = svg.clientHeight;
+
+  // rettangolo target
+  const rectX = +rect.getAttribute("x")!;
+  const rectY = +rect.getAttribute("y")!;
+  const rectWidth = +rect.getAttribute("width")!;
+  const rectHeight = +rect.getAttribute("height")!;
+
+  // calcolo rapporto tra rect e viewport
+  const widthRatio = rectWidth / svgWidth;
+  const heightRatio = rectHeight / svgHeight;
+
+  // più piccolo il rect rispetto alla pagina => zoom maggiore => più pad
+  const dynamicPad = basePad * Math.max(1, 0.5 / Math.min(widthRatio, heightRatio));
+
+  const viewBoxX = rectX - dynamicPad;
+  const viewBoxY = rectY - dynamicPad;
+  const viewBoxWidth = rectWidth + dynamicPad * 2;
+  const viewBoxHeight = rectHeight + dynamicPad * 2;
+
+  svg.setAttribute("viewBox", `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
 }
+
 
 function distance(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -424,11 +454,64 @@ function ObjectOverlay({
     )
       .then(r => r.json())
       .then(d => {
-        const prima =
-          d.descrizioni?.[0]?.[0] ?? null;
+        const prima = d.descrizioni?.[0]?.[0] ?? null;
         setDescrizione(prima);
       });
   }, [nome, session]);
+
+  // Funzione per aggiornare URL
+const updateURL = async (oggettoCorrente: string, oggettoAltro: string) => {
+  try {
+    // Se è IN o OUT, usiamo direttamente come stanza
+    const stanza = oggettoAltro === "IN" || oggettoAltro === "OUT"
+      ? oggettoAltro
+      : await fetchStanza(oggettoAltro);
+
+    history.replaceState(
+      null,
+      "",
+      `/?stanza=${stanza}/path/${oggettoCorrente}/${oggettoAltro}`
+    );
+
+    onClose();
+  } catch (err) {
+    console.error("Errore updateURL:", err);
+  }
+};
+
+// Funzione helper per ottenere stanza da API
+const fetchStanza = async (oggettoNome: string) => {
+  const res = await fetch(
+    `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(oggettoNome)}`
+  );
+  if (!res.ok) throw new Error("Oggetto non trovato");
+  const oggetto = await res.json();
+  return oggetto.stanza ?? "IN"; // fallback
+};
+
+
+
+  const handleNext = () => {
+    const percorso = session.percorso;
+    const index = percorso.indexOf(nome);
+    if (index === -1 || index >= percorso.length - 1) return;
+
+    const oggettoCorrente = percorso[index];
+    const oggettoSuccessivo = percorso[index + 1];
+
+    updateURL(oggettoCorrente, oggettoSuccessivo);
+  };
+
+  const handlePrev = () => {
+    const percorso = session.percorso;
+    const index = percorso.indexOf(nome);
+    if (index <= 0) return;
+
+    const oggettoPrecedente = percorso[index - 1];
+    const oggettoCorrente = percorso[index];
+
+    updateURL(oggettoPrecedente, oggettoCorrente);
+  };
 
   return (
     <div
@@ -445,15 +528,21 @@ function ObjectOverlay({
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: "#fff", padding: 24, borderRadius: 12 }}
+        style={{ background: "#fff", padding: 24, borderRadius: 12, minWidth: 300 }}
       >
         <h2>{nome}</h2>
         {descrizione ? <p>{descrizione}</p> : <p>Caricamento…</p>}
-        <button onClick={onClose}>Chiudi</button>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+          <button onClick={handlePrev}>Prev</button>
+          <button onClick={handleNext}>Next</button>
+        </div>
       </div>
     </div>
   );
 }
+
+
 
 function bindObjectClicks(svg: SVGSVGElement) {
   svg.querySelectorAll<SVGCircleElement>("circle.oggetto").forEach(c => {
