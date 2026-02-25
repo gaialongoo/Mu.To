@@ -13,6 +13,7 @@
       "IN": { "row": 0, "col": 1, "tipo": "ingresso" },
       "stanza 1": { "row": 1, "col": 1 },
       "stanza 2": { "row": 2, "col": 1 },
+      "stanza 4": { "row": 2, "col": 0, "tipo": "servizio" },
       "stanza 3": { "row": 3, "col": 1 },
       "WC": { "row": 2, "col": 2, "tipo": "bagno" },
       "SHOP": { "row": 3, "col": 2, "tipo": "servizio" },
