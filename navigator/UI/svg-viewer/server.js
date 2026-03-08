@@ -39,9 +39,8 @@ const dispatcher = new Agent({
 // ============================================================
 // CONFIG
 // ============================================================
-
-// ⬅️ QUI deve stare l'API vera (openAPI_server.js)
-const API_BASE = "https://127.0.0.1:3000"; // <-- PORTA API JSON
+const API_BASE = "https://127.0.0.1:3000"; //modificare con IP del server openAPI_server
+const SVG_BASE = "http://127.0.0.1:3001"; //modificare con IP del server svg_server
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "0.0.0.0";
 
@@ -50,10 +49,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 // ============================================================
 const app = express();
 
-// Middleware per parsing JSON (se dovessi inviare POST/PUT)
 app.use(express.json());
 
-// Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
@@ -69,17 +66,46 @@ app.use(
 );
 
 // ============================================================
-// PROXY API (ROBUSTO)
+// PROXY SVG (mappa → server SVG interno porta 3001)
+// ============================================================
+app.use("/svg", async (req, res) => {
+  const target = SVG_BASE + req.originalUrl.replace("/svg", "");
+  console.log("➡️ SVG PROXY:", req.method, target);
+
+  try {
+    const r = await fetch(target, {
+      method: req.method,
+      headers: { Accept: "image/svg+xml" },
+    });
+
+    const buffer = Buffer.from(await r.arrayBuffer());
+    res.status(r.status);
+
+    const ct = r.headers.get("content-type");
+    if (ct) res.set("Content-Type", ct);
+
+    res.send(buffer);
+  } catch (e) {
+    console.error("🔥 SVG PROXY ERROR:", e.message);
+    res.status(502).json({
+      error: "SVG server unreachable",
+      message: e.message,
+      target,
+    });
+  }
+});
+
+// ============================================================
+// PROXY API (JSON → openAPI_server porta 3000)
 // ============================================================
 app.use("/api", async (req, res) => {
   const target = API_BASE + req.originalUrl.replace("/api", "");
-  console.log("➡️ PROXY:", req.method, target);
+  console.log("➡️ API PROXY:", req.method, target);
 
   try {
     const forwardHeaders = {
-  "X-API-KEY": API_KEY,
-};
-
+      "X-API-KEY": API_KEY,
+    };
 
     if (req.headers.accept) {
       forwardHeaders.Accept = req.headers.accept;
@@ -109,9 +135,8 @@ app.use("/api", async (req, res) => {
     if (cc) res.set("Cache-Control", cc);
 
     res.send(buffer);
-
   } catch (e) {
-    console.error("🔥 PROXY ERROR:", e.message);
+    console.error("🔥 API PROXY ERROR:", e.message);
     res.status(502).json({
       error: "API unreachable",
       message: e.message,
@@ -120,15 +145,14 @@ app.use("/api", async (req, res) => {
   }
 });
 
-
 // ============================================================
-// HEALTH CHECK (utile per monitoring)
+// HEALTH CHECK
 // ============================================================
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
+  res.json({
+    status: "ok",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 
@@ -144,9 +168,9 @@ app.use((req, res) => {
 // ============================================================
 app.use((err, req, res, next) => {
   console.error("💥 Unhandled error:", err);
-  res.status(500).json({ 
+  res.status(500).json({
     error: "Internal server error",
-    message: err.message 
+    message: err.message,
   });
 });
 
@@ -156,6 +180,7 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, HOST, () => {
   console.log(`✅ SvgViewer BFF attivo su http://${HOST}:${PORT}`);
   console.log(`📡 Proxy API: /api/* → ${API_BASE}/*`);
+  console.log(`🗺️  Proxy SVG: /svg/* → ${SVG_BASE}/*`);
   console.log(`📁 Static files: ${path.join(__dirname, "dist")}`);
 });
 
