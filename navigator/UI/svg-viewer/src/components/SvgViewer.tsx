@@ -42,7 +42,7 @@ function isSessionValid(session: Session | null): session is Session {
 
 /* ===================== CONFIG ===================== */
 
-const SVG_SERVER_BASE = "http://192.168.1.119:3001";
+const SVG_SERVER_BASE = "http://127.0.0.1:3001";
 const API_BASE = "/api";
 
 /* ===================== STANZA / PATH LOGIC ===================== */

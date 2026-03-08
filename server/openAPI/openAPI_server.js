@@ -9,7 +9,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 
 // --- 🔧 CONFIGURAZIONE SICUREZZA ---
 const SOLO_LOCALHOST = false; // true = solo localhost, false = ascolta su tutte le interfacce
-const RICHIESTA_API_KEY = false; // true = obbligo API key, false = accesso libero (solo localhost)
+const RICHIESTA_API_KEY = true; // true = obbligo API key, false = accesso libero (solo localhost)
 const VALID_API_KEYS = [process.env.API_KEY]; // letta da .env
 
 const PORT = 3000;
