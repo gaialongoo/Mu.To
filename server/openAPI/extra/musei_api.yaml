@@ -2,12 +2,22 @@ openapi: 3.0.3
 
 info:
   title: Sistema Musei API
-  description: API completa per consultare, creare, aggiornare e cancellare musei e oggetti
-  version: 2.1.0
+  description: API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi e layout grafici
+  version: 2.2.0
 
 servers:
-  - url: http://localhost:3000
+  - url: https://localhost:3000
     description: Server locale di sviluppo
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+security:
+  - ApiKeyAuth: []
 
 paths:
 
@@ -325,8 +335,8 @@ paths:
 
   /musei/{nome_museo}/percorso:
     get:
-      summary: Percorso tra più oggetti
-      description: Calcola il percorso BFS tra più oggetti specificati
+      summary: Percorso BFS tra più oggetti
+      description: Calcola il percorso ottimale tra più oggetti specificati tramite BFS sul grafo del museo
       parameters:
         - in: path
           name: nome_museo
@@ -336,19 +346,45 @@ paths:
         - in: query
           name: oggetti
           required: true
+          description: Lista di nomi oggetto separati da virgola (es. "Venere,David,Perseo")
           schema:
             type: string
+            example: "Venere,David,Perseo"
       responses:
         '200':
           description: Percorso trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorso:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nome:
+                          type: string
+                        stanza:
+                          type: string
+                        connessi:
+                          type: array
+                          items:
+                            type: string
+                        descrizioni:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: string
         '400':
-          description: Parametri query mancanti
+          description: Parametro oggetti mancante
         '404':
           description: Percorso non trovato o museo non trovato
 
   /musei/{nome_museo}/percorsi:
     get:
-      summary: Lista dei percorsi
+      summary: Lista dei percorsi statici
       description: Ritorna tutti i percorsi statici del museo
       parameters:
         - in: path
@@ -379,8 +415,8 @@ paths:
           description: Museo non trovato
 
     post:
-      summary: Crea un nuovo percorso
-      description: Aggiunge un percorso statico a un museo
+      summary: Crea un nuovo percorso statico
+      description: Aggiunge un percorso statico a un museo. Tutti gli oggetti devono esistere nel museo.
       parameters:
         - in: path
           name: nome_museo
@@ -399,22 +435,40 @@ paths:
               properties:
                 nome:
                   type: string
+                  example: "Percorso Rinascimento"
                 oggetti:
                   type: array
                   items:
                     type: string
+                  example: ["Venere", "David", "Perseo"]
       responses:
         '201':
           description: Percorso creato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  percorso:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      oggetti:
+                        type: array
+                        items:
+                          type: string
         '400':
           description: Percorso già esistente o dati non validi
         '404':
-          description: Museo non trovato
+          description: Museo non trovato o oggetto non trovato
 
   /musei/{nome_museo}/percorsi/{nome_percorso}:
     get:
-      summary: Dettagli di un percorso
-      description: Ritorna i dettagli di un percorso specifico
+      summary: Dettagli di un percorso statico
+      description: Ritorna nome e lista oggetti di un percorso specifico
       parameters:
         - in: path
           name: nome_museo
@@ -444,7 +498,7 @@ paths:
           description: Museo o percorso non trovato
 
     delete:
-      summary: Cancella un percorso
+      summary: Cancella un percorso statico
       description: Elimina un percorso da un museo
       parameters:
         - in: path
@@ -462,3 +516,109 @@ paths:
           description: Percorso eliminato
         '404':
           description: Museo o percorso non trovato
+
+  /musei/{nome_museo}/layout:
+    get:
+      summary: Leggi il layout grafico del museo
+      description: >
+        Ritorna il documento di layout del museo recuperato da MongoDB (collection musei_layout).
+        Contiene le informazioni grafiche e posizionali usate per la visualizzazione SVG e la navigazione.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+      responses:
+        '200':
+          description: Layout trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                description: >
+                  Documento layout del museo. La struttura esatta dipende dal contenuto
+                  di layout.json sincronizzato su MongoDB. Il campo _id corrisponde al nome del museo.
+                properties:
+                  _id:
+                    type: string
+                    description: Nome del museo (chiave primaria MongoDB)
+                    example: "Uffizi"
+                additionalProperties: true
+        '404':
+          description: Layout non trovato per questo museo
+        '500':
+          description: Errore di connessione o recupero da MongoDB
+
+    put:
+      summary: Aggiorna il layout grafico del museo
+      description: >
+        Aggiorna il documento di layout nella collection musei_layout di MongoDB.
+        Se il layout non esiste viene creato (upsert). I campi inviati nel body
+        vengono applicati con $set, quindi è possibile aggiornare solo i campi desiderati.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: >
+                Campi del layout da aggiornare. La struttura è libera e dipende
+                dal formato usato in layout.json.
+              additionalProperties: true
+              example:
+                stanze:
+                  - id: "sala1"
+                    x: 100
+                    y: 200
+      responses:
+        '200':
+          description: Layout aggiornato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Layout 'Uffizi' aggiornato con successo"
+        '400':
+          description: Body vuoto o non valido
+        '500':
+          description: Errore di connessione o aggiornamento su MongoDB
+
+    delete:
+      summary: Elimina il layout grafico del museo
+      description: >
+        Rimuove il documento di layout dalla collection musei_layout di MongoDB.
+        Non influisce sui dati del museo (oggetti, percorsi) che risiedono altrove.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+      responses:
+        '200':
+          description: Layout eliminato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Layout 'Uffizi' eliminato con successo"
+        '404':
+          description: Layout non trovato per questo museo
+        '500':
+          description: Errore di connessione o eliminazione su MongoDB
