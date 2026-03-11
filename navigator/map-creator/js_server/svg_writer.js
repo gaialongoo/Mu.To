@@ -17,38 +17,75 @@ function svgHeader(title, w, h) {
     viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
   <defs>
     <style>
-      .stanza { fill:#fff; stroke:#2c3e50; stroke-width:3; }
-      .stanza.ingresso { fill:#a9dfbf; stroke:#2ecc71; }
-      .stanza.uscita { fill:#f5b7b1; stroke:#e74c3c; }
-      .stanza.bagno { fill:#aed6f1; stroke:#3498db; }
-      .stanza.servizio { fill:#fad7a0; stroke:#f39c12; }
+      /* ===== STANZE ===== */
+      .stanza {
+        fill: #fff;
+        stroke: #2c3e50;
+        stroke-width: 3;
+      }
 
-      .stanza-label { font:bold 14px Arial; fill:#2c3e50; }
+      .stanza.ingresso  { fill: #a9dfbf; stroke: #2ecc71; }
+      .stanza.uscita    { fill: #f5b7b1; stroke: #e74c3c; }
+      .stanza.bagno     { fill: #aed6f1; stroke: #3498db; }
+      .stanza.servizio  { fill: #fad7a0; stroke: #f39c12; }
 
-      .corridoio { fill:#ecf0f1; stroke:#95a5a6; stroke-width:2; }
+      .stanza-label {
+        font: bold 14px Arial;
+        fill: #2c3e50;
+        pointer-events: none;
+      }
 
-      .oggetto { fill:#3498db; stroke:#2980b9; stroke-width:2; }
-      .oggetto-label { font:10px Arial; fill:black; text-anchor:middle; pointer-events:none; }
+      /* ===== CORRIDOI ===== */
+      .corridoio { fill: #ecf0f1; stroke: #95a5a6; stroke-width: 2; }
+
+      /* ===== OGGETTI ===== */
+      .oggetto {
+        fill: #3498db;
+        stroke: #2980b9;
+        stroke-width: 2;
+        cursor: pointer;
+      }
+      .oggetto-label {
+        font: 10px Arial;
+        fill: black;
+        text-anchor: middle;
+        pointer-events: none;
+      }
+
+      /* Anello ripple che pulsa attorno all'oggetto */
+      .oggetto-ripple {
+        fill: none;
+        stroke: #3498db;
+        stroke-width: 2.5;
+        opacity: 0;
+        animation: ripple-out 1.8s ease-out infinite;
+      }
+      .oggetto-ripple.delay1 { animation-delay: 0.6s; }
+      .oggetto-ripple.delay2 { animation-delay: 1.2s; }
+
+      @keyframes ripple-out {
+        0%   { r: 11px; opacity: 0.75; stroke-width: 2.5; }
+        100% { r: 26px; opacity: 0;    stroke-width: 0.5; }
+      }
 
       /* ===== PERCORSI ANIMATI ===== */
-
       .conn-obj {
-        stroke:#e74c3c;
-        stroke-width:4;
-        fill:none;
-        stroke-linecap:round;
-        stroke-dasharray:12 10;
+        stroke: #e74c3c;
+        stroke-width: 4;
+        fill: none;
+        stroke-linecap: round;
+        stroke-dasharray: 12 10;
         animation: flow-red 1.2s linear infinite;
       }
 
       .conn-obj-debug {
-        stroke:black;
-        stroke-width:3;
-        fill:none;
-        stroke-linecap:round;
-        stroke-dasharray:6 6;
-        animation: flow-black 0.9s linear infinite;
-        opacity:0.85;
+        stroke: #27ae60;
+        stroke-width: 3;
+        fill: none;
+        stroke-linecap: round;
+        stroke-dasharray: 6 6;
+        animation: flow-green 0.9s linear infinite;
+        opacity: 0.85;
       }
 
       @keyframes flow-red {
@@ -56,7 +93,7 @@ function svgHeader(title, w, h) {
         to   { stroke-dashoffset: -22; }
       }
 
-      @keyframes flow-black {
+      @keyframes flow-green {
         from { stroke-dashoffset: 0; }
         to   { stroke-dashoffset: -12; }
       }
@@ -80,7 +117,6 @@ function roundedPath(points) {
 }
 
 function routeBetween(o, t, stanze, corridoi) {
-  // Costruisce grafo
   const graph = new Map();
   for (const s of stanze) graph.set(s, []);
 
@@ -93,7 +129,6 @@ function routeBetween(o, t, stanze, corridoi) {
     corrMap.set(`${c.b.nome}->${c.a.nome}`, c);
   }
 
-  // BFS
   const queue = [o.stanza];
   const prev = new Map();
   prev.set(o.stanza, null);
@@ -109,7 +144,6 @@ function routeBetween(o, t, stanze, corridoi) {
     }
   }
 
-  // Ricostruisce percorso
   const path = [];
   let cur = t.stanza;
   while (cur !== undefined && cur !== null) {
@@ -162,7 +196,6 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
   }
 
   // ---------- PERCORSI ----------
-
   if (edgeMode === "path") {
     if (edgeFocus && edgeFocus.length === 2) {
       const a = findObject(oggetti, edgeFocus[0]);
@@ -206,10 +239,20 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
     }
   }
 
-  // ---------- OGGETTI ----------
+  // ---------- OGGETTI (ripple solo su f1 = edgeFocus[0]) ----------
+  const rippleTarget = edgeFocus && edgeFocus[1] ? edgeFocus[1] : null;
+
   for (const o of oggetti) {
     if (o.visibile) {
       const [x, y] = o.pos;
+
+      // Ripple solo sull'oggetto f1 (es. "mummia" in /Museo/path/mummia/collana)
+      if (o.nome === rippleTarget) {
+        svg += `\n<circle cx="${x}" cy="${y}" r="11" class="oggetto-ripple"/>`;
+        svg += `\n<circle cx="${x}" cy="${y}" r="11" class="oggetto-ripple delay1"/>`;
+        svg += `\n<circle cx="${x}" cy="${y}" r="11" class="oggetto-ripple delay2"/>`;
+      }
+
       svg += `\n<circle cx="${x}" cy="${y}" r="10" class="oggetto"/>`;
       svg += `\n<text x="${x}" y="${y + 3}" class="oggetto-label">${o.nome}</text>`;
     }
