@@ -768,8 +768,8 @@ function replaceCircleWithImage(
     imgEl.setAttribute("preserveAspectRatio", "xMidYMid slice");
     imgEl.setAttribute("data-nome", nome);
     imgEl.style.cursor = "pointer";
-    imgEl.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
+    imgEl.addEventListener("click", (e) => {
+      e.stopPropagation();
       openObjectFocus(nome);
     });
 
@@ -906,12 +906,13 @@ function bindObjectClicks(svg: SVGSVGElement, session: Session) {
     if (!nome) return;
 
     circle.style.cursor = "pointer";
-    circle.addEventListener("pointerdown", e => {
-      e.preventDefault();
+
+    // ← era pointerdown + preventDefault: su Android richiedeva tap lungo
+    circle.addEventListener("click", e => {
+      e.stopPropagation();
       openObjectFocus(nome);
     });
 
-    // Tenta sostituzione con immagine preview
     replaceCircleWithImage(svg, circle, nome, session.museo);
   });
 }
@@ -930,8 +931,13 @@ function ObjectOverlay({
   showNav: boolean;
 }) {
   const [descrizione, setDescrizione] = useState<string | null>(null);
+  const [immagini, setImmagini]       = useState<{ tipo: string; url: string }[]>([]);
+  const [slideIdx, setSlideIdx]       = useState(0);
 
   useEffect(() => {
+    setSlideIdx(0);
+
+    // carica descrizione
     fetch(
       `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
     )
@@ -940,6 +946,19 @@ function ObjectOverlay({
         const prima = d.descrizioni?.[0]?.[0] ?? null;
         setDescrizione(prima);
       });
+
+    // carica lista immagini, esclude preview
+    fetch(
+      `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}/immagini`
+    )
+      .then(r => r.json())
+      .then(d => {
+        const lista = (d.immagini ?? []).filter(
+          (img: { tipo: string }) => img.tipo !== "preview"
+        );
+        setImmagini(lista);
+      })
+      .catch(() => setImmagini([]));
   }, [nome, session]);
 
   const fetchStanza = async (oggettoNome: string): Promise<string> => {
@@ -976,29 +995,148 @@ function ObjectOverlay({
     updateURL(percorso[index - 1], percorso[index]);
   };
 
+  const prevSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSlideIdx(i => (i - 1 + immagini.length) % immagini.length);
+  };
+
+  const nextSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSlideIdx(i => (i + 1) % immagini.length);
+  };
+
   return (
     <div
       onClick={onClose}
       style={{
-        position: "fixed",
-        inset: 0,
+        position: "fixed", inset: 0,
         background: "rgba(0,0,0,0.75)",
         zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: "#fff", padding: 24, borderRadius: 12, minWidth: 300 }}
+        style={{
+          background: "#fff",
+          borderRadius: 14,
+          minWidth: 300,
+          maxWidth: 420,
+          width: "90vw",
+          maxHeight: "88vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 12px 48px rgba(0,0,0,0.35)",
+        }}
       >
-        <h2>{nome}</h2>
-        {descrizione ? <p>{descrizione}</p> : <p>Caricamento…</p>}
+        {/* ── Slider immagini ── */}
+        {immagini.length > 0 && (
+          <div style={{ position: "relative", background: "#111", flexShrink: 0 }}>
+            <img
+              src={`${API_BASE}${immagini[slideIdx].url}`}
+              alt={immagini[slideIdx].tipo}
+              style={{
+                width: "100%",
+                maxHeight: 260,
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+
+            {/* frecce — visibili solo se ci sono più immagini */}
+            {immagini.length > 1 && (
+              <>
+                <button
+                  onClick={prevSlide}
+                  style={{
+                    position: "absolute", left: 8, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "rgba(0,0,0,0.45)", color: "#fff",
+                    border: "none", borderRadius: "50%",
+                    width: 34, height: 34, fontSize: 18,
+                    cursor: "pointer", display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >‹</button>
+                <button
+                  onClick={nextSlide}
+                  style={{
+                    position: "absolute", right: 8, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "rgba(0,0,0,0.45)", color: "#fff",
+                    border: "none", borderRadius: "50%",
+                    width: 34, height: 34, fontSize: 18,
+                    cursor: "pointer", display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >›</button>
+
+                {/* dots */}
+                <div style={{
+                  position: "absolute", bottom: 8, left: 0, right: 0,
+                  display: "flex", justifyContent: "center", gap: 6,
+                }}>
+                  {immagini.map((_, i) => (
+                    <div
+                      key={i}
+                      onClick={e => { e.stopPropagation(); setSlideIdx(i); }}
+                      style={{
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: i === slideIdx ? "#fff" : "rgba(255,255,255,0.4)",
+                        cursor: "pointer", transition: "background 0.2s",
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* etichetta tipo */}
+            <div style={{
+              position: "absolute", top: 8, right: 8,
+              background: "rgba(0,0,0,0.5)", color: "#fff",
+              fontSize: 11, padding: "2px 8px", borderRadius: 10,
+              backdropFilter: "blur(4px)",
+            }}>
+              {immagini[slideIdx].tipo}
+            </div>
+          </div>
+        )}
+
+        {/* ── Testo ── */}
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{nome}</h2>
+          {descrizione
+            ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
+            : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>Caricamento…</p>
+          }
+        </div>
+
+        {/* ── Navigazione percorso ── */}
         {showNav && (
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-            <button onClick={handlePrev}>Prev</button>
-            <button onClick={handleNext}>Next</button>
+          <div style={{
+            display: "flex", justifyContent: "space-between",
+            padding: "12px 24px", borderTop: "1px solid #eee", flexShrink: 0,
+          }}>
+            <button
+              onClick={handlePrev}
+              style={{
+                padding: "8px 20px", borderRadius: 8,
+                border: "1.5px solid #ccc", background: "transparent",
+                fontWeight: 600, fontSize: 14, cursor: "pointer",
+              }}
+            >← Precedente</button>
+            <button
+              onClick={handleNext}
+              style={{
+                padding: "8px 20px", borderRadius: 8,
+                border: "none", background: "#185FA5", color: "#fff",
+                fontWeight: 600, fontSize: 14, cursor: "pointer",
+              }}
+            >Successivo →</button>
           </div>
         )}
       </div>

@@ -1,10 +1,15 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+const API_KEY = typeof __API_KEY__ !== "undefined" ? __API_KEY__ : "";
 
 // ─── CONFIG API ────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
   const res = await fetch(`/api${path}`, {
     ...opts,
-    headers: { "Content-Type": "application/json", ...(opts.headers ?? {}) },
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": API_KEY,
+      ...(opts.headers ?? {})
+    },
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   return res.json();
@@ -12,29 +17,38 @@ async function apiFetch(path, opts = {}) {
 
 async function apiUploadImage(museo, oggetto, tipo, file) {
   const fd = new FormData();
-  fd.append("immagine", file);
+  fd.append("immagine", file, file.name);
   const res = await fetch(
-    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${tipo}`,
-    { method: "POST", body: fd }
+    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${encodeURIComponent(tipo)}`,
+    {
+      method: "POST",
+      body: fd,
+      headers: { "X-API-Key": API_KEY },
+    }
   );
-  if (!res.ok) throw new Error(`Upload ${res.status}`);
-  return res.json();
+  const errText = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`Upload ${res.status}: ${errText}`);
+  return JSON.parse(errText);
 }
 
 async function apiDeleteImage(museo, oggetto, tipo) {
   const res = await fetch(
     `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${tipo}`,
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      headers: { "X-API-Key": API_KEY },
+    }
   );
   if (!res.ok) throw new Error(`Delete ${res.status}`);
 }
 
 async function apiListImages(museo, oggetto) {
   const res = await fetch(
-    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini`
+    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini`,
+    { headers: { "X-API-Key": API_KEY } }
   );
   if (!res.ok) throw new Error(`List ${res.status}`);
-  return res.json(); // { oggetto, immagini: [{tipo, url, size, updatedAt}] }
+  return res.json();
 }
 
 // ─── COSTANTI LAYOUT ───────────────────────────────────────────────────────
@@ -179,11 +193,10 @@ function buildPercorsoLines(oggettiNomi, oggettiAll, stanze, corridors, roomPos,
 }
 
 // ─── PREVIEW LOADER HOOK ──────────────────────────────────────────────────
-// Carica le URL preview di tutti gli oggetti del museo corrente.
-// Usa HEAD request per evitare di scaricare bytes inutili, poi salva
-// l'URL stringa (non blob) così il browser usa la sua cache HTTP.
-function useObjPreviews(nomeMuseo, oggetti) {
-  const [previews, setPreviews] = useState({}); // { nomeOggetto: urlStringa }
+// refreshKey: incrementato dall'esterno dopo un upload di preview,
+// forza il re-fetch e busta la cache del browser con ?v=timestamp
+function useObjPreviews(nomeMuseo, oggetti, refreshKey = 0) {
+  const [previews, setPreviews] = useState({});
 
   useEffect(() => {
     if (!nomeMuseo || !oggetti.length) { setPreviews({}); return; }
@@ -191,17 +204,22 @@ function useObjPreviews(nomeMuseo, oggetti) {
     const results = {};
 
     Promise.all(oggetti.map(async (o) => {
-      const url = `/api/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(o.nome)}/immagini/preview`;
+      const baseUrl = `/api/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(o.nome)}/immagini/preview`;
       try {
-        const res = await fetch(url, { method: "HEAD" });
-        if (!cancelled && res.ok) results[o.nome] = url;
+        const res = await fetch(baseUrl, {
+          method: "HEAD",
+          headers: { "X-API-Key": API_KEY },
+        });
+        if (!cancelled && res.ok)
+          // se refreshKey > 0 busta la cache HTTP del browser
+          results[o.nome] = refreshKey > 0 ? `${baseUrl}?v=${refreshKey}` : baseUrl;
       } catch { /* nessuna preview */ }
     })).then(() => {
       if (!cancelled) setPreviews({ ...results });
     });
 
     return () => { cancelled = true; };
-  }, [nomeMuseo, oggetti]);
+  }, [nomeMuseo, oggetti, refreshKey]);
 
   return previews;
 }
@@ -246,19 +264,18 @@ function ModalConfirm({ modal, setModal }) {
 }
 
 // ─── IMAGE MANAGER CARD ───────────────────────────────────────────────────
-function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
-  const [immagini, setImmagini]     = useState([]);   // [{tipo, url, size, updatedAt}]
-  const [loading, setLoading]       = useState(false);
-  const [uploading, setUploading]   = useState(null); // tipo in corso di upload
-  const [deleting, setDeleting]     = useState(null); // tipo in corso di delete
-  const [newTipo, setNewTipo]       = useState("");   // tipo per nuova immagine
-  const [previewSrc, setPreviewSrc] = useState(null); // URL locale per anteprima
-  const [selectedFile, setSelectedFile] = useState(null); // File object salvato in stato
+function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
+  const [immagini, setImmagini]         = useState([]);
+  const [loading, setLoading]           = useState(false);
+  const [uploading, setUploading]       = useState(null);
+  const [deleting, setDeleting]         = useState(null);
+  const [newTipo, setNewTipo]           = useState("");
+  const [previewSrc, setPreviewSrc]     = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
-  const fileInputRef    = useRef();
-  const replaceRefs     = useRef({});                 // ref per ogni replace input
+  const fileInputRef = useRef();
+  const replaceRefs  = useRef({});
 
-  // carica lista immagini
   const reload = useCallback(async () => {
     if (!nomeMuseo || !nomeOggetto) return;
     setLoading(true);
@@ -271,10 +288,10 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  // reset quando cambia oggetto
   useEffect(() => {
     setPreviewSrc(null);
     setNewTipo("");
+    setSelectedFile(null);
   }, [nomeOggetto]);
 
   const handleUpload = async (file, tipo) => {
@@ -289,6 +306,8 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
       await apiUploadImage(nomeMuseo, nomeOggetto, tipoFinal, file);
       showToast(`✓ Immagine "${tipoFinal}" caricata`);
       await reload();
+      // se è una preview, notifica il canvas per aggiornare in tempo reale
+      if (tipoFinal === "preview") onPreviewUpdated?.();
       setNewTipo("");
       setPreviewSrc(null);
       setSelectedFile(null);
@@ -305,6 +324,8 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
       await apiDeleteImage(nomeMuseo, nomeOggetto, tipo);
       showToast(`✓ Immagine "${tipo}" eliminata`);
       await reload();
+      // se eliminiamo la preview, aggiorna anche il canvas
+      if (tipo === "preview") onPreviewUpdated?.();
     } catch (err) {
       showToast(`✗ ${err.message}`, false);
     } finally {
@@ -315,19 +336,16 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
   const onFileSelected = (file) => {
     if (!file) return;
     setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setPreviewSrc(url);
+    setPreviewSrc(URL.createObjectURL(file));
   };
 
-  const imgUrl = (url) => `/api${url}`;
-
-  const tipoLabel = (tipo) => tipo === "preview" ? "🖼 Preview" : `📷 Immagine ${tipo}`;
-  const formatSize = (b) => b > 1024*1024 ? `${(b/1024/1024).toFixed(1)} MB` : `${Math.round(b/1024)} KB`;
+  const imgUrl     = (url)  => `/api${url}`;
+  const tipoLabel  = (tipo) => tipo === "preview" ? "🖼 Preview" : `📷 Immagine ${tipo}`;
+  const formatSize = (b)    => b > 1024*1024 ? `${(b/1024/1024).toFixed(1)} MB` : `${Math.round(b/1024)} KB`;
 
   return (
     <Card title="IMMAGINI" color="#16a085">
 
-      {/* Lista immagini esistenti */}
       {loading && <div style={{fontSize:11,color:"#95a5a6",marginBottom:8}}>⏳ Caricamento...</div>}
 
       {!loading && immagini.length === 0 && (
@@ -337,22 +355,15 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
       )}
 
       {immagini.map(img => (
-        <div key={img.tipo} style={{
-          border:"1px solid #a2d9ce",borderRadius:6,marginBottom:8,overflow:"hidden",
-          background:"#f0faf8"
-        }}>
-          {/* Header riga */}
+        <div key={img.tipo} style={{border:"1px solid #a2d9ce",borderRadius:6,marginBottom:8,overflow:"hidden",background:"#f0faf8"}}>
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px"}}>
             <span style={{fontSize:12,fontWeight:"bold",color:"#16a085",flex:1}}>{tipoLabel(img.tipo)}</span>
             <span style={{fontSize:10,color:"#95a5a6"}}>{formatSize(img.size)}</span>
-
-            {/* Bottone sostituisci */}
             <button
               title="Sostituisci"
               onClick={() => replaceRefs.current[img.tipo]?.click()}
               disabled={uploading === img.tipo || deleting === img.tipo}
-              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #16a085",background:"white",
-                color:"#16a085",fontSize:11,cursor:"pointer"}}>
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #16a085",background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
               {uploading === img.tipo ? "⏳" : "↑"}
             </button>
             <input
@@ -360,19 +371,14 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
               ref={el => replaceRefs.current[img.tipo] = el}
               onChange={e => { const f = e.target.files?.[0]; e.target.value=""; if(f) handleUpload(f, img.tipo); }}
             />
-
-            {/* Bottone elimina */}
             <button
               title="Elimina"
               onClick={() => handleDelete(img.tipo)}
               disabled={deleting === img.tipo || uploading === img.tipo}
-              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #e74c3c",background:"#fdecea",
-                color:"#e74c3c",fontSize:11,cursor:"pointer"}}>
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #e74c3c",background:"#fdecea",color:"#e74c3c",fontSize:11,cursor:"pointer"}}>
               {deleting === img.tipo ? "⏳" : "✕"}
             </button>
           </div>
-
-          {/* Anteprima miniatura */}
           <img
             src={imgUrl(img.url)}
             alt={img.tipo}
@@ -381,15 +387,12 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
         </div>
       ))}
 
-      {/* Sezione aggiungi nuova immagine */}
       <div style={{marginTop:10,borderTop:"1px solid #a2d9ce",paddingTop:10}}>
         <div style={{fontSize:10,letterSpacing:1,color:"#16a085",marginBottom:6}}>AGGIUNGI NUOVA</div>
 
-        {/* Tipo */}
         <FLabel>Tipo</FLabel>
         <div style={{display:"flex",gap:6,marginBottom:8}}>
-          <button
-            onClick={() => setNewTipo("preview")}
+          <button onClick={() => setNewTipo("preview")}
             style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
               border:`1px solid ${newTipo==="preview"?"#16a085":"#dce1e7"}`,
               background:newTipo==="preview"?"#16a085":"white",
@@ -397,8 +400,7 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
             preview
           </button>
           {["1","2","3","4"].map(n => (
-            <button key={n}
-              onClick={() => setNewTipo(n)}
+            <button key={n} onClick={() => setNewTipo(n)}
               style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
                 border:`1px solid ${newTipo===n?"#16a085":"#dce1e7"}`,
                 background:newTipo===n?"#16a085":"white",
@@ -410,19 +412,16 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
             value={!["","preview","1","2","3","4"].includes(newTipo) ? newTipo : ""}
             onChange={e => setNewTipo(e.target.value)}
             placeholder="altro"
-            style={{width:44,padding:"4px 6px",border:"1px solid #dce1e7",borderRadius:4,
-              fontSize:11,outline:"none",textAlign:"center"}}
+            style={{width:44,padding:"4px 6px",border:"1px solid #dce1e7",borderRadius:4,fontSize:11,outline:"none",textAlign:"center"}}
           />
         </div>
 
-        {/* Selezione file */}
         <input
           type="file" accept="image/*" style={{display:"none"}}
           ref={fileInputRef}
-          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if(f) { onFileSelected(f); } }}
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if(f) onFileSelected(f); }}
         />
 
-        {/* Anteprima locale */}
         {previewSrc && (
           <div style={{marginBottom:8,borderRadius:6,overflow:"hidden",border:"1px solid #a2d9ce"}}>
             <img src={previewSrc} alt="anteprima" style={{width:"100%",maxHeight:120,objectFit:"cover",display:"block"}}/>
@@ -433,21 +432,16 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
         )}
 
         <div style={{display:"flex",gap:6}}>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #16a085",
-              background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #16a085",background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
             {previewSrc ? "📂 Cambia file" : "📂 Scegli file"}
           </button>
           <button
             disabled={!selectedFile || !newTipo.trim() || uploading !== null}
-            onClick={() => {
-              if (selectedFile) handleUpload(selectedFile, newTipo);
-            }}
+            onClick={() => { if (selectedFile) handleUpload(selectedFile, newTipo); }}
             style={{flex:1,padding:"7px",borderRadius:5,border:"none",fontSize:11,cursor:"pointer",fontWeight:"bold",
-              background:(!selectedFile||!newTipo.trim()||uploading!==null)?"#a2d9ce":"#16a085",
-              color:"white"}}>
-            {uploading && !["preview","1","2","3","4"].includes(uploading) ? "⏳ Upload..." : "↑ Carica"}
+              background:(!selectedFile||!newTipo.trim()||uploading!==null)?"#a2d9ce":"#16a085",color:"white"}}>
+            {uploading !== null ? "⏳ Upload..." : "↑ Carica"}
           </button>
         </div>
       </div>
@@ -535,6 +529,11 @@ export default function MuseoEditor() {
   const [toast, setToast]               = useState(null);
   const [modal, setModal]               = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [nomeStanzaEdit, setNomeStanzaEdit] = useState("");
+  const [nomeOggettoEdit, setNomeOggettoEdit] = useState("");
+
+  // ← chiave per forzare il refresh delle preview sul canvas
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
   const [percorsoEdit, setPercorsoEdit]         = useState(null);
   const [percorsoNomeEdit, setPercorsoNomeEdit] = useState("");
@@ -568,7 +567,9 @@ export default function MuseoEditor() {
   };
 
   const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti);
-  const objPreviews = useObjPreviews(museo.nome, museo.oggetti);
+
+  // passa previewRefreshKey: quando cambia, il hook ri-fetcha e busta la cache
+  const objPreviews = useObjPreviews(museo.nome, museo.oggetti, previewRefreshKey);
 
   const maxRow   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.row))+2, [museo.stanze]);
   const maxCol   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.col))+2, [museo.stanze]);
@@ -598,6 +599,20 @@ export default function MuseoEditor() {
       .then(data => { setMuseList(data?.musei??[]); setApiStatus("ok"); })
       .catch(() => setApiStatus("err"));
   }, []);
+
+  useEffect(() => {
+    if (selected?.type === "stanza") {
+      const s = museo.stanze.find(s => s.nome === selected.nome);
+      if (s) setNomeStanzaEdit(s.nome);
+    }
+  }, [selected?.nome, selected?.type]);
+
+  useEffect(() => {
+    if (selected?.type === "oggetto") {
+      const o = museo.oggetti.find(o => o.nome === selected.nome);
+      if (o) setNomeOggettoEdit(o.nome);
+    }
+  }, [selected?.nome, selected?.type]);
 
   const loadMuseoFromApi = async (nome) => {
     setLoadingMuseo(nome);
@@ -1047,7 +1062,6 @@ export default function MuseoEditor() {
             <marker id="arrow-orange-dim" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
               <path d="M0,0 L0,6 L8,3 z" fill="#f0a060"/>
             </marker>
-            {/* clipPaths per preview oggetti */}
             {museo.oggetti.filter(o=>objPreviews[o.nome]&&objPos[o.nome]).map(o=>{
               const [x,y] = objPos[o.nome];
               return (
@@ -1112,6 +1126,7 @@ export default function MuseoEditor() {
             const r = inPercorso||isHoverPreview ? 13 : 10;
             const fill = isHoverPreview ? "#f0a060" : isInEdit ? "#e67e22" : sel ? OBJ_SEL_FILL : OBJ_FILL;
             const stroke = isPick ? OBJ_PICK_STROKE : isInEdit||isHoverPreview ? "#d35400" : OBJ_STROKE;
+            const hasPreview = objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso;
             return (
               <g key={o.nome} style={{cursor:"pointer"}} onClick={e=>onObjClick(e,o.nome)}>
                 {sel&&<>
@@ -1120,10 +1135,14 @@ export default function MuseoEditor() {
                   <circle cx={x} cy={y} r={11} fill="none" stroke="#3498db" strokeWidth={2} className="rp3"/>
                 </>}
                 {isInEdit&&<circle cx={x} cy={y} r={r+4} fill="none" stroke="#e67e22" strokeWidth={1} strokeOpacity={0.4}/>}
-                {/* Se non in modalità percorso/connessione e c'è una preview: mostra immagine circolare */}
-                {objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso
+
+                {hasPreview
                   ? <>
-                      <circle cx={x} cy={y} r={15} fill="none" stroke={sel?"#f39c12":OBJ_STROKE} strokeWidth={sel?3:2}
+                      {/* ── fill="transparent" (non "none"): cattura i click sull'intera area ── */}
+                      <circle cx={x} cy={y} r={15}
+                        fill="transparent"
+                        stroke={sel?"#f39c12":OBJ_STROKE}
+                        strokeWidth={sel?3:2}
                         style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":undefined}}/>
                       <image
                         href={objPreviews[o.nome]}
@@ -1136,6 +1155,7 @@ export default function MuseoEditor() {
                   : <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth={sel||isPick||isInEdit?3:2}
                       style={{filter:isPick?"drop-shadow(0 0 4px #27ae6099)":isHoverPreview?"drop-shadow(0 0 6px #e67e2288)":undefined}}/>
                 }
+
                 {(inPercorso||isInEdit)
                   ? <>
                       <text x={x} y={y+4} textAnchor="middle" style={{font:"bold 10px Arial",fill:"white",pointerEvents:"none"}}>
@@ -1143,7 +1163,7 @@ export default function MuseoEditor() {
                       </text>
                       <text x={x} y={y+r+11} textAnchor="middle" style={{font:"9px Arial",fill:isHoverPreview?"#f0a060":"#e67e22",pointerEvents:"none"}}>{o.nome}</text>
                     </>
-                  : <text x={x} y={y+3} textAnchor="middle" style={{font:"10px Arial",fill:OBJ_TEXT,pointerEvents:"none"}}>{o.nome}</text>
+                  : <text x={x} y={y+3} textAnchor="middle" style={{font:"10px Arial",fill:hasPreview?"#2c3e50":OBJ_TEXT,pointerEvents:"none"}}>{o.nome}</text>
                 }
               </g>
             );
@@ -1178,8 +1198,20 @@ export default function MuseoEditor() {
           {!percorsoEdit && selItem && selected.type==="stanza" && (
             <Card title="STANZA" color="#27ae60">
               <FLabel>Nome</FLabel>
-              <input value={selItem.nome} onChange={e=>updStanza(selItem.nome,{nome:e.target.value})} style={INP}/>
-              <FLabel>Tipo</FLabel>
+              <input
+                value={nomeStanzaEdit}
+                onChange={e => setNomeStanzaEdit(e.target.value)}
+                onBlur={() => {
+                  const t = nomeStanzaEdit.trim();
+                  if (t && t !== selItem.nome) updStanza(selItem.nome, { nome: t });
+                  else setNomeStanzaEdit(selItem.nome);
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") { setNomeStanzaEdit(selItem.nome); e.currentTarget.blur(); }
+                }}
+                style={INP}
+              />              <FLabel>Tipo</FLabel>
               <select value={selItem.tipo} onChange={e=>updStanza(selItem.nome,{tipo:e.target.value})} style={INP}>
                 {["normale","ingresso","uscita","bagno","servizio"].map(t=><option key={t}>{t}</option>)}
               </select>
@@ -1194,8 +1226,20 @@ export default function MuseoEditor() {
           {!percorsoEdit && selItem && selected.type==="oggetto" && (<>
             <Card title="OGGETTO" color="#3498db">
               <FLabel>Nome</FLabel>
-              <input value={selItem.nome} onChange={e=>updOggetto(selItem.nome,{nome:e.target.value})} style={INP}/>
-              <FLabel>Stanza</FLabel>
+              <input
+                value={nomeOggettoEdit}
+                onChange={e => setNomeOggettoEdit(e.target.value)}
+                onBlur={() => {
+                  const t = nomeOggettoEdit.trim();
+                  if (t && t !== selItem.nome) updOggetto(selItem.nome, { nome: t });
+                  else setNomeOggettoEdit(selItem.nome);
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") { setNomeOggettoEdit(selItem.nome); e.currentTarget.blur(); }
+                }}
+                style={INP}
+              />              <FLabel>Stanza</FLabel>
               <select value={selItem.stanza} onChange={e=>updOggetto(selItem.nome,{stanza:e.target.value})} style={INP}>
                 {museo.stanze.map(s=><option key={s.nome}>{s.nome}</option>)}
               </select>
@@ -1221,11 +1265,11 @@ export default function MuseoEditor() {
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:12}}>✕ Elimina oggetto</button>
             </Card>
 
-            {/* ── CARD IMMAGINI ── */}
             <ImmaginiCard
               nomeMuseo={museo.nome}
               nomeOggetto={selItem.nome}
               showToast={showToast}
+              onPreviewUpdated={() => setPreviewRefreshKey(k => k + 1)}
             />
 
             <Card title="DESCRIZIONI" color="#8e44ad">

@@ -124,7 +124,7 @@
       "oggetti": [
         {
           "nome": "sarcofago",
-          "stanza": "stanza 1",
+          "stanza": "STANZA 1",
           "connessi": [
             "mummia"
           ],
@@ -153,7 +153,7 @@
         },
         {
           "nome": "collana",
-          "stanza": "stanza 2",
+          "stanza": "STANZA 2",
           "connessi": [
             "mummia",
             "scettro"
@@ -183,7 +183,7 @@
         },
         {
           "nome": "scettro",
-          "stanza": "stanza 2",
+          "stanza": "STANZA 2",
           "connessi": [
             "collana",
             "maschera"
@@ -213,7 +213,7 @@
         },
         {
           "nome": "maschera",
-          "stanza": "stanza 3",
+          "stanza": "STANZA 3",
           "connessi": [
             "scettro"
           ],
@@ -242,7 +242,7 @@
         },
         {
           "nome": "mummia",
-          "stanza": "stanza 1",
+          "stanza": "STANZA 1",
           "connessi": [
             "sarcofago",
             "collana"

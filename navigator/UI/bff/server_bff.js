@@ -85,7 +85,7 @@ const dispatcher = new Agent({
 // ============================================================
 const app = express();
 
-app.use(express.json());
+//app.use(express.json());
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
@@ -150,19 +150,39 @@ app.use("/svg", async (req, res) => {
 // ============================================================
 // PROXY API → openAPI_server
 // ============================================================
-app.use("/api", async (req, res) => {
+// ============================================================
+// PROXY API → openAPI_server
+// ============================================================
+app.use("/api", (req, res, next) => {
+  const ct = req.headers["content-type"] ?? "";
+  if (ct.includes("multipart/form-data")) {
+    // multipart: salta il parsing, va dritto al proxy
+    next();
+  } else {
+    // JSON e tutto il resto: parsa normalmente
+    express.json()(req, res, next);
+  }
+}, async (req, res) => {
   const target = API_BASE + req.originalUrl.replace("/api", "");
   console.log("➡️  API PROXY:", req.method, target);
 
   try {
     const forwardHeaders = { "X-API-KEY": API_KEY };
-    if (req.headers.accept) forwardHeaders.Accept = req.headers.accept;
+    if (req.headers.accept) forwardHeaders["accept"] = req.headers.accept;
+    if (req.headers["content-type"]) forwardHeaders["content-type"] = req.headers["content-type"];
 
     const fetchOptions = { method: req.method, headers: forwardHeaders, dispatcher };
 
-    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
-      fetchOptions.body = JSON.stringify(req.body);
-      fetchOptions.headers["Content-Type"] = "application/json";
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const ct = req.headers["content-type"] ?? "";
+      if (ct.includes("multipart/form-data")) {
+        fetchOptions.body = req;
+        fetchOptions.duplex = "half";
+        delete forwardHeaders["content-length"];
+      } else if (req.body && Object.keys(req.body).length > 0) {
+        fetchOptions.body = JSON.stringify(req.body);
+        forwardHeaders["content-type"] = "application/json";
+      }
     }
 
     const r = await fetch(target, fetchOptions);
