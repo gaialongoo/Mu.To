@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 
 // ─── CONFIG API ────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
@@ -8,6 +8,33 @@ async function apiFetch(path, opts = {}) {
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   return res.json();
+}
+
+async function apiUploadImage(museo, oggetto, tipo, file) {
+  const fd = new FormData();
+  fd.append("immagine", file);
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${tipo}`,
+    { method: "POST", body: fd }
+  );
+  if (!res.ok) throw new Error(`Upload ${res.status}`);
+  return res.json();
+}
+
+async function apiDeleteImage(museo, oggetto, tipo) {
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${tipo}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) throw new Error(`Delete ${res.status}`);
+}
+
+async function apiListImages(museo, oggetto) {
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini`
+  );
+  if (!res.ok) throw new Error(`List ${res.status}`);
+  return res.json(); // { oggetto, immagini: [{tipo, url, size, updatedAt}] }
 }
 
 // ─── COSTANTI LAYOUT ───────────────────────────────────────────────────────
@@ -139,7 +166,6 @@ function smoothPath(pts) {
   return d;
 }
 
-// helper: calcola le linee del percorso dato un array di nomi oggetto
 function buildPercorsoLines(oggettiNomi, oggettiAll, stanze, corridors, roomPos, objPos) {
   const lines = [];
   for (let i = 0; i < oggettiNomi.length - 1; i++) {
@@ -150,6 +176,34 @@ function buildPercorsoLines(oggettiNomi, oggettiAll, stanze, corridors, roomPos,
     if (d) lines.push({ d, key:`${a.nome}→${b.nome}`, idx: i });
   }
   return lines;
+}
+
+// ─── PREVIEW LOADER HOOK ──────────────────────────────────────────────────
+// Carica le URL preview di tutti gli oggetti del museo corrente.
+// Usa HEAD request per evitare di scaricare bytes inutili, poi salva
+// l'URL stringa (non blob) così il browser usa la sua cache HTTP.
+function useObjPreviews(nomeMuseo, oggetti) {
+  const [previews, setPreviews] = useState({}); // { nomeOggetto: urlStringa }
+
+  useEffect(() => {
+    if (!nomeMuseo || !oggetti.length) { setPreviews({}); return; }
+    let cancelled = false;
+    const results = {};
+
+    Promise.all(oggetti.map(async (o) => {
+      const url = `/api/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(o.nome)}/immagini/preview`;
+      try {
+        const res = await fetch(url, { method: "HEAD" });
+        if (!cancelled && res.ok) results[o.nome] = url;
+      } catch { /* nessuna preview */ }
+    })).then(() => {
+      if (!cancelled) setPreviews({ ...results });
+    });
+
+    return () => { cancelled = true; };
+  }, [nomeMuseo, oggetti]);
+
+  return previews;
 }
 
 // ─── MODAL PROMPT ─────────────────────────────────────────────────────────
@@ -173,7 +227,6 @@ function ModalPrompt({ modal, setModal }) {
   );
 }
 
-// ─── MODAL CONFIRM (per eliminazione museo) ───────────────────────────────
 function ModalConfirm({ modal, setModal }) {
   const confirm = () => { setModal(null); modal.onConfirm(true); };
   const cancel  = () => { setModal(null); modal.onConfirm(false); };
@@ -192,12 +245,220 @@ function ModalConfirm({ modal, setModal }) {
   );
 }
 
+// ─── IMAGE MANAGER CARD ───────────────────────────────────────────────────
+function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast }) {
+  const [immagini, setImmagini]     = useState([]);   // [{tipo, url, size, updatedAt}]
+  const [loading, setLoading]       = useState(false);
+  const [uploading, setUploading]   = useState(null); // tipo in corso di upload
+  const [deleting, setDeleting]     = useState(null); // tipo in corso di delete
+  const [newTipo, setNewTipo]       = useState("");   // tipo per nuova immagine
+  const [previewSrc, setPreviewSrc] = useState(null); // URL locale per anteprima
+  const [selectedFile, setSelectedFile] = useState(null); // File object salvato in stato
+
+  const fileInputRef    = useRef();
+  const replaceRefs     = useRef({});                 // ref per ogni replace input
+
+  // carica lista immagini
+  const reload = useCallback(async () => {
+    if (!nomeMuseo || !nomeOggetto) return;
+    setLoading(true);
+    try {
+      const data = await apiListImages(nomeMuseo, nomeOggetto);
+      setImmagini(data.immagini ?? []);
+    } catch { setImmagini([]); }
+    finally { setLoading(false); }
+  }, [nomeMuseo, nomeOggetto]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  // reset quando cambia oggetto
+  useEffect(() => {
+    setPreviewSrc(null);
+    setNewTipo("");
+  }, [nomeOggetto]);
+
+  const handleUpload = async (file, tipo) => {
+    if (!file) return;
+    const tipoFinal = tipo?.trim() || "preview";
+    if (tipoFinal !== "preview" && !/^\d+$/.test(tipoFinal)) {
+      showToast("✗ Tipo non valido: usa 'preview' o un numero", false);
+      return;
+    }
+    setUploading(tipoFinal);
+    try {
+      await apiUploadImage(nomeMuseo, nomeOggetto, tipoFinal, file);
+      showToast(`✓ Immagine "${tipoFinal}" caricata`);
+      await reload();
+      setNewTipo("");
+      setPreviewSrc(null);
+      setSelectedFile(null);
+    } catch (err) {
+      showToast(`✗ ${err.message}`, false);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleDelete = async (tipo) => {
+    setDeleting(tipo);
+    try {
+      await apiDeleteImage(nomeMuseo, nomeOggetto, tipo);
+      showToast(`✓ Immagine "${tipo}" eliminata`);
+      await reload();
+    } catch (err) {
+      showToast(`✗ ${err.message}`, false);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const onFileSelected = (file) => {
+    if (!file) return;
+    setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setPreviewSrc(url);
+  };
+
+  const imgUrl = (url) => `/api${url}`;
+
+  const tipoLabel = (tipo) => tipo === "preview" ? "🖼 Preview" : `📷 Immagine ${tipo}`;
+  const formatSize = (b) => b > 1024*1024 ? `${(b/1024/1024).toFixed(1)} MB` : `${Math.round(b/1024)} KB`;
+
+  return (
+    <Card title="IMMAGINI" color="#16a085">
+
+      {/* Lista immagini esistenti */}
+      {loading && <div style={{fontSize:11,color:"#95a5a6",marginBottom:8}}>⏳ Caricamento...</div>}
+
+      {!loading && immagini.length === 0 && (
+        <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:10}}>
+          Nessuna immagine caricata
+        </div>
+      )}
+
+      {immagini.map(img => (
+        <div key={img.tipo} style={{
+          border:"1px solid #a2d9ce",borderRadius:6,marginBottom:8,overflow:"hidden",
+          background:"#f0faf8"
+        }}>
+          {/* Header riga */}
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px"}}>
+            <span style={{fontSize:12,fontWeight:"bold",color:"#16a085",flex:1}}>{tipoLabel(img.tipo)}</span>
+            <span style={{fontSize:10,color:"#95a5a6"}}>{formatSize(img.size)}</span>
+
+            {/* Bottone sostituisci */}
+            <button
+              title="Sostituisci"
+              onClick={() => replaceRefs.current[img.tipo]?.click()}
+              disabled={uploading === img.tipo || deleting === img.tipo}
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #16a085",background:"white",
+                color:"#16a085",fontSize:11,cursor:"pointer"}}>
+              {uploading === img.tipo ? "⏳" : "↑"}
+            </button>
+            <input
+              type="file" accept="image/*" style={{display:"none"}}
+              ref={el => replaceRefs.current[img.tipo] = el}
+              onChange={e => { const f = e.target.files?.[0]; e.target.value=""; if(f) handleUpload(f, img.tipo); }}
+            />
+
+            {/* Bottone elimina */}
+            <button
+              title="Elimina"
+              onClick={() => handleDelete(img.tipo)}
+              disabled={deleting === img.tipo || uploading === img.tipo}
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #e74c3c",background:"#fdecea",
+                color:"#e74c3c",fontSize:11,cursor:"pointer"}}>
+              {deleting === img.tipo ? "⏳" : "✕"}
+            </button>
+          </div>
+
+          {/* Anteprima miniatura */}
+          <img
+            src={imgUrl(img.url)}
+            alt={img.tipo}
+            style={{width:"100%",maxHeight:100,objectFit:"cover",display:"block",borderTop:"1px solid #a2d9ce"}}
+          />
+        </div>
+      ))}
+
+      {/* Sezione aggiungi nuova immagine */}
+      <div style={{marginTop:10,borderTop:"1px solid #a2d9ce",paddingTop:10}}>
+        <div style={{fontSize:10,letterSpacing:1,color:"#16a085",marginBottom:6}}>AGGIUNGI NUOVA</div>
+
+        {/* Tipo */}
+        <FLabel>Tipo</FLabel>
+        <div style={{display:"flex",gap:6,marginBottom:8}}>
+          <button
+            onClick={() => setNewTipo("preview")}
+            style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
+              border:`1px solid ${newTipo==="preview"?"#16a085":"#dce1e7"}`,
+              background:newTipo==="preview"?"#16a085":"white",
+              color:newTipo==="preview"?"white":"#7f8c8d",fontWeight:newTipo==="preview"?"bold":"normal"}}>
+            preview
+          </button>
+          {["1","2","3","4"].map(n => (
+            <button key={n}
+              onClick={() => setNewTipo(n)}
+              style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
+                border:`1px solid ${newTipo===n?"#16a085":"#dce1e7"}`,
+                background:newTipo===n?"#16a085":"white",
+                color:newTipo===n?"white":"#7f8c8d",fontWeight:newTipo===n?"bold":"normal"}}>
+              {n}
+            </button>
+          ))}
+          <input
+            value={!["","preview","1","2","3","4"].includes(newTipo) ? newTipo : ""}
+            onChange={e => setNewTipo(e.target.value)}
+            placeholder="altro"
+            style={{width:44,padding:"4px 6px",border:"1px solid #dce1e7",borderRadius:4,
+              fontSize:11,outline:"none",textAlign:"center"}}
+          />
+        </div>
+
+        {/* Selezione file */}
+        <input
+          type="file" accept="image/*" style={{display:"none"}}
+          ref={fileInputRef}
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if(f) { onFileSelected(f); } }}
+        />
+
+        {/* Anteprima locale */}
+        {previewSrc && (
+          <div style={{marginBottom:8,borderRadius:6,overflow:"hidden",border:"1px solid #a2d9ce"}}>
+            <img src={previewSrc} alt="anteprima" style={{width:"100%",maxHeight:120,objectFit:"cover",display:"block"}}/>
+            <div style={{fontSize:10,color:"#16a085",padding:"4px 8px",background:"#f0faf8"}}>
+              Anteprima locale — non ancora caricata
+            </div>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:6}}>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #16a085",
+              background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
+            {previewSrc ? "📂 Cambia file" : "📂 Scegli file"}
+          </button>
+          <button
+            disabled={!selectedFile || !newTipo.trim() || uploading !== null}
+            onClick={() => {
+              if (selectedFile) handleUpload(selectedFile, newTipo);
+            }}
+            style={{flex:1,padding:"7px",borderRadius:5,border:"none",fontSize:11,cursor:"pointer",fontWeight:"bold",
+              background:(!selectedFile||!newTipo.trim()||uploading!==null)?"#a2d9ce":"#16a085",
+              color:"white"}}>
+            {uploading && !["preview","1","2","3","4"].includes(uploading) ? "⏳ Upload..." : "↑ Carica"}
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ─── PERCORSO EDITOR PANEL ────────────────────────────────────────────────
 function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeChange, nomeEdit, onSave, onCancel, saving }) {
   const [hovered, setHovered] = useState(null);
-
   const oggettiDisponibili = museo.oggetti.map(o => o.nome).filter(n => !oggettiEdit.includes(n));
-
   const removeOggetto = (i) => onOggettiChange(oggettiEdit.filter((_,j) => j !== i));
   const moveUp   = (i) => { if(i===0)return; const a=[...oggettiEdit];[a[i-1],a[i]]=[a[i],a[i-1]];onOggettiChange(a); };
   const moveDown = (i) => { if(i===oggettiEdit.length-1)return; const a=[...oggettiEdit];[a[i],a[i+1]]=[a[i+1],a[i]];onOggettiChange(a); };
@@ -207,10 +468,8 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
       <div style={{fontSize:10,color:"#e67e22",background:"#fef9f0",border:"1px solid #fad7a0",borderRadius:4,padding:"5px 8px",marginBottom:10}}>
         💡 Clicca gli oggetti sul canvas per aggiungerli/rimuoverli
       </div>
-
       <FLabel>Nome percorso</FLabel>
       <input value={nomeEdit} onChange={e=>onNomeChange(e.target.value)} style={INP} placeholder="es. Tour Rinascimento"/>
-
       <FLabel>Oggetti nel percorso ({oggettiEdit.length})</FLabel>
       {oggettiEdit.length === 0
         ? <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:8}}>Nessun oggetto — clicca sul canvas o usa la lista</div>
@@ -220,29 +479,23 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
                 background:"#fef9f0",border:"1px solid #fad7a0",borderRadius:4,marginBottom:3}}>
                 <span style={{fontSize:10,color:"#e67e22",minWidth:18,textAlign:"center",fontWeight:"bold"}}>{i+1}</span>
                 <span style={{flex:1,fontSize:12,color:"#2c3e50"}}>{n}</span>
-                <button onClick={()=>moveUp(i)} disabled={i===0}
-                  style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▲</button>
-                <button onClick={()=>moveDown(i)} disabled={i===oggettiEdit.length-1}
-                  style={{background:"none",border:"none",cursor:i===oggettiEdit.length-1?"default":"pointer",color:i===oggettiEdit.length-1?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▼</button>
-                <button onClick={()=>removeOggetto(i)}
-                  style={{background:"none",border:"none",color:"#e74c3c",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 2px"}}>×</button>
+                <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▲</button>
+                <button onClick={()=>moveDown(i)} disabled={i===oggettiEdit.length-1} style={{background:"none",border:"none",cursor:i===oggettiEdit.length-1?"default":"pointer",color:i===oggettiEdit.length-1?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▼</button>
+                <button onClick={()=>removeOggetto(i)} style={{background:"none",border:"none",color:"#e74c3c",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 2px"}}>×</button>
               </div>
             ))}
           </div>
       }
-
       {oggettiDisponibili.length > 0 && (
         <>
           <FLabel>Aggiungi oggetto {hovered ? <span style={{color:"#e67e22"}}>— preview: {hovered}</span> : ""}</FLabel>
           <div style={{border:"1px solid #dce1e7",borderRadius:5,overflow:"hidden",marginBottom:8,maxHeight:120,overflowY:"auto"}}>
             {oggettiDisponibili.map(n => (
               <div key={n}
-                onMouseEnter={()=>setHovered(n)}
-                onMouseLeave={()=>setHovered(null)}
+                onMouseEnter={()=>setHovered(n)} onMouseLeave={()=>setHovered(null)}
                 onClick={()=>{ onOggettiChange([...oggettiEdit, n]); setHovered(null); }}
                 style={{padding:"5px 10px",fontSize:12,cursor:"pointer",
-                  background:hovered===n?"#fad7a0":"white",
-                  borderBottom:"1px solid #f0f0f0",
+                  background:hovered===n?"#fad7a0":"white",borderBottom:"1px solid #f0f0f0",
                   color:"#2c3e50",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span>{n}</span>
                 <span style={{fontSize:10,color:"#bdc3c7"}}>{museo.oggetti.find(o=>o.nome===n)?.stanza}</span>
@@ -251,12 +504,8 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
           </div>
         </>
       )}
-
       <div style={{display:"flex",gap:8,marginTop:4}}>
-        <button onClick={onCancel}
-          style={{flex:1,padding:"7px",borderRadius:5,border:"1px solid #dce1e7",background:"transparent",color:"#95a5a6",fontSize:12,cursor:"pointer"}}>
-          Annulla
-        </button>
+        <button onClick={onCancel} style={{flex:1,padding:"7px",borderRadius:5,border:"1px solid #dce1e7",background:"transparent",color:"#95a5a6",fontSize:12,cursor:"pointer"}}>Annulla</button>
         <button onClick={onSave} disabled={saving||!nomeEdit.trim()||oggettiEdit.length===0}
           style={{flex:2,padding:"7px",borderRadius:5,border:"none",
             background:(saving||!nomeEdit.trim()||oggettiEdit.length===0)?"#f5cba7":"#e67e22",
@@ -287,10 +536,10 @@ export default function MuseoEditor() {
   const [modal, setModal]               = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
 
-  const [percorsoEdit, setPercorsoEdit]     = useState(null);
+  const [percorsoEdit, setPercorsoEdit]         = useState(null);
   const [percorsoNomeEdit, setPercorsoNomeEdit] = useState("");
   const [percorsoOggettiEdit, setPercorsoOggettiEdit] = useState([]);
-  const [percorsoSaving, setPercorsoSaving] = useState(false);
+  const [percorsoSaving, setPercorsoSaving]     = useState(false);
   const [percorsoHoverObj, setPercorsoHoverObj] = useState(null);
 
   const showPrompt = (message, defaultValue = "") =>
@@ -319,6 +568,7 @@ export default function MuseoEditor() {
   };
 
   const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti);
+  const objPreviews = useObjPreviews(museo.nome, museo.oggetti);
 
   const maxRow   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.row))+2, [museo.stanze]);
   const maxCol   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.col))+2, [museo.stanze]);
@@ -389,22 +639,18 @@ export default function MuseoEditor() {
     try {
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}`,
         { method:"PUT", body:JSON.stringify({ nome:museo.nome }) });
-
       const grid = Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
         { method:"PUT", body:JSON.stringify({ grid }) });
-
       await Promise.all(museo.oggetti.map(o =>
         apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
           { method:"PUT", body:JSON.stringify({
-              stanza: o.stanza, connessi: o.connessi,
-              visibile: o.visibile,
+              stanza: o.stanza, connessi: o.connessi, visibile: o.visibile,
               descrizioni: o.descrizioni ?? Array.from({length:4},()=>Array(3).fill(""))
             })
           }
         )
       ));
-
       showToast("✓ Tutto salvato!");
     } catch(e) { showToast(`✗ ${e.message}`, false); }
     finally { setSavingAll(false); }
@@ -423,7 +669,6 @@ export default function MuseoEditor() {
     } catch(err) { showToast(`⚠ Rename solo locale (${err.message})`, false); }
   };
 
-  // ─── ELIMINA MUSEO (tutto: oggetti + percorsi + layout + museo) ───────
   const eliminaMuseo = async () => {
     const nomeM = museo.nome;
     const confermato = await showConfirm(
@@ -431,28 +676,18 @@ export default function MuseoEditor() {
       `Questa azione è irreversibile. Verranno eliminati:\n• Tutte le stanze (${museo.stanze.length})\n• Tutti gli oggetti (${museo.oggetti.length})\n• Tutti i percorsi (${museo.percorsi.length})\n• Il museo stesso dall'API`
     );
     if (!confermato) return;
-
     setDeletingMuseo(true);
     try {
-      // 1. Elimina tutti i percorsi
       await Promise.all(museo.percorsi.map(p =>
         apiFetch(`/musei/${encodeURIComponent(nomeM)}/percorsi/${encodeURIComponent(p.nome)}`, { method:"DELETE" }).catch(()=>{})
       ));
-
-      // 2. Elimina tutti gli oggetti
       await Promise.all(museo.oggetti.map(o =>
         apiFetch(`/musei/${encodeURIComponent(nomeM)}/oggetti/${encodeURIComponent(o.nome)}`, { method:"DELETE" }).catch(()=>{})
       ));
-
-      // 3. Elimina layout (sovrascrive con grid vuota, o DELETE se supportato)
       await apiFetch(`/musei/${encodeURIComponent(nomeM)}/layout`,
         { method:"PUT", body:JSON.stringify({ grid: {} }) }
       ).catch(()=>{});
-
-      // 4. Elimina il museo
       await apiFetch(`/musei/${encodeURIComponent(nomeM)}`, { method:"DELETE" });
-
-      // 5. Aggiorna stato locale
       setMuseList(l => l.filter(n => n !== nomeM));
       setMuseo(MUSEO_VUOTO);
       setSelected(null);
@@ -498,7 +733,7 @@ export default function MuseoEditor() {
     } catch(err) { showToast(`✗ ${err.message}`, false); }
   };
 
-  // ─── MUTATORS ────────────────────────────────────────────────────────
+  // ─── MUTATORS ─────────────────────────────────────────────────────────
   const updDescrizione = (nomeOggetto, livello, lunghezza, testo) => {
     setMuseo(m => ({...m, oggetti: m.oggetti.map(o => {
       if (o.nome !== nomeOggetto) return o;
@@ -558,12 +793,10 @@ export default function MuseoEditor() {
 
   const deleteSelected = useCallback(async () => {
     if (!selected) return;
-
     if (selected.type === "stanza") {
       const oggettiDaEliminare = museo.oggetti.filter(o => o.stanza === selected.nome).map(o => o.nome);
       const percorsiAggiornati = museo.percorsi.map(p => ({
-        ...p,
-        oggetti: p.oggetti.filter(n => !oggettiDaEliminare.includes(n))
+        ...p, oggetti: p.oggetti.filter(n => !oggettiDaEliminare.includes(n))
       })).filter(p => p.oggetti.length > 0);
       setMuseo(m => ({...m,
         stanze:   m.stanze.filter(s => s.nome !== selected.nome),
@@ -580,12 +813,10 @@ export default function MuseoEditor() {
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
         showToast(`✓ Stanza eliminata`);
       } catch(err) { showToast(`⚠ Eliminazione parziale (${err.message})`, false); }
-
     } else if (selected.type === "oggetto") {
       const nomeObj = selected.nome;
       const percorsiAggiornati = museo.percorsi.map(p => ({
-        ...p,
-        oggetti: p.oggetti.filter(n => n !== nomeObj)
+        ...p, oggetti: p.oggetti.filter(n => n !== nomeObj)
       })).filter(p => p.oggetti.length > 0);
       setMuseo(m => ({...m,
         oggetti:  m.oggetti.filter(o=>o.nome!==nomeObj).map(o=>({...o,connessi:o.connessi.filter(c=>c!==nomeObj)})),
@@ -597,7 +828,6 @@ export default function MuseoEditor() {
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
         showToast(`✓ Oggetto eliminato`);
       } catch(err) { showToast(`⚠ Eliminazione parziale (${err.message})`, false); }
-
     } else if (selected.type === "percorso") {
       await eliminaPercorso(selected.nome);
     }
@@ -615,7 +845,7 @@ export default function MuseoEditor() {
     return o;
   })})),[]);
 
-  // ─── CLICK HANDLERS ──────────────────────────────────────────────────
+  // ─── CLICK HANDLERS ───────────────────────────────────────────────────
   const onRoomClick = async (e, nome) => {
     e.stopPropagation();
     if (mode==="addObject") {
@@ -637,11 +867,8 @@ export default function MuseoEditor() {
     e.stopPropagation();
     if (percorsoEdit) {
       const idx = percorsoOggettiEdit.indexOf(nome);
-      if (idx >= 0) {
-        setPercorsoOggettiEdit(percorsoOggettiEdit.filter((_,i)=>i!==idx));
-      } else {
-        setPercorsoOggettiEdit([...percorsoOggettiEdit, nome]);
-      }
+      if (idx >= 0) setPercorsoOggettiEdit(percorsoOggettiEdit.filter((_,i)=>i!==idx));
+      else setPercorsoOggettiEdit([...percorsoOggettiEdit, nome]);
       return;
     }
     if (mode==="connectPick") {
@@ -666,7 +893,7 @@ export default function MuseoEditor() {
     } catch(err){showToast(`⚠ Stanza solo locale (${err.message})`,false);}
   };
 
-  // ─── CONNESSIONI OGGETTI ──────────────────────────────────────────────
+  // ─── CONNESSIONI ──────────────────────────────────────────────────────
   const connections = useMemo(() => {
     if (selected?.type !== "oggetto") return [];
     const o = museo.oggetti.find(x=>x.nome===selected.nome);
@@ -679,7 +906,7 @@ export default function MuseoEditor() {
     });
   }, [selected,museo.oggetti,museo.stanze,objPos,corridors,roomPos]);
 
-  // ─── EXPORT ──────────────────────────────────────────────────────────
+  // ─── EXPORT ───────────────────────────────────────────────────────────
   const exportData = useMemo(() => ({
     layout: { grid: Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}])) },
     museo:  { nome: museo.nome, oggetti: museo.oggetti, percorsi: museo.percorsi },
@@ -698,7 +925,6 @@ export default function MuseoEditor() {
     : null : null;
 
   const activePercorsoLines = percorsoEdit ? percorsoEditLines : percorsoViewLines;
-
   const percorsoAttivoOggetti = percorsoEdit
     ? (percorsoHoverObj && !percorsoOggettiEdit.includes(percorsoHoverObj)
         ? [...percorsoOggettiEdit, percorsoHoverObj]
@@ -712,7 +938,7 @@ export default function MuseoEditor() {
     : mode==="connectPick" ? `Clicca un oggetto da collegare a "${selected?.nome}"`
     : null;
 
-  // ─── RENDER: WELCOME / NUOVO ─────────────────────────────────────────
+  // ─── RENDER: WELCOME / NUOVO ──────────────────────────────────────────
   if (screen === "welcome" || screen === "nuovo") {
     return (
       <div style={{display:"flex",height:"100vh",background:"#1a252f",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif"}}>
@@ -802,7 +1028,6 @@ export default function MuseoEditor() {
             {hint}
           </div>
         )}
-
         <svg width={svgW} height={svgH} style={{display:"block",background:"#f8f9fa",cursor:percorsoEdit?"crosshair":"default"}}
           onClick={()=>{ if(!percorsoEdit){setSelected(null);setMode("select");} }}>
           <defs>
@@ -822,9 +1047,17 @@ export default function MuseoEditor() {
             <marker id="arrow-orange-dim" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
               <path d="M0,0 L0,6 L8,3 z" fill="#f0a060"/>
             </marker>
+            {/* clipPaths per preview oggetti */}
+            {museo.oggetti.filter(o=>objPreviews[o.nome]&&objPos[o.nome]).map(o=>{
+              const [x,y] = objPos[o.nome];
+              return (
+                <clipPath key={`clip-${o.nome}`} id={`clip-prev-${o.nome.replace(/\s+/g,"_")}`}>
+                  <circle cx={x} cy={y} r={15}/>
+                </clipPath>
+              );
+            })}
           </defs>
 
-          {/* Ghost cells */}
           {mode==="addRoom"&&!percorsoEdit&&Array.from({length:maxRow},(_,row)=>Array.from({length:maxCol},(_,col)=>{
             if(occupied.has(`${row},${col}`))return null;
             return <rect key={`g${row}-${col}`} x={START_X+col*(ROOM_W+GAP_X)} y={START_Y+row*(ROOM_H+GAP_Y)} width={ROOM_W} height={ROOM_H} rx={8}
@@ -832,10 +1065,8 @@ export default function MuseoEditor() {
               onClick={e=>{e.stopPropagation();onGhostClick(row,col);}}/>;
           }))}
 
-          {/* Corridoi */}
           {corridors.map((c,i)=><rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill="#ecf0f1" stroke="#95a5a6" strokeWidth={1.5}/>)}
 
-          {/* Stanze */}
           {museo.stanze.map(s=>{
             const p=roomPos[s.nome]; if(!p) return null;
             const tc=TIPO_COLORS[s.tipo]||TIPO_COLORS.normale;
@@ -851,12 +1082,10 @@ export default function MuseoEditor() {
             );
           })}
 
-          {/* Linee connessioni oggetti */}
           {!percorsoEdit&&connections.map(({d,key})=>(
             <path key={key} d={d} stroke="#e74c3c" strokeWidth={3} fill="none" strokeLinecap="round" strokeDasharray="10 8" className="conn-path"/>
           ))}
 
-          {/* Linee percorso attivo */}
           {activePercorsoLines.map(({d,key,idx})=>{
             const isPreview = percorsoEdit && percorsoHoverObj &&
               !percorsoOggettiEdit.includes(percorsoHoverObj) &&
@@ -871,7 +1100,6 @@ export default function MuseoEditor() {
             );
           })}
 
-          {/* Oggetti */}
           {museo.oggetti.filter(o=>o.visibile).map(o=>{
             const pos=objPos[o.nome]; if(!pos) return null;
             const [x,y]=pos;
@@ -882,13 +1110,8 @@ export default function MuseoEditor() {
             const isHoverPreview = percorsoEdit && percorsoHoverObj===o.nome && !percorsoOggettiEdit.includes(o.nome);
             const isInEdit = percorsoEdit && percorsoOggettiEdit.includes(o.nome);
             const r = inPercorso||isHoverPreview ? 13 : 10;
-            const fill = isHoverPreview ? "#f0a060"
-              : isInEdit   ? "#e67e22"
-              : sel        ? OBJ_SEL_FILL
-              : OBJ_FILL;
-            const stroke = isPick ? OBJ_PICK_STROKE
-              : isInEdit||isHoverPreview ? "#d35400"
-              : OBJ_STROKE;
+            const fill = isHoverPreview ? "#f0a060" : isInEdit ? "#e67e22" : sel ? OBJ_SEL_FILL : OBJ_FILL;
+            const stroke = isPick ? OBJ_PICK_STROKE : isInEdit||isHoverPreview ? "#d35400" : OBJ_STROKE;
             return (
               <g key={o.nome} style={{cursor:"pointer"}} onClick={e=>onObjClick(e,o.nome)}>
                 {sel&&<>
@@ -897,8 +1120,22 @@ export default function MuseoEditor() {
                   <circle cx={x} cy={y} r={11} fill="none" stroke="#3498db" strokeWidth={2} className="rp3"/>
                 </>}
                 {isInEdit&&<circle cx={x} cy={y} r={r+4} fill="none" stroke="#e67e22" strokeWidth={1} strokeOpacity={0.4}/>}
-                <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth={sel||isPick||isInEdit?3:2}
-                  style={{filter:isPick?"drop-shadow(0 0 4px #27ae6099)":isHoverPreview?"drop-shadow(0 0 6px #e67e2288)":undefined}}/>
+                {/* Se non in modalità percorso/connessione e c'è una preview: mostra immagine circolare */}
+                {objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso
+                  ? <>
+                      <circle cx={x} cy={y} r={15} fill="none" stroke={sel?"#f39c12":OBJ_STROKE} strokeWidth={sel?3:2}
+                        style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":undefined}}/>
+                      <image
+                        href={objPreviews[o.nome]}
+                        x={x-15} y={y-15} width={30} height={30}
+                        clipPath={`url(#clip-prev-${o.nome.replace(/\s+/g,"_")})`}
+                        preserveAspectRatio="xMidYMid slice"
+                        style={{pointerEvents:"none"}}
+                      />
+                    </>
+                  : <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth={sel||isPick||isInEdit?3:2}
+                      style={{filter:isPick?"drop-shadow(0 0 4px #27ae6099)":isHoverPreview?"drop-shadow(0 0 6px #e67e2288)":undefined}}/>
+                }
                 {(inPercorso||isInEdit)
                   ? <>
                       <text x={x} y={y+4} textAnchor="middle" style={{font:"bold 10px Arial",fill:"white",pointerEvents:"none"}}>
@@ -923,7 +1160,6 @@ export default function MuseoEditor() {
 
         <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
 
-          {/* ── Editor percorso ── */}
           {percorsoEdit !== null && (
             <PercorsoEditor
               museo={museo}
@@ -939,7 +1175,6 @@ export default function MuseoEditor() {
             />
           )}
 
-          {/* ── Card stanza ── */}
           {!percorsoEdit && selItem && selected.type==="stanza" && (
             <Card title="STANZA" color="#27ae60">
               <FLabel>Nome</FLabel>
@@ -956,7 +1191,6 @@ export default function MuseoEditor() {
             </Card>
           )}
 
-          {/* ── Card oggetto ── */}
           {!percorsoEdit && selItem && selected.type==="oggetto" && (<>
             <Card title="OGGETTO" color="#3498db">
               <FLabel>Nome</FLabel>
@@ -987,6 +1221,13 @@ export default function MuseoEditor() {
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:12}}>✕ Elimina oggetto</button>
             </Card>
 
+            {/* ── CARD IMMAGINI ── */}
+            <ImmaginiCard
+              nomeMuseo={museo.nome}
+              nomeOggetto={selItem.nome}
+              showToast={showToast}
+            />
+
             <Card title="DESCRIZIONI" color="#8e44ad">
               <div style={{fontSize:10,color:"#8e44ad",background:"#f5eef8",border:"1px solid #d2b4de",borderRadius:4,padding:"5px 8px",marginBottom:10}}>
                 💾 Le descrizioni vengono salvate con "Salva su API"
@@ -1012,7 +1253,6 @@ export default function MuseoEditor() {
             </Card>
           </>)}
 
-          {/* ── Card percorso ── */}
           {!percorsoEdit && selItem && selected.type==="percorso" && (
             <Card title="PERCORSO" color="#e67e22">
               <div style={{fontSize:15,fontWeight:"bold",color:"#2c3e50",marginBottom:8}}>{selItem.nome}</div>
@@ -1039,7 +1279,6 @@ export default function MuseoEditor() {
             </div>
           )}
 
-          {/* ── Liste ── */}
           <Section label={`Stanze (${museo.stanze.length})`}>
             {museo.stanze.map(s=>(
               <ListRow key={s.nome} active={!percorsoEdit&&selected?.nome===s.nome&&selected?.type==="stanza"} accent={TIPO_COLORS[s.tipo]?.stroke||"#2c3e50"}
@@ -1074,8 +1313,7 @@ export default function MuseoEditor() {
             {museo.percorsi.length===0
               ? <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic"}}>Nessun percorso</div>
               : museo.percorsi.map(p=>(
-                <ListRow key={p.nome}
-                  active={!percorsoEdit&&selected?.nome===p.nome&&selected?.type==="percorso"} accent="#e67e22"
+                <ListRow key={p.nome} active={!percorsoEdit&&selected?.nome===p.nome&&selected?.type==="percorso"} accent="#e67e22"
                   onClick={()=>{if(percorsoEdit)return;setSelected({type:"percorso",nome:p.nome});}}>
                   <span>🗺 {p.nome}</span>
                   <span style={{fontSize:10,color:"#95a5a6"}}>{p.oggetti.length} oggetti</span>
@@ -1113,17 +1351,12 @@ export default function MuseoEditor() {
                 fontWeight:"bold",cursor:(savingAll||deletingMuseo)?"default":"pointer"}}>
               {savingAll ? "⏳ Salvataggio..." : "↑ Salva su API"}
             </button>
-            <button
-              onClick={eliminaMuseo}
-              disabled={savingAll||deletingMuseo}
+            <button onClick={eliminaMuseo} disabled={savingAll||deletingMuseo}
               title={`Elimina museo "${museo.nome}"`}
-              style={{
-                padding:"10px 12px",borderRadius:7,border:"1px solid #e74c3c",
+              style={{padding:"10px 12px",borderRadius:7,border:"1px solid #e74c3c",
                 background:deletingMuseo?"#7f8c8d":"#fdecea",
                 color:deletingMuseo?"white":"#e74c3c",fontSize:16,
-                cursor:(savingAll||deletingMuseo)?"default":"pointer",
-                flexShrink:0,
-              }}>
+                cursor:(savingAll||deletingMuseo)?"default":"pointer",flexShrink:0}}>
               {deletingMuseo ? "⏳" : "🗑"}
             </button>
           </div>
@@ -1133,7 +1366,7 @@ export default function MuseoEditor() {
   );
 }
 
-// ─── MICRO COMPONENTS ──────────────────────────────────────────────────────
+// ─── MICRO COMPONENTS ─────────────────────────────────────────────────────
 const INP    = {width:"100%",padding:"6px 8px",border:"1px solid #dce1e7",borderRadius:5,fontSize:12,boxSizing:"border-box",marginTop:2,marginBottom:8,outline:"none"};
 const DELBTN = {width:"100%",padding:"7px",border:"none",borderRadius:5,background:"#fdecea",color:"#e74c3c",fontSize:12,cursor:"pointer"};
 const FLabel = ({children})=><div style={{fontSize:10,letterSpacing:1,color:"#95a5a6",marginBottom:2,marginTop:4}}>{children}</div>;

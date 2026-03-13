@@ -2,8 +2,8 @@ openapi: 3.0.3
 
 info:
   title: Sistema Musei API
-  description: API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi e layout grafici
-  version: 2.2.0
+  description: API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi, layout grafici e immagini
+  version: 2.3.0
 
 servers:
   - url: https://localhost:3000
@@ -15,6 +15,27 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+
+  schemas:
+    ImmagineInfo:
+      type: object
+      properties:
+        tipo:
+          type: string
+          description: "'preview' oppure un numero intero (es. '1', '2', '3')"
+          example: "preview"
+        url:
+          type: string
+          description: URL relativo per accedere all'immagine
+          example: "/musei/Uffizi/oggetti/Venere/immagini/preview"
+        size:
+          type: integer
+          description: Dimensione del file in byte
+          example: 204800
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-06-01T12:00:00Z"
 
 security:
   - ApiKeyAuth: []
@@ -332,6 +353,187 @@ paths:
           description: Oggetto eliminato
         '404':
           description: Oggetto o museo non trovato
+
+  /musei/{nome_museo}/oggetti/{oggetto}/immagini:
+    get:
+      summary: Lista immagini di un oggetto
+      description: >
+        Ritorna la lista dei tipi di immagine disponibili per un oggetto.
+        Ordine: 'preview' prima, poi i numeri in ordine crescente (1, 2, 3…).
+        I dati binari non sono inclusi; usare il singolo endpoint con il tipo per scaricare l'immagine.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+        - in: path
+          name: oggetto
+          required: true
+          schema:
+            type: string
+          example: "Venere"
+      responses:
+        '200':
+          description: Lista immagini disponibili
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  oggetto:
+                    type: string
+                    example: "Venere"
+                  immagini:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImmagineInfo'
+        '404':
+          description: Museo o oggetto non trovato
+        '500':
+          description: Errore recupero lista immagini da MongoDB
+
+  /musei/{nome_museo}/oggetti/{oggetto}/immagini/{tipo}:
+    get:
+      summary: Scarica un'immagine
+      description: >
+        Restituisce i byte grezzi dell'immagine con il corretto Content-Type.
+        Usa 'preview' per l'immagine di anteprima, oppure un numero (1, 2, 3…) per le immagini aggiuntive.
+        La risposta include Cache-Control: public, max-age=3600.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+        - in: path
+          name: oggetto
+          required: true
+          schema:
+            type: string
+          example: "Venere"
+        - in: path
+          name: tipo
+          required: true
+          schema:
+            type: string
+          description: "'preview' oppure un numero intero (es. '1', '2')"
+          example: "preview"
+      responses:
+        '200':
+          description: Immagine restituita come stream binario
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Immagine non trovata
+        '500':
+          description: Errore recupero immagine da MongoDB
+
+    post:
+      summary: Carica o sostituisce un'immagine
+      description: >
+        Carica una nuova immagine (o sovrascrive quella esistente) per un oggetto del museo.
+        Il campo form-data deve chiamarsi **immagine**. Dimensione massima: 10 MB.
+        Il tipo può essere 'preview' oppure un numero intero (1, 2, 3…).
+        La collection MongoDB usata è `musei.oggetti_immagini`.
+        L'_id del documento è nel formato `{nome_museo}_{oggetto}_{tipo}`.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+        - in: path
+          name: oggetto
+          required: true
+          schema:
+            type: string
+          example: "Venere"
+        - in: path
+          name: tipo
+          required: true
+          schema:
+            type: string
+          description: "'preview' oppure un numero intero (es. '1', '2')"
+          example: "1"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - immagine
+              properties:
+                immagine:
+                  type: string
+                  format: binary
+                  description: File immagine da caricare (qualsiasi MIME image/*)
+      responses:
+        '201':
+          description: Immagine salvata con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: _id del documento salvato su MongoDB
+                    example: "Uffizi_Venere_preview"
+        '400':
+          description: Nessun file ricevuto, tipo non valido, o file non immagine
+        '404':
+          description: Museo o oggetto non trovato
+        '500':
+          description: Errore salvataggio su MongoDB
+
+    delete:
+      summary: Elimina un'immagine
+      description: >
+        Rimuove un'immagine specifica dalla collection `musei.oggetti_immagini` di MongoDB.
+        Non influisce sui dati dell'oggetto o del museo.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema:
+            type: string
+          example: "Uffizi"
+        - in: path
+          name: oggetto
+          required: true
+          schema:
+            type: string
+          example: "Venere"
+        - in: path
+          name: tipo
+          required: true
+          schema:
+            type: string
+          description: "'preview' oppure un numero intero (es. '1', '2')"
+          example: "preview"
+      responses:
+        '200':
+          description: Immagine eliminata con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Immagine 'preview' eliminata da 'Venere'"
+        '404':
+          description: Museo non trovato o immagine non trovata
+        '500':
+          description: Errore eliminazione da MongoDB
 
   /musei/{nome_museo}/percorso:
     get:

@@ -15,8 +15,15 @@ export default defineConfig(({ mode }) => ({
   base: "/",
   plugins: [react()],
   build: {
+    rollupOptions: {},
     outDir: "dist",
     emptyOutDir: true,
+  },
+  resolve: {
+    alias: {
+      // Forza Vite a usare il rollup WASM invece del nativo
+      rollup: "@rollup/wasm-node",
+    },
   },
   server: {
     port: 8080,

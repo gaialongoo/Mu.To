@@ -8,6 +8,7 @@ const { syncLayoutSuMongo } = require("./layout_upload.js");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: __dirname + "/.env" });
+const multer = require("multer");
 
 // ============================================================
 // CONFIG DA .ENV
@@ -482,6 +483,167 @@ async function startServer() {
     console.log(`✅ Server API in ascolto su https://${HOST}:${PORT}`);
     console.log(`   API key richiesta`);
   });
+
+  
+  const imgUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // max 10 MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith("image/")) cb(null, true);
+      else cb(new Error("Solo file immagine accettati"), false);
+    },
+  });
+
+  // Funzione per generare l'_id del documento immagine
+  function imgDocId(museo, oggetto, tipo) {
+    return `${museo}_${oggetto}_${tipo}`;
+  }
+
+  // ==========================================================
+  // POST /musei/:nome_museo/oggetti/:oggetto/immagini/:tipo
+  // Upload o sostituzione immagine
+  // ==========================================================
+  app.post(
+    "/musei/:nome_museo/oggetti/:oggetto/immagini/:tipo",
+    imgUpload.single("immagine"),
+    async (req, res) => {
+      const { nome_museo, oggetto, tipo } = req.params;
+
+      const museo = sistema.get_museo(nome_museo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      if (!museo.get_oggetto(oggetto)) return res.status(404).json({ error: "Oggetto non trovato" });
+      if (!req.file) return res.status(400).json({ error: "Nessun file ricevuto (campo: 'immagine')" });
+      if (tipo !== "preview" && !/^\d+$/.test(tipo))
+        return res.status(400).json({ error: "Tipo non valido: usa 'preview' o un numero (1, 2, 3…)" });
+
+      const client = new MongoClient(MONGO_URI);
+      try {
+        await client.connect();
+        const col = client.db("musei").collection("oggetti_immagini");
+
+        await col.replaceOne(
+          { _id: imgDocId(nome_museo, oggetto, tipo) },
+          {
+            _id:       imgDocId(nome_museo, oggetto, tipo),
+            museo:     nome_museo,
+            oggetto,
+            tipo,
+            mimeType:  req.file.mimetype,
+            data:      req.file.buffer,
+            size:      req.file.size,
+            updatedAt: new Date(),
+          },
+          { upsert: true }
+        );
+
+        console.log(`✅ Immagine '${imgDocId(nome_museo, oggetto, tipo)}' salvata (${req.file.size} B)`);
+        res.status(201).json({ id: imgDocId(nome_museo, oggetto, tipo) });
+      } catch (err) {
+        console.error("Errore immagine POST:", err.message);
+        res.status(500).json({ error: "Errore salvataggio immagine" });
+      } finally {
+        await client.close();
+      }
+    }
+  );
+
+  // ==========================================================
+  // GET /musei/:nome_museo/oggetti/:oggetto/immagini
+  // Lista tipi disponibili per quell'oggetto
+  // ==========================================================
+  app.get("/musei/:nome_museo/oggetti/:oggetto/immagini", async (req, res) => {
+    const { nome_museo, oggetto } = req.params;
+
+    const museo = sistema.get_museo(nome_museo);
+    if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+    if (!museo.get_oggetto(oggetto)) return res.status(404).json({ error: "Oggetto non trovato" });
+
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("oggetti_immagini");
+
+      const docs = await col
+        .find({ museo: nome_museo, oggetto }, { projection: { tipo: 1, size: 1, updatedAt: 1 } })
+        .toArray();
+
+      // Ordina: preview prima, poi 1, 2, 3…
+      docs.sort((a, b) => {
+        if (a.tipo === "preview") return -1;
+        if (b.tipo === "preview") return 1;
+        return parseInt(a.tipo) - parseInt(b.tipo);
+      });
+
+      res.json({
+        oggetto,
+        immagini: docs.map(d => ({
+          tipo:      d.tipo,
+          url:       `/musei/${encodeURIComponent(nome_museo)}/oggetti/${encodeURIComponent(oggetto)}/immagini/${d.tipo}`,
+          size:      d.size,
+          updatedAt: d.updatedAt,
+        })),
+      });
+    } catch (err) {
+      console.error("Errore immagini GET list:", err.message);
+      res.status(500).json({ error: "Errore recupero lista immagini" });
+    } finally {
+      await client.close();
+    }
+  });
+
+  // ==========================================================
+  // GET /musei/:nome_museo/oggetti/:oggetto/immagini/:tipo
+  // Restituisce i byte dell'immagine
+  // ==========================================================
+  app.get("/musei/:nome_museo/oggetti/:oggetto/immagini/:tipo", async (req, res) => {
+    const { nome_museo, oggetto, tipo } = req.params;
+
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("oggetti_immagini");
+
+      const doc = await col.findOne({ _id: imgDocId(nome_museo, oggetto, tipo) });
+      if (!doc) return res.status(404).json({ error: "Immagine non trovata" });
+
+      res.set("Content-Type", doc.mimeType);
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(doc.data.buffer ?? doc.data);
+    } catch (err) {
+      console.error("Errore immagine GET:", err.message);
+      res.status(500).json({ error: "Errore recupero immagine" });
+    } finally {
+      await client.close();
+    }
+  });
+
+  // ==========================================================
+  // DELETE /musei/:nome_museo/oggetti/:oggetto/immagini/:tipo
+  // ==========================================================
+  app.delete("/musei/:nome_museo/oggetti/:oggetto/immagini/:tipo", async (req, res) => {
+    const { nome_museo, oggetto, tipo } = req.params;
+
+    const museo = sistema.get_museo(nome_museo);
+    if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("oggetti_immagini");
+
+      const result = await col.deleteOne({ _id: imgDocId(nome_museo, oggetto, tipo) });
+      if (result.deletedCount === 0)
+        return res.status(404).json({ error: "Immagine non trovata" });
+
+      console.log(`🗑️  Immagine '${imgDocId(nome_museo, oggetto, tipo)}' eliminata`);
+      res.json({ message: `Immagine '${tipo}' eliminata da '${oggetto}'` });
+    } catch (err) {
+      console.error("Errore immagine DELETE:", err.message);
+      res.status(500).json({ error: "Errore eliminazione immagine" });
+    } finally {
+      await client.close();
+    }
+});
 }
 
 // ============================================================
