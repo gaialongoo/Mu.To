@@ -18,7 +18,7 @@ node openAPI_server.js
 ## Terminale 2
 ```bash 
 cd navigator/map-creator/js_server
-node svg-server.js
+node svg_server.js
 ```
 
 ## Terminale 3
