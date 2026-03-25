@@ -1035,6 +1035,16 @@
   <script>
     const API = '/api';
 
+    /* ── SESSION (Navigator) ───────────────────────── */
+    const COOKIE  = 'museo_session';
+    const MAX_AGE = 24 * 60 * 60 * 1000;
+
+    function setSession(s) {
+      document.cookie =
+        COOKIE + '=' + encodeURIComponent(JSON.stringify(s)) +
+        '; max-age=' + (MAX_AGE / 1000) + '; path=/; SameSite=Lax';
+    }
+
     /* ── NAVBAR scroll ─────────────────────────── */
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
@@ -1190,11 +1200,48 @@
 
     function confirmChoice() {
       const museo = document.getElementById('overlay').dataset.museo;
+
       if (selectedMode === 'marketplace') {
         window.location.href = `/marketplace?museo=${encodeURIComponent(museo)}`;
+
       } else if (selectedMode === 'navigator') {
-        const percorso = document.getElementById('routeSelect').value;
-        window.location.href = `/navigator?museo=${encodeURIComponent(museo)}&percorso=${encodeURIComponent(percorso)}`;
+        const percorsoNome = document.getElementById('routeSelect').value;
+        const confirmBtn   = document.getElementById('overlayConfirm');
+
+        confirmBtn.disabled  = true;
+        confirmBtn.textContent = 'Caricamento…';
+
+        fetch(`${API}/musei/${encodeURIComponent(museo)}/percorsi/${encodeURIComponent(percorsoNome)}`)
+          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+          .then(d => {
+            // Costruisce il percorso con sentinelle IN/OUT (stessa logica di indexSelezionamuseo)
+            const percorsoArr = ['IN', ...d.oggetti, 'OUT'];
+
+            setSession({
+              museo:     museo,
+              percorso:  percorsoArr,
+              createdAt: Date.now()
+            });
+
+            // Aggiorna URL prima di navigare (identico a indexSelezionamuseo)
+            if (percorsoArr.length >= 2) {
+              const stanza       = percorsoArr[0];
+              const primoOggetto = encodeURIComponent(percorsoArr[1]);
+              history.replaceState(
+                null,
+                '',
+                `/?stanza=${stanza}/path/${stanza}/${primoOggetto}`
+              );
+            }
+
+            // Il navigator troverà il cookie valido e avvierà React direttamente
+            window.location.href = '/navigator';
+          })
+          .catch(() => {
+            confirmBtn.disabled    = false;
+            confirmBtn.textContent = 'Conferma →';
+            alert('Errore nel caricamento del percorso. Riprova.');
+          });
       }
     }
 
