@@ -9,6 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
 
   <style>
+    .hidden {
+      display: none !important;
+    }
     /* ── TOKENS ────────────────────────────────────── */
     :root {
       --bg:        #0c0b09;
@@ -31,7 +34,6 @@
     html { scroll-behavior: smooth; font-size: 16px; }
     body {
       background: var(--bg);
-      color: var(--text);
       font-family: 'Raleway', sans-serif;
       font-weight: 300;
       overflow-x: hidden;
@@ -868,10 +870,12 @@
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
   </style>
+  <script type="module" crossorigin src="/assets/index-CnARWm5o.js"></script>
 </head>
 <body>
 
-  <!-- ── NAVBAR ──────────────────────────────── -->
+  <div id="home">
+    <!-- ── NAVBAR ──────────────────────────────── -->
   <nav class="navbar" id="navbar">
     <a href="#" class="nav-logo">ArtAround</a>
     <ul class="nav-links">
@@ -935,10 +939,10 @@
       <div class="museum-select-wrapper">
         <p class="select-label">Museo</p>
         <div class="select-group">
-          <select class="museum-select" id="museumSelect" disabled>
+          <select class="museum-select" id="museo" disabled>
             <option value="">— Caricamento… —</option>
           </select>
-          <button class="btn-primary" id="ctaBtn" onclick="handleMuseumSelect()" disabled>
+          <button class="btn-primary" id="ctaBtn" onclick="handlemuseo()" disabled>
             Vai →
           </button>
         </div>
@@ -985,6 +989,7 @@
     <span class="footer-logo">ArtAround</span>
     <p class="footer-copy">© 2025 ArtAround · Tutti i diritti riservati</p>
   </footer>
+  </div>
 
   <!-- ── OVERLAY ─────────────────────────────── -->
   <div class="overlay" id="overlay">
@@ -1017,199 +1022,303 @@
 
         <div class="route-error" id="routeError"></div>
 
-        <select class="route-select" id="routeSelect" disabled>
+        <select class="route-select" id="percorso" disabled>
           <option value="">— Seleziona un percorso —</option>
         </select>
       </div>
 
       <div class="overlay-actions">
         <button class="btn-secondary" onclick="closeOverlay()">Annulla</button>
-        <button class="btn-primary" id="overlayConfirm" onclick="confirmChoice()" disabled>
+        <button class="btn-primary" id="apri" onclick="confirmChoice()" disabled>
           Conferma →
         </button>
       </div>
     </div>
   </div>
 
-  <!-- ── SCRIPTS ─────────────────────────────── -->
-  <script>
-    const API = '/api';
+  <!-- ================= ROOT REACT ================= -->
+  <div id="root" class="hidden"></div>
 
-    /* ── NAVBAR scroll ─────────────────────────── */
-    const navbar = document.getElementById('navbar');
-    window.addEventListener('scroll', () => {
-      navbar.classList.toggle('scrolled', window.scrollY > 60);
-    });
+<script>
+  const API = '/api';
 
-    /* ── HAMBURGER ─────────────────────────────── */
-    const hamburger  = document.getElementById('hamburger');
-    const mobileMenu = document.getElementById('mobileMenu');
+  /* ================= SESSION ================= */
+  const COOKIE = "museo_session";
+  const MAX_AGE = 24 * 60 * 60 * 1000;
+
+  const home = document.getElementById("home");
+  const root = document.getElementById("root");
+
+  function getSession() {
+    const m = document.cookie.match(new RegExp("(^| )" + COOKIE + "=([^;]+)"));
+    if (!m) return null;
+    try { return JSON.parse(decodeURIComponent(m[2])); }
+    catch { return null; }
+  }
+
+  function setSession(s) {
+    document.cookie =
+      COOKIE + "=" + encodeURIComponent(JSON.stringify(s)) +
+      "; max-age=" + (MAX_AGE / 1000) + "; path=/; SameSite=Lax";
+  }
+
+  function validSession(s) {
+    return s &&
+      typeof s.museo === "string" &&
+      Array.isArray(s.percorso) &&
+      s.percorso.length >= 2 &&
+      Date.now() - s.createdAt <= MAX_AGE;
+  }
+
+  function startReact() {
+    if (home && root) {
+      home.classList.add("hidden");
+      root.classList.remove("hidden");
+    }
+    window.dispatchEvent(new Event("museo-session-ready"));
+  }
+
+  /* ── NAVBAR scroll ─────────────────────────── */
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 60);
+  });
+
+  /* ── HAMBURGER ─────────────────────────────── */
+  const hamburger  = document.getElementById('hamburger');
+  const mobileMenu = document.getElementById('mobileMenu');
+  if (hamburger && mobileMenu) {
     hamburger.addEventListener('click', () => {
       const open = hamburger.classList.toggle('open');
       mobileMenu.classList.toggle('open', open);
     });
-    function closeMobile() {
-      hamburger.classList.remove('open');
-      mobileMenu.classList.remove('open');
-    }
+  }
+  function closeMobile() {
+    if (!hamburger || !mobileMenu) return;
+    hamburger.classList.remove('open');
+    mobileMenu.classList.remove('open');
+  }
 
-    /* ── MUSEUM SELECT — GET /api/musei ────────── */
-    const museumSelect = document.getElementById('museumSelect');
-    const ctaBtn       = document.getElementById('ctaBtn');
+  /* ── MUSEUM SELECT — GET /api/musei ────────── */
+  const museo = document.getElementById('museo');
+  const ctaBtn = document.getElementById('ctaBtn');
 
-    fetch(`${API}/musei`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(d => {
-        museumSelect.innerHTML = '<option value="">— Seleziona un museo —</option>';
-        d.musei.forEach(nome => {
-          const o = document.createElement('option');
-          o.value = nome;
-          o.textContent = nome;
-          museumSelect.appendChild(o);
-        });
-        museumSelect.disabled = false;
-      })
-      .catch(() => {
-        museumSelect.innerHTML = '<option value="">Errore nel caricamento</option>';
-      });
-
-    museumSelect.addEventListener('change', () => {
-      ctaBtn.disabled = !museumSelect.value;
+  // Se esiste una sessione valida, vai direttamente a React
+  const session = getSession();
+  if (validSession(session)) {
+    // Aspetta che React sia pronto
+    window.addEventListener("museo-react-ready", () => {
+      startReact();
     });
+  } else {
+    // Carica musei solo se non c'è sessione valida
+    if (museo) {
+      fetch(`${API}/musei`)
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(d => {
+          museo.innerHTML = '<option value="">— Seleziona un museo —</option>';
+          d.musei.forEach(nome => {
+            const o = document.createElement('option');
+            o.value = nome;
+            o.textContent = nome;
+            museo.appendChild(o);
+          });
+          museo.disabled = false;
+        })
+        .catch(() => {
+          museo.innerHTML = '<option value="">Errore nel caricamento</option>';
+        });
 
-    /* ── OVERLAY open/close ────────────────────── */
-    function handleMuseumSelect() {
-      if (!museumSelect.value) return;
-      openOverlay(museumSelect.value);
+      museo.addEventListener('change', () => {
+        if (ctaBtn) ctaBtn.disabled = !museo.value;
+      });
     }
+  }
 
-    function openOverlayDirect() {
-      openOverlay(museumSelect.value || null);
-    }
+  /* ── OVERLAY open/close ────────────────────── */
+  function handlemuseo() {
+    if (!museo || !museo.value) return;
+    openOverlay(museo.value);
+  }
 
-    function openOverlay(museoNome) {
-      const overlay = document.getElementById('overlay');
+  function openOverlayDirect() {
+    openOverlay(museo ? museo.value || null : null);
+  }
 
-      overlay.dataset.museo = museoNome || '';
-      document.getElementById('overlayMuseumName').textContent = museoNome || '—';
+  function openOverlay(museoNome) {
+    const overlay = document.getElementById('overlay');
+    if (!overlay) return;
 
-      selectedMode = null;
-      document.getElementById('cardMarketplace').classList.remove('selected');
-      document.getElementById('cardNavigator').classList.remove('selected');
-      document.getElementById('navStep').classList.remove('visible');
-      document.getElementById('overlayConfirm').disabled = true;
+    overlay.dataset.museo = museoNome || '';
+    document.getElementById('overlayMuseumName').textContent = museoNome || '—';
 
-      const routeSelect = document.getElementById('routeSelect');
-      routeSelect.innerHTML = '<option value="">— Seleziona un percorso —</option>';
-      routeSelect.disabled = true;
-      document.getElementById('routeLoading').classList.remove('visible');
-      document.getElementById('routeError').classList.remove('visible');
+    selectedMode = null;
+    document.getElementById('cardMarketplace').classList.remove('selected');
+    document.getElementById('cardNavigator').classList.remove('selected');
+    document.getElementById('navStep').classList.remove('visible');
+    document.getElementById('apri').disabled = true;
 
-      overlay.classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
+    const percorso = document.getElementById('percorso');
+    percorso.innerHTML = '<option value="">— Seleziona un percorso —</option>';
+    percorso.disabled = true;
+    document.getElementById('routeLoading').classList.remove('visible');
+    document.getElementById('routeError').classList.remove('visible');
 
-    function closeOverlay() {
-      document.getElementById('overlay').classList.remove('active');
-      document.body.style.overflow = '';
-    }
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 
-    document.getElementById('overlay').addEventListener('click', function(e) {
+  function closeOverlay() {
+    const overlay = document.getElementById('overlay');
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  const overlayEl = document.getElementById('overlay');
+  if (overlayEl) {
+    overlayEl.addEventListener('click', function(e) {
       if (e.target === this) closeOverlay();
     });
+  }
 
-    /* ── MODE SELECTION ────────────────────────── */
-    let selectedMode = null;
+  /* ── MODE SELECTION ────────────────────────── */
+  let selectedMode = null;
 
-    function selectMode(mode) {
-      selectedMode = mode;
-      document.getElementById('cardMarketplace').classList.toggle('selected', mode === 'marketplace');
-      document.getElementById('cardNavigator').classList.toggle('selected', mode === 'navigator');
+  function selectMode(mode) {
+    selectedMode = mode;
+    document.getElementById('cardMarketplace').classList.toggle('selected', mode === 'marketplace');
+    document.getElementById('cardNavigator').classList.toggle('selected', mode === 'navigator');
 
-      const navStep = document.getElementById('navStep');
-      if (mode === 'navigator') {
-        navStep.classList.add('visible');
-        loadPercorsi();
-      } else {
-        navStep.classList.remove('visible');
-      }
-      checkConfirm();
+    const navStep = document.getElementById('navStep');
+    if (mode === 'navigator') {
+      navStep.classList.add('visible');
+      loadPercorsi();
+    } else {
+      navStep.classList.remove('visible');
+    }
+    checkConfirm();
+  }
+
+  /* ── PERCORSI — GET /api/musei/{nome}/percorsi */
+  function loadPercorsi() {
+    const overlay = document.getElementById('overlay');
+    if (!overlay) return;
+
+    const museoNome = overlay.dataset.museo;
+    const percorso = document.getElementById('percorso');
+    const loading  = document.getElementById('routeLoading');
+    const error    = document.getElementById('routeError');
+
+    loading.classList.add('visible');
+    error.classList.remove('visible');
+    percorso.innerHTML = '<option value="">— Seleziona un percorso —</option>';
+    percorso.disabled  = true;
+    document.getElementById('apri').disabled = true;
+
+    if (!museoNome) {
+      loading.classList.remove('visible');
+      error.textContent = 'Nessun museo selezionato.';
+      error.classList.add('visible');
+      return;
     }
 
-    /* ── PERCORSI — GET /api/musei/{nome}/percorsi */
-    function loadPercorsi() {
-      const museoNome   = document.getElementById('overlay').dataset.museo;
-      const routeSelect = document.getElementById('routeSelect');
-      const loading     = document.getElementById('routeLoading');
-      const error       = document.getElementById('routeError');
-
-      loading.classList.add('visible');
-      error.classList.remove('visible');
-      routeSelect.innerHTML = '<option value="">— Seleziona un percorso —</option>';
-      routeSelect.disabled  = true;
-      document.getElementById('overlayConfirm').disabled = true;
-
-      if (!museoNome) {
+    fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(d => {
         loading.classList.remove('visible');
-        error.textContent = 'Nessun museo selezionato.';
+        d.percorsi.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.nome;
+          o.textContent = p.nome;
+          percorso.appendChild(o);
+        });
+        percorso.disabled = false;
+        percorso.addEventListener('change', checkConfirm);
+      })
+      .catch(() => {
+        loading.classList.remove('visible');
+        error.textContent = 'Impossibile caricare i percorsi. Riprova.';
         error.classList.add('visible');
+      });
+  }
+
+  /* ── CONFERMA ──────────────────────────────── */
+  function checkConfirm() {
+    const confirmBtn = document.getElementById('apri');
+    if (!confirmBtn) return;
+
+    if (selectedMode === 'marketplace') {
+      confirmBtn.disabled = false;
+    } else if (selectedMode === 'navigator') {
+      confirmBtn.disabled = !document.getElementById('percorso').value;
+    } else {
+      confirmBtn.disabled = true;
+    }
+  }
+
+  // QUI inseriamo la logica del secondo script
+  function confirmChoice() {
+    const overlay = document.getElementById('overlay');
+    if (!overlay) return;
+
+    const museoNome = overlay.dataset.museo;
+
+    if (selectedMode === 'marketplace') {
+      // Se vuoi mantenere il vecchio redirect marketplace:
+      window.location.href = `/marketplace?museo=${encodeURIComponent(museoNome)}`;
+      return;
+    }
+
+    if (selectedMode === 'navigator') {
+      const percorsoNome = document.getElementById('percorso').value;
+      if (!museoNome || !percorsoNome) {
+        alert("Seleziona museo e percorso");
         return;
       }
 
-      fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi`)
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi/${encodeURIComponent(percorsoNome)}`)
+        .then(r => r.json())
         .then(d => {
-          loading.classList.remove('visible');
-          d.percorsi.forEach(p => {
-            const o = document.createElement('option');
-            o.value = p.nome;
-            o.textContent = p.nome;
-            routeSelect.appendChild(o);
+          const percorsoArr = ["IN", ...d.oggetti, "OUT"];
+
+          setSession({
+            museo: museoNome,
+            percorso: percorsoArr,
+            createdAt: Date.now()
           });
-          routeSelect.disabled = false;
-          routeSelect.addEventListener('change', checkConfirm);
+
+          if (percorsoArr.length >= 2) {
+            const stanza = percorsoArr[0];
+            const primoOggetto = encodeURIComponent(percorsoArr[1]);
+            history.replaceState(
+              null,
+              "",
+              `/?stanza=${stanza}/path/${stanza}/${primoOggetto}`
+            );
+          }
+
+          closeOverlay();
+          startReact();
         })
-        .catch(() => {
-          loading.classList.remove('visible');
-          error.textContent = 'Impossibile caricare i percorsi. Riprova.';
-          error.classList.add('visible');
-        });
+        .catch(() => alert("Errore percorso"));
     }
+  }
 
-    /* ── CONFERMA ──────────────────────────────── */
-    function checkConfirm() {
-      const confirmBtn = document.getElementById('overlayConfirm');
-      if (selectedMode === 'marketplace') {
-        confirmBtn.disabled = false;
-      } else if (selectedMode === 'navigator') {
-        confirmBtn.disabled = !document.getElementById('routeSelect').value;
-      } else {
-        confirmBtn.disabled = true;
+  /* ── SCROLL REVEAL ─────────────────────────── */
+  const revealEls = document.querySelectorAll('.reveal');
+  const observer  = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
       }
-    }
+    });
+  }, { threshold: .15 });
+  revealEls.forEach(el => observer.observe(el));
+</script>
 
-    function confirmChoice() {
-      const museo = document.getElementById('overlay').dataset.museo;
-      if (selectedMode === 'marketplace') {
-        window.location.href = `/marketplace?museo=${encodeURIComponent(museo)}`;
-      } else if (selectedMode === 'navigator') {
-        const percorso = document.getElementById('routeSelect').value;
-        window.location.href = `/navigator?museo=${encodeURIComponent(museo)}&percorso=${encodeURIComponent(percorso)}`;
-      }
-    }
-
-    /* ── SCROLL REVEAL ─────────────────────────── */
-    const revealEls = document.querySelectorAll('.reveal');
-    const observer  = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          observer.unobserve(e.target);
-        }
-      });
-    }, { threshold: .15 });
-    revealEls.forEach(el => observer.observe(el));
-  </script>
+<!-- React -->
 
 </body>
 </html>
