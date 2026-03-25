@@ -288,13 +288,12 @@
       align-items: center;
       gap: .6rem;
       opacity: 0;
-      animation: fadeUp .8s 1.3s var(--ease) forwards;
+      animation: fadeUpCenter .8s 1.3s var(--ease) forwards;
       cursor: pointer;
     }
     .scroll-hint span {
       font-size: .65rem;
-      letter-spacing: .3em;  
-      padding-left: .3em; /* compensa il letter-spacing */
+      letter-spacing: .3em;
       text-transform: uppercase;
       color: var(--text-dim);
     }
@@ -854,6 +853,10 @@
 
     /* ── ANIMATIONS ────────────────────────────────── */
     @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUpCenter {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
 
     .reveal {
       opacity: 0;
