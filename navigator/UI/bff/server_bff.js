@@ -5,6 +5,7 @@
  * Routes:
  *   /          → Viewer SPA  (viewer/dist/)
  *   /editor    → Editor SPA  (editor/dist/)
+ *   /marketplace → Marketplace static (marketplace/)
  *   /api/*     → Proxy → openAPI_server (HTTPS + X-API-KEY)
  *   /svg/*     → Proxy → svg_server (HTTP)
  *   /health    → Health check
@@ -66,12 +67,25 @@ if (!editorAvailable) {
   console.log("✅ Editor dist trovato");
 }
 
+// ============================================================
+// CHECK — MARKETPLACE (opzionale: warning, non blocca il boot)
+// ============================================================
+const marketplacePath  = path.join(__dirname, "marketplace");
+const marketplaceIndex = path.join(marketplacePath, "indexMarketplace.html");
+const marketplaceAvailable = fs.existsSync(marketplaceIndex);
+if (!marketplaceAvailable) {
+  console.warn("⚠️  marketplace/indexMarketplace.html non trovato — /marketplace non disponibile.");
+} else {
+  console.log("✅ Marketplace trovato");
+}
+
 console.log("✅ Config caricata");
-console.log(`   API    → ${API_BASE}`);
-console.log(`   SVG    → ${SVG_BASE}`);
-console.log(`   BFF    → http://${BFF_HOST}:${BFF_PORT}`);
-console.log(`   Viewer → ${path.join(__dirname, "viewer/dist")}`);
-console.log(`   Editor → ${path.join(__dirname, "editor/dist")} ${editorAvailable ? "✅" : "⚠️  non compilato"}`);
+console.log(`   API         → ${API_BASE}`);
+console.log(`   SVG         → ${SVG_BASE}`);
+console.log(`   BFF         → http://${BFF_HOST}:${BFF_PORT}`);
+console.log(`   Viewer      → ${path.join(__dirname, "viewer/dist")}`);
+console.log(`   Editor      → ${path.join(__dirname, "editor/dist")} ${editorAvailable ? "✅" : "⚠️  non compilato"}`);
+console.log(`   Marketplace → ${marketplacePath} ${marketplaceAvailable ? "✅" : "⚠️  non trovato"}`);
 
 // ============================================================
 // UNDICI AGENT (self-signed TLS)
@@ -84,8 +98,6 @@ const dispatcher = new Agent({
 // EXPRESS
 // ============================================================
 const app = express();
-
-//app.use(express.json());
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
@@ -115,6 +127,14 @@ app.get(["/editor", "/editor/*"], (req, res) => {
   }
   res.sendFile(distEditorIndex);
 });
+
+// ============================================================
+// STATIC — MARKETPLACE  (/marketplace/*)
+// ============================================================
+app.use(
+  "/marketplace",
+  express.static(marketplacePath)
+);
 
 // ============================================================
 // STATIC — VIEWER  (/assets/*, /vite.svg, ecc.)
@@ -150,16 +170,11 @@ app.use("/svg", async (req, res) => {
 // ============================================================
 // PROXY API → openAPI_server
 // ============================================================
-// ============================================================
-// PROXY API → openAPI_server
-// ============================================================
 app.use("/api", (req, res, next) => {
   const ct = req.headers["content-type"] ?? "";
   if (ct.includes("multipart/form-data")) {
-    // multipart: salta il parsing, va dritto al proxy
     next();
   } else {
-    // JSON e tutto il resto: parsa normalmente
     express.json()(req, res, next);
   }
 }, async (req, res) => {
@@ -209,6 +224,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     editor: editorAvailable ? "available" : "not built",
+    marketplace: marketplaceAvailable ? "available" : "not found",
   });
 });
 
@@ -232,10 +248,11 @@ app.use((err, req, res, next) => {
 // ============================================================
 const server = app.listen(BFF_PORT, BFF_HOST, () => {
   console.log(`\n✅ BFF in ascolto su http://${BFF_HOST}:${BFF_PORT}`);
-  console.log(`   🗺️  Viewer:    http://${BFF_HOST}:${BFF_PORT}/`);
-  console.log(`   ✏️  Editor:    http://${BFF_HOST}:${BFF_PORT}/editor`);
-  console.log(`   📡 Proxy API: /api/* → ${API_BASE}/*`);
-  console.log(`   🖼️  Proxy SVG: /svg/* → ${SVG_BASE}/*\n`);
+  console.log(`   🗺️  Viewer:      http://${BFF_HOST}:${BFF_PORT}/`);
+  console.log(`   ✏️  Editor:      http://${BFF_HOST}:${BFF_PORT}/editor`);
+  console.log(`   🛒 Marketplace: http://${BFF_HOST}:${BFF_PORT}/marketplace/indexMarketplace.html`);
+  console.log(`   📡 Proxy API:   /api/* → ${API_BASE}/*`);
+  console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*\n`);
 });
 
 const shutdown = (signal) => {
