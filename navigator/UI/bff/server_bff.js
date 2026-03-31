@@ -3,12 +3,12 @@
  * Node 25+ compatible
  *
  * Routes:
- *   /          → Viewer SPA  (viewer/dist/)
- *   /editor    → Editor SPA  (editor/dist/)
- *   /marketplace → Marketplace static (marketplace/)
- *   /api/*     → Proxy → openAPI_server (HTTPS + X-API-KEY)
- *   /svg/*     → Proxy → svg_server (HTTP)
- *   /health    → Health check
+ *   /              → Viewer SPA       (viewer/dist/)
+ *   /editor        → Editor SPA       (editor/dist/)
+ *   /marketplace   → Marketplace SPA  (marketplace/dist/)
+ *   /api/*         → Proxy → openAPI_server (HTTPS + X-API-KEY)
+ *   /svg/*         → Proxy → svg_server (HTTP)
+ *   /health        → Health check
  */
 import express from "express";
 import path from "path";
@@ -68,15 +68,15 @@ if (!editorAvailable) {
 }
 
 // ============================================================
-// CHECK — MARKETPLACE (opzionale: warning, non blocca il boot)
+// CHECK DIST — MARKETPLACE (opzionale: warning, non blocca il boot)
 // ============================================================
-const marketplacePath  = path.join(__dirname, "marketplace");
-const marketplaceIndex = path.join(marketplacePath, "indexMarketplace.html");
-const marketplaceAvailable = fs.existsSync(marketplaceIndex);
+const distMarketplaceIndex = path.join(__dirname, "marketplace/dist/index.html");
+const marketplaceAvailable = fs.existsSync(distMarketplaceIndex);
 if (!marketplaceAvailable) {
-  console.warn("⚠️  marketplace/indexMarketplace.html non trovato — /marketplace non disponibile.");
+  console.warn("⚠️  marketplace/dist/index.html non trovato — /marketplace non disponibile.");
+  console.warn("   Esegui: npm run build:marketplace");
 } else {
-  console.log("✅ Marketplace trovato");
+  console.log("✅ Marketplace dist trovato");
 }
 
 console.log("✅ Config caricata");
@@ -85,7 +85,7 @@ console.log(`   SVG         → ${SVG_BASE}`);
 console.log(`   BFF         → http://${BFF_HOST}:${BFF_PORT}`);
 console.log(`   Viewer      → ${path.join(__dirname, "viewer/dist")}`);
 console.log(`   Editor      → ${path.join(__dirname, "editor/dist")} ${editorAvailable ? "✅" : "⚠️  non compilato"}`);
-console.log(`   Marketplace → ${marketplacePath} ${marketplaceAvailable ? "✅" : "⚠️  non trovato"}`);
+console.log(`   Marketplace → ${path.join(__dirname, "marketplace/dist")} ${marketplaceAvailable ? "✅" : "⚠️  non compilato"}`);
 
 // ============================================================
 // UNDICI AGENT (self-signed TLS)
@@ -129,12 +129,28 @@ app.get(["/editor", "/editor/*"], (req, res) => {
 });
 
 // ============================================================
-// STATIC — MARKETPLACE  (/marketplace/*)
+// STATIC — MARKETPLACE  (/marketplace/assets/*, ecc.)
+// Deve stare PRIMA dello static del viewer per evitare collisioni
 // ============================================================
 app.use(
   "/marketplace",
-  express.static(marketplacePath)
+  express.static(path.join(__dirname, "marketplace/dist"), { index: false })
 );
+
+// ============================================================
+// SPA FALLBACK — MARKETPLACE  (/marketplace  e  /marketplace/*)
+// ============================================================
+app.get(["/marketplace", "/marketplace/*"], (req, res) => {
+  if (!marketplaceAvailable) {
+    return res
+      .status(503)
+      .send(
+        `<h2>Marketplace non ancora compilato</h2>` +
+        `<p>Esegui <code>npm run build:marketplace</code>.</p>`
+      );
+  }
+  res.sendFile(distMarketplaceIndex);
+});
 
 // ============================================================
 // STATIC — VIEWER  (/assets/*, /vite.svg, ecc.)
@@ -223,8 +239,8 @@ app.get("/health", (req, res) => {
     status: "ok",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    editor: editorAvailable ? "available" : "not built",
-    marketplace: marketplaceAvailable ? "available" : "not found",
+    editor:      editorAvailable      ? "available" : "not built",
+    marketplace: marketplaceAvailable ? "available" : "not built",
   });
 });
 
@@ -250,7 +266,7 @@ const server = app.listen(BFF_PORT, BFF_HOST, () => {
   console.log(`\n✅ BFF in ascolto su http://${BFF_HOST}:${BFF_PORT}`);
   console.log(`   🗺️  Viewer:      http://${BFF_HOST}:${BFF_PORT}/`);
   console.log(`   ✏️  Editor:      http://${BFF_HOST}:${BFF_PORT}/editor`);
-  console.log(`   🛒 Marketplace: http://${BFF_HOST}:${BFF_PORT}/marketplace/indexMarketplace.html`);
+  console.log(`   🛒 Marketplace: http://${BFF_HOST}:${BFF_PORT}/marketplace`);
   console.log(`   📡 Proxy API:   /api/* → ${API_BASE}/*`);
   console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*\n`);
 });
