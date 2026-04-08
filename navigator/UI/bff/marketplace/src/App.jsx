@@ -235,8 +235,8 @@ export default function App() {
   if (!MUSEO) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
-        <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>Nessun museo specificato. Torna alla landing.</p>
-        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Torna alla Landing</a>
+        <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>Nessun museo specificato. Torna alla home.</p>
+        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Torna alla home</a>
       </div>
     );
   }
@@ -255,29 +255,22 @@ export default function App() {
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1440, margin: "0 auto", padding: "0 40px 80px" }}>
 
         {/* ── Header ── */}
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: 44, gap: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <a href="/" style={{
-              display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 18px",
-              background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)",
-              cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em",
-              textTransform: "uppercase", color: "var(--text-dim)", textDecoration: "none",
-            }}>
-              ← Landing
-            </a>
-            <div style={{ width: 1, height: 32, background: "var(--border)" }} />
-            <div style={{ fontFamily: "var(--font-head)", fontSize: 18, letterSpacing: "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 26, height: 26, border: "1.5px solid var(--gold)", borderRadius: "50%", position: "relative" }} />
-              MU.TO <span style={{ color: "var(--gold)" }}>MKT</span>
-            </div>
+        <header style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", alignItems: "center", padding: "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: 44, gap: 24 }}>
+          {/* Left */}
+          <div style={{ fontFamily: "var(--font-head)", fontSize: 18, letterSpacing: "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 26, height: 26, border: "1.5px solid var(--gold)", borderRadius: "50%", position: "relative" }} />
+            MU.TO <span style={{ color: "var(--gold)" }}>MARKETPLACE</span>
           </div>
 
-          <div style={{ flex: 1, textAlign: "center" }}>
+          {/* Center */}
+          <div style={{ textAlign: "center" }}>
             <p style={{ fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>Museo selezionato</p>
             <p style={{ fontFamily: "var(--font-head)", fontSize: 17, fontWeight: 400, letterSpacing: "0.1em", color: "var(--text)" }}>{MUSEO}</p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* Right */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, justifyContent: "flex-end" }}>
+            <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Home</a>
             {apiKeyActive && (
               <>
                 <span style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--text-dim)" }}>🔑 Key attiva</span>
