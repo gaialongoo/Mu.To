@@ -76,9 +76,15 @@
       font-size: 1.35rem;
       font-weight: 600;
       letter-spacing: .25em;
-      color: var(--gold);
+      color: var(--text);
       text-decoration: none;
       text-transform: uppercase;
+    }
+    .nav-logo em {
+      font-style: normal;
+      font-weight: 600;
+      color: var(--gold);
+      letter-spacing: .08em;
     }
 
     .nav-links {
@@ -121,7 +127,7 @@
     .hamburger span {
       display: block;
       width: 26px; height: 1.5px;
-      background: var(--text);
+      background: var(--gold);
       transition: transform .35s var(--ease), opacity .25s, width .35s var(--ease);
       transform-origin: center;
     }
@@ -160,6 +166,35 @@
       transition: color .25s;
     }
     .mobile-menu a:hover { color: var(--gold); }
+
+    .mobile-menu-close {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 201;
+    }
+    .mobile-menu-close span {
+      display: block;
+      width: 24px;
+      height: 1.5px;
+      background: var(--gold);
+      transition: transform .35s var(--ease);
+    }
+    .mobile-menu-close span:nth-child(1) {
+      position: absolute;
+      transform: rotate(45deg);
+    }
+    .mobile-menu-close span:nth-child(2) {
+      position: absolute;
+      transform: rotate(-45deg);
+    }
 
     @media (max-width: 768px) {
       .nav-links { display: none; }
@@ -877,11 +912,10 @@
   <div id="home">
     <!-- ── NAVBAR ──────────────────────────────── -->
   <nav class="navbar" id="navbar">
-    <a href="#" class="nav-logo">ArtAround</a>
+    <a href="#" class="nav-logo">Art<em>Around</em></a>
     <ul class="nav-links">
-      <li><a href="#about">Progetto</a></li>
+      <li><a href="#about">Esplora</a></li>
       <li><a href="#project">Info</a></li>
-      <li><a href="#" onclick="openOverlayDirect(); return false;">Esplora</a></li>
     </ul>
     <button class="hamburger" id="hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
@@ -890,9 +924,12 @@
 
   <!-- Mobile menu -->
   <div class="mobile-menu" id="mobileMenu">
-    <a href="#about" onclick="closeMobile()">Progetto</a>
+    <button class="mobile-menu-close" onclick="closeMobile()" aria-label="Chiudi menu">
+      <span></span>
+      <span></span>
+    </button>
+    <a href="#about" onclick="closeMobile()">Esplora</a>
     <a href="#project" onclick="closeMobile()">Info</a>
-    <a href="#" onclick="openOverlayDirect(); closeMobile(); return false;">Esplora</a>
   </div>
 
   <!-- ── HERO ────────────────────────────────── -->
@@ -906,7 +943,7 @@
     <div class="hero-content">
       <p class="hero-eyebrow">Esplora l'arte attorno a te</p>
       <h1 class="hero-title">Art<em>Around</em></h1>
-      <p class="hero-sub">Musei · Percorsi · Marketplace</p>
+      <p class="hero-sub">Percorsi personalizzati · Marketplace</p>
       <div class="hero-divider"><div class="hero-divider-diamond"></div></div>
     </div>
 
@@ -979,7 +1016,6 @@
           <div class="project-feature"><div class="project-feature-dot"></div>Navigazione guidata con mappe interattive del museo</div>
           <div class="project-feature"><div class="project-feature-dot"></div>Disponibile su web e mobile, sempre con te</div>
         </div>
-        <a href="#" class="project-link">Scopri di più <span class="project-link-arrow">→</span></a>
       </div>
     </div>
   </section>
@@ -1091,12 +1127,14 @@
     hamburger.addEventListener('click', () => {
       const open = hamburger.classList.toggle('open');
       mobileMenu.classList.toggle('open', open);
+      document.body.style.overflow = open ? 'hidden' : '';
     });
   }
   function closeMobile() {
     if (!hamburger || !mobileMenu) return;
     hamburger.classList.remove('open');
     mobileMenu.classList.remove('open');
+    document.body.style.overflow = '';
   }
 
   /* ── MUSEUM SELECT — GET /api/musei ────────── */
