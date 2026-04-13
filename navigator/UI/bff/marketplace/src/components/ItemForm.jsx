@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { api, enc } from "../api";
 
-const LINGUE = ["it", "en", "fr", "de", "es"];
-const TONI   = ["infantile", "semplice", "medio", "avanzato"];
+const LIVELLI = ["bambino", "studente", "avanzato", "esperto"];
+const DURATE  = ["breve", "medio", "lungo"];
 
 export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
   const editing = !!oggetto;
@@ -33,16 +33,19 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
   };
   const removeConnesso = (n) => setConnessi(connessi.filter((c) => c !== n));
 
-  const addDescRow = () => setDesc([...descrizioni, ["it", "medio", "15", ""]]);
-  const removeDescRow = (i) => setDesc(descrizioni.filter((_, idx) => idx !== i));
-  const updateDesc = (i, field, val) => {
-    const next = descrizioni.map((r, idx) => {
-      if (idx !== i) return r;
-      const copy = [...r];
-      copy[field] = val;
-      return copy;
-    });
-    setDesc(next);
+  const updateOrAddDesc = (livello, durata, secs, text) => {
+    const existing = descrizioni.findIndex((d) => d[0] === livello && d[1] === durata);
+    if (existing !== -1) {
+      const next = [...descrizioni];
+      next[existing] = [livello, durata, secs, text];
+      setDesc(next);
+    } else if (secs || text) {
+      setDesc([...descrizioni, [livello, durata, secs, text]]);
+    }
+  };
+
+  const removeDesc = (livello, durata) => {
+    setDesc(descrizioni.filter((d) => !(d[0] === livello && d[1] === durata)));
   };
 
   const handleSubmit = async (e) => {
@@ -114,60 +117,97 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
 
         <Divider label="Descrizioni" />
         <p style={{ fontSize: 12, color: "var(--text-faint)", margin: "-10px 0 18px", letterSpacing: "0.04em" }}>
-          Struttura: <Code>lingua</Code> · <Code>tono</Code> · <Code>durata (s)</Code> · <Code>testo</Code>
+          Seleziona livello e durata, inserisci <Code>durata (s)</Code> e <Code>testo</Code>
         </p>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
-          <thead>
-            <tr>
-              {["Lingua", "Tono", "Durata", "Testo", ""].map((h, i) => (
-                <th key={i} style={{
-                  fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
-                  textTransform: "uppercase", color: "var(--gold)",
-                  padding: "8px 10px", textAlign: "left",
-                  borderBottom: "1px solid var(--border)",
-                  width: i === 0 ? 90 : i === 1 ? 110 : i === 2 ? 80 : i === 4 ? 40 : undefined,
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {descrizioni.map((row, i) => (
-              <tr key={i}>
-                <td style={{ padding: "5px 4px" }}>
-                  <select style={{ ...inputStyle, padding: "8px 10px", fontSize: 12 }} value={row[0]} onChange={(e) => updateDesc(i, 0, e.target.value)}>
-                    {LINGUE.map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}
-                  </select>
-                </td>
-                <td style={{ padding: "5px 4px" }}>
-                  <select style={{ ...inputStyle, padding: "8px 10px", fontSize: 12 }} value={row[1]} onChange={(e) => updateDesc(i, 1, e.target.value)}>
-                    {TONI.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </td>
-                <td style={{ padding: "5px 4px" }}>
-                  <input type="number" style={{ ...inputStyle, width: 72, padding: "8px 10px", fontSize: 12 }} value={row[2]} min="1" onChange={(e) => updateDesc(i, 2, e.target.value)} />
-                </td>
-                <td style={{ padding: "5px 4px" }}>
-                  <textarea style={{ ...inputStyle, padding: "8px 10px", fontSize: 12, minHeight: 58, resize: "vertical" }} value={row[3]} onChange={(e) => updateDesc(i, 3, e.target.value)} />
-                </td>
-                <td style={{ padding: "5px 4px" }}>
-                  <button type="button" onClick={() => removeDescRow(i)} style={{
-                    padding: "6px 10px", background: "transparent",
-                    border: "1px solid var(--border)", borderRadius: "var(--radius)",
-                    cursor: "pointer", color: "var(--text-faint)", fontSize: 14,
-                  }}>×</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button type="button" onClick={addDescRow} style={{
-          marginTop: 10, padding: "8px 18px",
-          background: "transparent", border: "1px dashed rgba(92,191,128,0.3)",
-          borderRadius: "var(--radius)", cursor: "pointer",
-          fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.14em",
-          textTransform: "uppercase", color: "var(--text-faint)",
-        }}>+ Aggiungi descrizione</button>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${DURATE.length + 1}, 1fr)`, gap: 12, marginBottom: 24 }}>
+          {/* Header row */}
+          <div />
+          {DURATE.map((d) => (
+            <div key={d} style={{
+              fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
+              textTransform: "uppercase", color: "var(--gold)",
+              padding: "10px 8px", textAlign: "center",
+              borderBottom: "1px solid var(--border)",
+            }}>{d}</div>
+          ))}
+          
+          {/* Body rows */}
+          {LIVELLI.map((livello) => (
+            <React.Fragment key={livello}>
+              <div style={{
+                fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
+                textTransform: "uppercase", color: "var(--gold)",
+                padding: "10px 8px", textAlign: "center",
+                borderRight: "1px solid var(--border)",
+              }}>{livello}</div>
+              {DURATE.map((durata) => {
+                const desc = descrizioni.find((d) => d[0] === livello && d[1] === durata);
+                return (
+                  <div key={`${livello}-${durata}`} style={{
+                    display: "flex", flexDirection: "column", gap: 6,
+                    padding: "10px 8px",
+                    background: "var(--bg-panel)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                  }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="s"
+                        value={desc?.[2] || ""}
+                        onChange={(e) => updateOrAddDesc(livello, durata, e.target.value, desc?.[3] || "")}
+                        style={{
+                          flex: 1,
+                          padding: "6px 8px",
+                          background: "var(--bg)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius)",
+                          color: "var(--text)",
+                          fontSize: 11,
+                          outline: "none",
+                        }}
+                      />
+                      {desc && (
+                        <button
+                          type="button"
+                          onClick={() => removeDesc(livello, durata)}
+                          style={{
+                            padding: "4px 6px",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius)",
+                            cursor: "pointer",
+                            color: "var(--text-faint)",
+                            fontSize: 12,
+                          }}
+                        >×</button>
+                      )}
+                    </div>
+                    <textarea
+                      placeholder="Testo..."
+                      value={desc?.[3] || ""}
+                      onChange={(e) => updateOrAddDesc(livello, durata, desc?.[2] || "15", e.target.value)}
+                      style={{
+                        padding: "6px 8px",
+                        background: "var(--bg)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius)",
+                        color: "var(--text)",
+                        fontSize: 11,
+                        minHeight: 60,
+                        resize: "vertical",
+                        outline: "none",
+                        fontFamily: "var(--font-body)",
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
 
         <FormGroup label={<>Immagine preview <span style={{ color: "var(--text-faint)", fontSize: 9 }}>(opzionale)</span></>} style={{ marginTop: 22 }}>
           <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} style={{ ...inputStyle, cursor: "pointer", color: "var(--text-dim)" }} />
