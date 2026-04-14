@@ -120,6 +120,15 @@ function DangerBtn({ onClick, children }) {
 
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isTablet = viewportW <= 1024;
+  const isMobile = viewportW <= 768;
+
   const params = new URLSearchParams(window.location.search);
   const MUSEO  = params.get("museo");
 
@@ -245,43 +254,43 @@ export default function App() {
   return (
     <>
       <ArcDeco />
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 1440, margin: "0 auto", padding: "0 40px 80px" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 1440, margin: "0 auto", padding: isMobile ? "0 12px 56px" : isTablet ? "0 22px 70px" : "0 40px 80px" }}>
 
         {/* ── Header ── */}
-        <header style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", alignItems: "center", padding: "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: 44, gap: 24 }}>
+        <header style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr 1fr" : "1fr 1fr 1fr", alignItems: "center", padding: isMobile ? "18px 0 22px" : "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: isMobile ? 26 : 44, gap: isMobile ? 14 : 24 }}>
           {/* Left */}
-          <div style={{ fontFamily: "var(--font-head)", fontSize: 18, letterSpacing: "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 18, letterSpacing: isMobile ? "0.12em" : "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? "center" : "left", flexWrap: "wrap" }}>
             <div style={{ width: 26, height: 26, border: "1.5px solid var(--gold)", borderRadius: "50%", position: "relative" }} />
             MU.TO <span style={{ color: "var(--gold)" }}>MARKETPLACE</span>
           </div>
 
           {/* Center */}
-          <div style={{ textAlign: "center" }}>
-            <p style={{ fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>Museo selezionato</p>
-            <p style={{ fontFamily: "var(--font-head)", fontSize: 17, fontWeight: 400, letterSpacing: "0.1em", color: "var(--text)" }}>{MUSEO}</p>
+          <div style={{ textAlign: "center", gridColumn: isMobile ? "1 / -1" : undefined, order: isMobile ? -1 : 0 }}>
+            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 8 : 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>Museo selezionato</p>
+            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 17, fontWeight: 400, letterSpacing: isMobile ? "0.06em" : "0.1em", color: "var(--text)", overflowWrap: "anywhere" }}>{MUSEO}</p>
           </div>
 
           {/* Right */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, justifyContent: "flex-end" }}>
-            <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Home</a>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: isMobile ? "center" : "flex-end", flexWrap: "wrap" }}>
+            <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Home</a>
             {apiKeyActive && (
               <>
                 <span style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--text-dim)" }}>🔑 Key attiva</span>
-                <button onClick={handleLogout} style={{ padding: "10px 22px", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Rimuovi Key</button>
+                <button onClick={handleLogout} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Rimuovi Key</button>
               </>
             )}
           </div>
         </header>
 
         {/* ── Navigation ── */}
-        <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 32 }}>
-          <div style={{ display: "flex", gap: 2, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4 }}>
+        <nav style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12, marginBottom: isMobile ? 22 : 32 }}>
+          <div style={{ display: "flex", gap: 2, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4, width: isMobile ? "100%" : "auto" }}>
             {[
               { id: "items", label: "Oggetti" },
               { id: "visits", label: "Percorsi" },
             ].map((t) => (
               <button key={t.id} onClick={() => switchSection(t.id)} style={{
-                padding: "12px 18px",
+                padding: isMobile ? "11px 12px" : "12px 18px",
                 background: currentSection === t.id ? "var(--gold)" : "transparent",
                 border: "none", borderRadius: 5, cursor: "pointer",
                 fontFamily: "var(--font-head)", fontSize: 10, fontWeight: 500,
@@ -289,6 +298,7 @@ export default function App() {
                 color: currentSection === t.id ? "#0d0d0d" : "var(--text-dim)",
                 transition: "all 0.2s",
                 whiteSpace: "nowrap",
+                flex: isMobile ? 1 : undefined,
               }}>{t.label}</button>
             ))}
           </div>
@@ -296,14 +306,14 @@ export default function App() {
           {currentSection === "items" ? (
             <button
               onClick={() => { setEditingObj(null); setActiveTab("create-item"); }}
-              style={{ padding: "11px 18px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
+              style={{ padding: "11px 18px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
             >
               + Nuovo Oggetto
             </button>
           ) : (
             <button
               onClick={() => setActiveTab("create-visit")}
-              style={{ padding: "11px 18px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
+              style={{ padding: "11px 18px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
             >
               + Nuovo Percorso
             </button>
@@ -317,20 +327,20 @@ export default function App() {
               type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { setAppliedSearch(search); setAppliedStanza(stanzaFilter); setItemPage(1); } }}
               placeholder="Cerca oggetti..."
-              style={{ flex: 1, minWidth: 200, padding: "11px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
+              style={{ flex: 1, minWidth: isMobile ? "100%" : 200, width: isMobile ? "100%" : undefined, padding: "11px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
             />
-            <select value={stanzaFilter} onChange={(e) => setStanzaFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
+            <select value={stanzaFilter} onChange={(e) => setStanzaFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
               <option value="">Tutte le stanze</option>
               {stanze.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button onClick={() => { setAppliedSearch(search); setAppliedStanza(stanzaFilter); setItemPage(1); }} style={{ padding: "11px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Filtra</button>
+            <button onClick={() => { setAppliedSearch(search); setAppliedStanza(stanzaFilter); setItemPage(1); }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Filtra</button>
           </div>
         )}
 
         {/* ── Tab: Oggetti ── */}
         {activeTab === "items" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20, marginBottom: 40 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: isMobile ? 14 : 20, marginBottom: 40 }}>
               {loadingItems
                 ? <Skeleton />
                 : pagedItems.length === 0
@@ -347,7 +357,7 @@ export default function App() {
         {/* ── Tab: Percorsi ── */}
         {activeTab === "visits" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20, marginBottom: 40 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: isMobile ? 14 : 20, marginBottom: 40 }}>
               {loadingVisits
                 ? <Skeleton />
                 : pagedVisits.length === 0

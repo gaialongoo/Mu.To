@@ -36,6 +36,14 @@ function normalizeDescrizioni(raw) {
 }
 
 export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = viewportW <= 768;
+
   const editing = !!oggetto;
 
   const [nome,      setNome]      = useState(oggetto?.nome      || "");
@@ -205,14 +213,18 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
   }, [newTipoPreview]);
 
   return (
-    <div style={formContainerStyle}>
+    <div style={{
+      ...formContainerStyle,
+      padding: isMobile ? 16 : formContainerStyle.padding,
+      margin: isMobile ? "0 0 26px" : formContainerStyle.margin,
+    }}>
       <div style={topLineStyle} />
       <h3 style={h3Style}>
         <small style={smallStyle}>{editing ? "Modifica Oggetto" : "Gestione Oggetti"}</small>
         {editing ? oggetto.nome : "Aggiungi Oggetto"}
       </h3>
       <form onSubmit={handleSubmit}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 18, marginBottom: 22 }}>
           <FormGroup label="Nome">
             <input style={inputStyle} value={nome} onChange={(e) => setNome(e.target.value)} required placeholder="Es: La Nascita di Venere" />
           </FormGroup>
@@ -286,17 +298,21 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
           Seleziona livello e durata, inserisci <Code>testo</Code>
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${DURATE.length + 1}, 1fr)`, gap: 12, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : `repeat(${DURATE.length + 1}, 1fr)`, gap: 12, marginBottom: 24 }}>
           {/* Header row */}
-          <div />
-          {DURATE.map((d) => (
-            <div key={d} style={{
-              fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
-              textTransform: "uppercase", color: "var(--gold)",
-              padding: "10px 8px", textAlign: "center",
-              borderBottom: "1px solid var(--border)",
-            }}>{d}</div>
-          ))}
+          {!isMobile && (
+            <>
+              <div />
+              {DURATE.map((d) => (
+                <div key={d} style={{
+                  fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
+                  textTransform: "uppercase", color: "var(--gold)",
+                  padding: "10px 8px", textAlign: "center",
+                  borderBottom: "1px solid var(--border)",
+                }}>{d}</div>
+              ))}
+            </>
+          )}
           
           {/* Body rows */}
           {LIVELLI.map((livello, livelloIdx) => (
@@ -305,7 +321,8 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                 fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
                 textTransform: "uppercase", color: "var(--gold)",
                 padding: "10px 8px", textAlign: "center",
-                borderRight: "1px solid var(--border)",
+                borderRight: isMobile ? "none" : "1px solid var(--border)",
+                borderBottom: isMobile ? "1px solid var(--border)" : "none",
               }}>{livello}</div>
               {DURATE.map((durata, durataIdx) => {
                 const text = descrizioni?.[livelloIdx]?.[durataIdx] || "";
@@ -317,6 +334,17 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                     border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
                   }}>
+                    {isMobile && (
+                      <div style={{
+                        fontFamily: "var(--font-head)",
+                        fontSize: 9,
+                        letterSpacing: "0.16em",
+                        textTransform: "uppercase",
+                        color: "var(--gold)",
+                      }}>
+                        {durata}
+                      </div>
+                    )}
                     <textarea
                       placeholder="Testo..."
                       value={text}
@@ -401,7 +429,7 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                   </button>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginBottom: 8, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 <label style={{ ...miniBtnStyle, cursor: "pointer" }}>
                   Scegli file
                   <input
@@ -430,9 +458,9 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
           </>
         )}
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 36, paddingTop: 28, borderTop: "1px solid var(--border)" }}>
-          <button type="button" onClick={onCancel} style={cancelBtnStyle}>Annulla</button>
-          <button type="submit" disabled={saving} style={saveBtnStyle}>{saving ? "Salvataggio..." : "Salva Oggetto"}</button>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexDirection: isMobile ? "column" : "row", marginTop: 36, paddingTop: 28, borderTop: "1px solid var(--border)" }}>
+          <button type="button" onClick={onCancel} style={{ ...cancelBtnStyle, width: isMobile ? "100%" : "auto" }}>Annulla</button>
+          <button type="submit" disabled={saving} style={{ ...saveBtnStyle, width: isMobile ? "100%" : "auto" }}>{saving ? "Salvataggio..." : "Salva Oggetto"}</button>
         </div>
       </form>
     </div>

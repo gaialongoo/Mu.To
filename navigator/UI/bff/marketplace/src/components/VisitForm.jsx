@@ -3,6 +3,14 @@ import { api, enc } from "../api";
 import { inputStyle } from "./ItemForm";
 
 export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast }) {
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  React.useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = viewportW <= 768;
+
   const [nome,          setNome]     = useState("");
   const [visitOggetti,  setVisit]    = useState([]);
   const [selected,      setSelected] = useState("");
@@ -37,7 +45,7 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
-      borderRadius: "var(--radius-lg)", padding: 46, maxWidth: 780, margin: "0 auto 40px", position: "relative",
+      borderRadius: "var(--radius-lg)", padding: isMobile ? 16 : 46, maxWidth: 780, margin: isMobile ? "0 0 26px" : "0 auto 40px", position: "relative",
     }}>
       <div style={{ position: "absolute", top: 0, left: 48, right: 48, height: 1, background: "linear-gradient(90deg, transparent, var(--gold), transparent)", opacity: 0.45 }} />
       <h3 style={{ fontFamily: "var(--font-head)", fontSize: 19, fontWeight: 400, letterSpacing: "0.12em", color: "var(--text)", marginBottom: 34 }}>
@@ -77,9 +85,9 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
               }
             </div>
             {/* Footer */}
-            <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", background: "var(--bg-card)" }}>
+            <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px", display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, alignItems: "center", background: "var(--bg-card)" }}>
               <select
-                style={{ ...inputStyle, flex: 1, padding: "8px 12px", fontSize: 12 }}
+                style={{ ...inputStyle, flex: 1, width: "100%", padding: "8px 12px", fontSize: 12 }}
                 value={selected}
                 onChange={(e) => setSelected(e.target.value)}
               >
@@ -88,6 +96,7 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
               </select>
               <button type="button" onClick={addOggetto} style={{
                 padding: "8px 16px",
+                width: isMobile ? "100%" : "auto",
                 background: "var(--gold-dim)", color: "var(--gold)",
                 border: "1px solid rgba(92,191,128,0.3)", borderRadius: "var(--radius)",
                 cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase",
@@ -97,9 +106,9 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
           <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8, letterSpacing: "0.04em" }}>Tutti gli oggetti devono esistere nel museo · nessun duplicato</p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 36, paddingTop: 28, borderTop: "1px solid var(--border)" }}>
-          <button type="button" onClick={onCancel} style={{ padding: "10px 22px", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Annulla</button>
-          <button type="submit" disabled={saving} style={{ padding: "10px 22px", background: "var(--gold)", color: "#0d0d0d", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{saving ? "Salvataggio..." : "Salva Percorso"}</button>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexDirection: isMobile ? "column" : "row", marginTop: 36, paddingTop: 28, borderTop: "1px solid var(--border)" }}>
+          <button type="button" onClick={onCancel} style={{ padding: "10px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Annulla</button>
+          <button type="submit" disabled={saving} style={{ padding: "10px 22px", width: isMobile ? "100%" : "auto", background: "var(--gold)", color: "#0d0d0d", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{saving ? "Salvataggio..." : "Salva Percorso"}</button>
         </div>
       </form>
     </div>

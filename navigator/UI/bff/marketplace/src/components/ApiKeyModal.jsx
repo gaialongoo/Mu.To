@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 export default function ApiKeyModal({ open, onClose, onConfirm }) {
   const [key, setKey] = useState("");
+  const isMobile = window.innerWidth <= 768;
 
   const handleConfirm = () => {
     if (!key.trim()) return;
@@ -29,7 +30,7 @@ export default function ApiKeyModal({ open, onClose, onConfirm }) {
         background: "var(--bg-card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-lg)",
-        padding: 48,
+        padding: isMobile ? 16 : 48,
         width: "90%",
         maxWidth: 420,
         position: "relative",
