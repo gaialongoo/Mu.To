@@ -3,12 +3,14 @@ const https = require("https");
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
+const { SistemaMusei } = require("./sistema_musei.js");
 const { upsertMuseo, syncMuseiSuMongo } = require("./mongo_upload.js");
 const { syncLayoutSuMongo } = require("./layout_upload.js");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: __dirname + "/.env" });
 const multer = require("multer");
+const pkg = require("./package.json");
 
 // ============================================================
 // CONFIG DA .ENV
@@ -25,6 +27,89 @@ const VALID_API_KEYS = [API_KEY];
 
 const FILE_JSON   = path.join(__dirname, "musei.json");
 const LAYOUT_FILE = path.join(__dirname, "layout.json");
+const DB_NAME = "musei";
+const MUSEI_COLLECTION = "musei_db";
+const LAYOUT_COLLECTION = "musei_layout";
+
+function parseCliArgs(argv) {
+  const args = { bootstrapMode: "disk-override", help: false, version: false };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--help" || arg === "-h") args.help = true;
+    else if (arg === "--version" || arg === "-v") args.version = true;
+    else if (arg === "--bootstrap-mode" && argv[i + 1]) args.bootstrapMode = argv[++i];
+    else if (arg.startsWith("--bootstrap-mode=")) args.bootstrapMode = arg.split("=")[1];
+  }
+  return args;
+}
+
+function printHelp() {
+  console.log(`Sistema Musei API v${pkg.version}
+
+Uso:
+  node openAPI_server.js [opzioni]
+
+Opzioni:
+  -h, --help                     Mostra questo help
+  -v, --version                  Mostra la versione
+  --bootstrap-mode <mode>        Strategia di bootstrap dati all'avvio
+                                 Mode disponibili:
+                                   disk-override  Carica da musei.json/layout.json e forza sync su MongoDB
+                                   mongo          Carica da MongoDB e salva snapshot su musei.json/layout.json
+`);
+}
+
+function readLayoutStore(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const raw = fs.readFileSync(filePath, "utf-8");
+  if (!raw.trim()) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error(`❌ layout.json non valido: ${err.message}`);
+    return {};
+  }
+}
+
+function saveLayoutStore(filePath, layoutStore) {
+  fs.writeFileSync(filePath, JSON.stringify(layoutStore, null, 2), "utf-8");
+}
+
+async function loadSistemaFromMongo() {
+  const client = new MongoClient(MONGO_URI);
+  try {
+    await client.connect();
+    const docs = await client.db(DB_NAME).collection(MUSEI_COLLECTION).find({}).toArray();
+    const sistema = new SistemaMusei();
+    for (const d of docs) {
+      sistema.aggiungi_museo({
+        nome: d.nome,
+        citta: d.citta,
+        oggetti: d.oggetti || [],
+        percorsi: d.percorsi || [],
+      });
+    }
+    return sistema;
+  } finally {
+    await client.close();
+  }
+}
+
+async function loadLayoutStoreFromMongo() {
+  const client = new MongoClient(MONGO_URI);
+  try {
+    await client.connect();
+    const docs = await client.db(DB_NAME).collection(LAYOUT_COLLECTION).find({}).toArray();
+    const layoutStore = {};
+    for (const doc of docs) {
+      const { _id, ...rest } = doc;
+      layoutStore[_id] = rest;
+    }
+    return layoutStore;
+  } finally {
+    await client.close();
+  }
+}
 
 // ============================================================
 // APP EXPRESS
@@ -58,7 +143,7 @@ app.use((req, res, next) => {
 // ============================================================
 // AVVIO ASINCRONO
 // ============================================================
-async function startServer() {
+async function startServer(cliOptions) {
 
   // --- ✅ Check MongoDB ---
   console.log(`🔌 Verifica MongoDB su ${MONGO_URI}...`);
@@ -75,13 +160,23 @@ async function startServer() {
     await probe.close();
   }
 
-  // --- Caricamento dati ---
-  console.log("📂 Caricamento musei da:", FILE_JSON);
-  const sistema = caricaMuseiDaJSON(FILE_JSON);
-  console.log(`✅ Caricati ${sistema.musei.size} musei`);
-
-  syncMuseiSuMongo(sistema);
-  syncLayoutSuMongo(LAYOUT_FILE);
+  // --- Caricamento dati bootstrap ---
+  let sistema;
+  let layoutStore;
+  if (cliOptions.bootstrapMode === "mongo") {
+    console.log("☁️ Bootstrap da MongoDB (musei + layout), con snapshot locale su disco");
+    sistema = await loadSistemaFromMongo();
+    layoutStore = await loadLayoutStoreFromMongo();
+    sistema.salvaSuFile(FILE_JSON);
+    saveLayoutStore(LAYOUT_FILE, layoutStore);
+  } else {
+    console.log("📂 Bootstrap da file locali (disk-override) e sync su MongoDB");
+    sistema = caricaMuseiDaJSON(FILE_JSON);
+    layoutStore = readLayoutStore(LAYOUT_FILE);
+    syncMuseiSuMongo(sistema);
+    syncLayoutSuMongo(LAYOUT_FILE);
+  }
+  console.log(`✅ Sistema pronto con ${sistema.musei.size} musei`);
 
   // ==========================================================
   // ROUTE — GET
@@ -206,6 +301,11 @@ async function startServer() {
         { $set: nuovoLayout },
         { upsert: true }
       );
+      layoutStore[req.params.nome_museo] = {
+        ...(layoutStore[req.params.nome_museo] || {}),
+        ...nuovoLayout,
+      };
+      saveLayoutStore(LAYOUT_FILE, layoutStore);
 
       console.log(`Layout '${req.params.nome_museo}' aggiornato`);
       res.json({ message: `Layout '${req.params.nome_museo}' aggiornato con successo` });
@@ -230,6 +330,8 @@ async function startServer() {
         console.log(`Layout '${req.params.nome_museo}' non trovato per eliminazione`);
         return res.status(404).json({ error: "Layout non trovato" });
       }
+      delete layoutStore[req.params.nome_museo];
+      saveLayoutStore(LAYOUT_FILE, layoutStore);
 
       console.log(`Layout '${req.params.nome_museo}' eliminato`);
       res.json({ message: `Layout '${req.params.nome_museo}' eliminato con successo` });
@@ -419,7 +521,10 @@ async function startServer() {
     const client = new MongoClient(MONGO_URI);
     try {
       await client.connect();
-      await client.db("musei_db").collection("musei").deleteOne({ nome: req.params.nome_museo });
+      await client.db(DB_NAME).collection(MUSEI_COLLECTION).deleteOne({ nome: req.params.nome_museo });
+      await client.db(DB_NAME).collection(LAYOUT_COLLECTION).deleteOne({ _id: req.params.nome_museo });
+      delete layoutStore[req.params.nome_museo];
+      saveLayoutStore(LAYOUT_FILE, layoutStore);
       console.log(`Museo '${req.params.nome_museo}' eliminato`);
     } catch (err) {
       console.error("Errore MongoDB:", err.message);
@@ -649,7 +754,22 @@ async function startServer() {
 // ============================================================
 // ENTRY POINT
 // ============================================================
-startServer().catch(err => {
+const cliOptions = parseCliArgs(process.argv.slice(2));
+if (cliOptions.help) {
+  printHelp();
+  process.exit(0);
+}
+if (cliOptions.version) {
+  console.log(pkg.version);
+  process.exit(0);
+}
+if (!["disk-override", "mongo"].includes(cliOptions.bootstrapMode)) {
+  console.error(`❌ bootstrap mode non valido: ${cliOptions.bootstrapMode}`);
+  printHelp();
+  process.exit(1);
+}
+
+startServer(cliOptions).catch(err => {
   console.error("💥 Errore fatale avvio server:", err);
   process.exit(1);
 });

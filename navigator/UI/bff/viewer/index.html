@@ -1113,6 +1113,13 @@
     window.dispatchEvent(new Event("museo-session-ready"));
   }
 
+  function getNavigatorRedirectUrl(s) {
+    if (!s || !Array.isArray(s.percorso) || s.percorso.length < 2) return null;
+    const stanza = encodeURIComponent(s.percorso[0]);
+    const primoOggetto = encodeURIComponent(s.percorso[1]);
+    return `/?stanza=${stanza}/path/${stanza}/${primoOggetto}`;
+  }
+
   /* ── NAVBAR scroll ─────────────────────────── */
   const navbar = document.getElementById('navbar');
   window.addEventListener('scroll', () => {
@@ -1143,10 +1150,15 @@
   // Se esiste una sessione valida, vai direttamente a React
   const session = getSession();
   if (validSession(session)) {
-    // Aspetta che React sia pronto
-    window.addEventListener("museo-react-ready", () => {
-      startReact();
-    });
+    const hasStanzaInUrl = new URLSearchParams(window.location.search).has("stanza");
+    if (!hasStanzaInUrl) {
+      const redirectUrl = getNavigatorRedirectUrl(session);
+      if (redirectUrl) {
+        window.location.replace(redirectUrl);
+      }
+    }
+    // Sessione valida: mostra subito il navigator React
+    startReact();
   } else {
     // Carica musei solo se non c'è sessione valida
     if (museo) {

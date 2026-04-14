@@ -184,11 +184,12 @@ export default function App() {
   const pagedItems = filtered.slice((itemPage - 1) * PAGE_SIZE, itemPage * PAGE_SIZE);
   const pagedVisits = percorsi.slice((visitPage - 1) * PAGE_SIZE, visitPage * PAGE_SIZE);
 
-  // ── Tab switching ──────────────────────────────────────────────────────────
-  const switchTab = (tab) => {
-    setActiveTab(tab);
-    if (tab === "visits" && !percorsiLoaded) loadPercorsi();
-    if (tab === "create-item") setEditingObj(null);
+  // ── Navigation switching ───────────────────────────────────────────────────
+  const currentSection = activeTab === "visits" || activeTab === "create-visit" ? "visits" : "items";
+  const switchSection = (section) => {
+    if (section === "visits" && !percorsiLoaded) loadPercorsi();
+    if (section === "items") setEditingObj(null);
+    setActiveTab(section);
   };
 
   // ── Auth ───────────────────────────────────────────────────────────────────
@@ -241,14 +242,6 @@ export default function App() {
     );
   }
 
-  // ── Tabs config ────────────────────────────────────────────────────────────
-  const TABS = [
-    { id: "items",        label: "Oggetti" },
-    { id: "visits",       label: "Percorsi" },
-    { id: "create-item",  label: "+ Nuovo Oggetto" },
-    { id: "create-visit", label: "+ Nuovo Percorso" },
-  ];
-
   return (
     <>
       <ArcDeco />
@@ -280,20 +273,41 @@ export default function App() {
           </div>
         </header>
 
-        {/* ── Tabs ── */}
-        <nav style={{ display: "flex", gap: 2, marginBottom: 32, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4 }}>
-          {TABS.map((t) => (
-            <button key={t.id} onClick={() => switchTab(t.id)} style={{
-              flex: 1, padding: "12px 14px",
-              background: activeTab === t.id ? "var(--gold)" : "transparent",
-              border: "none", borderRadius: 5, cursor: "pointer",
-              fontFamily: "var(--font-head)", fontSize: 10, fontWeight: 500,
-              letterSpacing: "0.13em", textTransform: "uppercase",
-              color: activeTab === t.id ? "#0d0d0d" : "var(--text-dim)",
-              transition: "all 0.2s",
-              whiteSpace: "nowrap",
-            }}>{t.label}</button>
-          ))}
+        {/* ── Navigation ── */}
+        <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 32 }}>
+          <div style={{ display: "flex", gap: 2, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4 }}>
+            {[
+              { id: "items", label: "Oggetti" },
+              { id: "visits", label: "Percorsi" },
+            ].map((t) => (
+              <button key={t.id} onClick={() => switchSection(t.id)} style={{
+                padding: "12px 18px",
+                background: currentSection === t.id ? "var(--gold)" : "transparent",
+                border: "none", borderRadius: 5, cursor: "pointer",
+                fontFamily: "var(--font-head)", fontSize: 10, fontWeight: 500,
+                letterSpacing: "0.13em", textTransform: "uppercase",
+                color: currentSection === t.id ? "#0d0d0d" : "var(--text-dim)",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}>{t.label}</button>
+            ))}
+          </div>
+
+          {currentSection === "items" ? (
+            <button
+              onClick={() => { setEditingObj(null); setActiveTab("create-item"); }}
+              style={{ padding: "11px 18px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
+            >
+              + Nuovo Oggetto
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab("create-visit")}
+              style={{ padding: "11px 18px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
+            >
+              + Nuovo Percorso
+            </button>
+          )}
         </nav>
 
         {/* ── Filters (only on items tab) ── */}

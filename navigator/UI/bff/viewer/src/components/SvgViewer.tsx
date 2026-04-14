@@ -29,6 +29,13 @@ function getSession(): Session | null {
   }
 }
 
+function clearSessionCookies() {
+  const expired = "Thu, 01 Jan 1970 00:00:00 GMT";
+  document.cookie = `${COOKIE_NAME}=; expires=${expired}; path=/; SameSite=Lax`;
+  document.cookie = `museo=; expires=${expired}; path=/; SameSite=Lax`;
+  document.cookie = `percorso=; expires=${expired}; path=/; SameSite=Lax`;
+}
+
 function isSessionValid(session: Session | null): session is Session {
   if (!session) return false;
   if (!session.museo) return false;
@@ -92,6 +99,8 @@ type Link = {
   corridor: Corridor;
 };
 
+type RectBox = { x: number; y: number; w: number; h: number };
+
 /* ===================== COMPONENT ===================== */
 
 export default function SvgViewer() {
@@ -109,6 +118,7 @@ export default function SvgViewer() {
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
   const [freeExplore, setFreeExplore] = useState(false);
   const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   const lockedViewBox = useRef<string | null>(null);
   const setRoomConfirmRef = useRef(setRoomConfirm);
@@ -127,14 +137,14 @@ export default function SvgViewer() {
 
   useEffect(() => {
     if (!session) return;
-    loadSvg(computeSvgUrl(session), session);
+    loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
     ensureDefaultStanza(session);
     const onPop = () => {
-      if (!freeExplore) loadSvg(computeSvgUrl(session), session);
+      if (!freeExplore) loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -382,10 +392,48 @@ export default function SvgViewer() {
     }, 0);
   };
 
+  const handleExitConfirm = () => {
+    clearSessionCookies();
+    setExitConfirmOpen(false);
+    setRoomConfirm(null);
+    setFocusedObject(null);
+    lockedViewBox.current = null;
+    setFreeExplore(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("stanza");
+    url.searchParams.delete("oggetto");
+    window.location.replace(url.toString());
+  };
+
   if (!session) return <div style={{ padding: 20 }}>Caricamento…</div>;
 
   return (
     <>
+      <button
+        onClick={() => setExitConfirmOpen(true)}
+        title="Esci dal percorso"
+        style={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          zIndex: 1001,
+          border: "none",
+          borderRadius: 10,
+          background: "rgba(200, 32, 32, 0.9)",
+          color: "#fff",
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: "0.05em",
+          padding: "8px 12px",
+          cursor: "pointer",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
+      >
+        EXIT
+      </button>
+
       <button
         onClick={() => setFreeExplore(prev => !prev)}
         title={freeExplore ? "Torna alla stanza" : "Esplora mappa"}
@@ -514,6 +562,62 @@ export default function SvgViewer() {
         </div>
       )}
 
+      {exitConfirmOpen && (
+        <div
+          onClick={() => setExitConfirmOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 9001,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              padding: "24px 28px",
+              borderRadius: 14,
+              minWidth: 280,
+              maxWidth: 360,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+          >
+            <p style={{ margin: "0 0 8px", fontSize: 13, color: "#666" }}>
+              Sei sicuro di uscire dalla navigazione attuale?
+            </p>
+            <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
+              Perderai tutti i progressi del percorso in corso.
+            </h3>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={handleExitConfirm}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
+                  background: "#C72020", color: "#fff", fontWeight: 600,
+                  fontSize: 14, cursor: "pointer",
+                }}
+              >
+                SI
+              </button>
+              <button
+                onClick={() => setExitConfirmOpen(false)}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 8,
+                  border: "1.5px solid #ccc", background: "transparent",
+                  fontWeight: 600, fontSize: 14, cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {focusedObject && (
         <ObjectOverlay
           nome={focusedObject}
@@ -544,28 +648,24 @@ function findRoomLabel(svg: SVGSVGElement, rect: SVGRectElement): string | null 
     sibling = sibling.nextElementSibling;
   }
 
-  const navLayer = svg.querySelector("#nav-layer");
-  if (navLayer) {
-    const cx = +rect.getAttribute("x")! + +rect.getAttribute("width")! / 2;
-    const cy = +rect.getAttribute("y")! + +rect.getAttribute("height")! / 2;
-    let best: string | null = null;
-    let bestDist = Infinity;
-    for (const t of Array.from(navLayer.querySelectorAll<SVGTextElement>("text"))) {
-      if (!(t.getAttribute("class") ?? "").includes("stanza-label")) continue;
-      const tx = +(t.getAttribute("x") ?? 0);
-      const ty = +(t.getAttribute("y") ?? 0);
-      const d = Math.hypot(tx - cx, ty - cy);
-      if (d < bestDist) { bestDist = d; best = t.textContent?.trim() ?? null; }
-    }
-    return best;
+  const cx = +rect.getAttribute("x")! + +rect.getAttribute("width")! / 2;
+  const cy = +rect.getAttribute("y")! + +rect.getAttribute("height")! / 2;
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const t of Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))) {
+    const tx = +(t.getAttribute("x") ?? 0);
+    const ty = +(t.getAttribute("y") ?? 0);
+    const d = Math.hypot(tx - cx, ty - cy);
+    if (d < bestDist) { bestDist = d; best = t.textContent?.trim() ?? null; }
   }
+  if (best) return best;
 
   return null;
 }
 
 /* ===================== SVG LOADER ===================== */
 
-function loadSvg(url: string, session: Session) {
+function loadSvg(url: string, session: Session, onExitRequested: () => void) {
   const host = document.getElementById("svg-host");
   if (!host) return;
   fetch(url)
@@ -584,7 +684,48 @@ function loadSvg(url: string, session: Session) {
 
       renderNavigation(svg);
       bindObjectClicks(svg, session);
+      mountExitInOutRoom(svg, onExitRequested);
     });
+}
+
+function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
+  const outLabel = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))
+    .find(label => normalize(label.textContent ?? "") === "out");
+
+  if (!outLabel) return;
+
+  const outRoomRect = Array.from(svg.querySelectorAll<SVGRectElement>("rect.stanza"))
+    .find(rect => normalize(findRoomLabel(svg, rect) ?? "") === "out");
+
+  const centerX = outRoomRect
+    ? Number(outRoomRect.getAttribute("x") ?? 0) + Number(outRoomRect.getAttribute("width") ?? 0) / 2
+    : Number(outLabel.getAttribute("x") ?? 0);
+  const centerY = outRoomRect
+    ? Number(outRoomRect.getAttribute("y") ?? 0) + Number(outRoomRect.getAttribute("height") ?? 0) / 2
+    : Number(outLabel.getAttribute("y") ?? 0);
+
+  const ns = "http://www.w3.org/2000/svg";
+  const exitGroup = document.createElementNS(ns, "g");
+  exitGroup.setAttribute("class", "exit-room-cta");
+  exitGroup.style.cursor = "pointer";
+
+  const exitText = document.createElementNS(ns, "text");
+  exitText.setAttribute("x", String(centerX));
+  exitText.setAttribute("y", String(centerY + 1));
+  exitText.setAttribute("text-anchor", "middle");
+  exitText.setAttribute("dominant-baseline", "middle");
+  exitText.setAttribute("class", "exit-room-label");
+  exitText.setAttribute("fill", "#ff2b2b");
+  exitText.setAttribute("stroke", "#630000");
+  exitText.setAttribute("stroke-width", "1.1");
+  exitText.textContent = "EXIT";
+
+  exitGroup.appendChild(exitText);
+  exitGroup.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onExitRequested();
+  });
+  svg.appendChild(exitGroup);
 }
 
 /* ===================== NAVIGATION ===================== */
@@ -597,11 +738,21 @@ function renderNavigation(svg: SVGSVGElement) {
   const session = getSession();
   if (!session) return;
 
-  const { stanza } = parseStanzaFromUrl(session);
+  const { stanza, svgPath } = parseStanzaFromUrl(session);
   const corridors = extractCorridors(svg);
   const rooms = extractRooms(svg);
 
-  const current = rooms.find(r => normalize(r.label) === normalize(stanza));
+  let current = rooms.find(r => normalize(r.label) === normalize(stanza));
+  if (!current) {
+    const fallbackStanza = session.percorso[0];
+    current = rooms.find(r => normalize(r.label) === normalize(fallbackStanza));
+    if (current) {
+      const value = svgPath ? `${current.label}/${svgPath}` : current.label;
+      const url = new URL(window.location.href);
+      url.searchParams.set("stanza", value);
+      window.history.replaceState({}, "", url);
+    }
+  }
   if (!current) return;
 
   zoomToRect(svg, current.rect);
@@ -622,27 +773,23 @@ function ensureDefaultStanza(session: Session) {
 
 function extractRooms(svg: SVGSVGElement): Room[] {
   const rooms: Room[] = [];
-  let lastRect: SVGRectElement | null = null;
+  const roomRects = Array.from(svg.querySelectorAll<SVGRectElement>("rect.stanza"));
+  const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"));
 
-  const navLayer = svg.querySelector("#nav-layer") as SVGGElement;
-  if (!navLayer) throw new Error("Nav layer mancante!");
+  for (const labelEl of labels) {
+    const label = labelEl.textContent?.trim();
+    if (!label) continue;
 
-  for (const el of Array.from(svg.children)) {
-    if (el.tagName === "rect") {
-      const r = el as SVGRectElement;
-      lastRect = (r.getAttribute("class") ?? "").includes("stanza") ? r : null;
-    }
-    if (el.tagName === "text" && lastRect) {
-      const t = el as SVGTextElement;
-      if ((t.getAttribute("class") ?? "").includes("stanza-label")) {
-        navLayer.appendChild(t);
-        rooms.push({
-          label: t.textContent!.trim(),
-          rect: lastRect,
-          center: rectCenter(lastRect),
-        });
-      }
-    }
+    const tx = Number(labelEl.getAttribute("x") ?? 0);
+    const ty = Number(labelEl.getAttribute("y") ?? 0);
+    const rect = findBestRoomRectForLabel(roomRects, tx, ty);
+    if (!rect) continue;
+
+    rooms.push({
+      label,
+      rect,
+      center: rectCenter(rect),
+    });
   }
   return rooms;
 }
@@ -837,18 +984,65 @@ function rectCenter(r: SVGRectElement): Point {
   return { x: x + w / 2, y: y + h / 2 };
 }
 
+function rectBox(r: SVGRectElement): RectBox {
+  const x = +r.getAttribute("x")!;
+  const y = +r.getAttribute("y")!;
+  const w = +r.getAttribute("width")!;
+  const h = +r.getAttribute("height")!;
+  return { x, y, w, h };
+}
+
+function pointInRect(px: number, py: number, b: RectBox, margin = 4): boolean {
+  return (
+    px >= b.x - margin &&
+    px <= b.x + b.w + margin &&
+    py >= b.y - margin &&
+    py <= b.y + b.h + margin
+  );
+}
+
+function findBestRoomRectForLabel(rects: SVGRectElement[], tx: number, ty: number): SVGRectElement | null {
+  const containing = rects
+    .map(rect => ({ rect, box: rectBox(rect) }))
+    .filter(({ box }) => pointInRect(tx, ty, box))
+    .sort((a, b) => (a.box.w * a.box.h) - (b.box.w * b.box.h));
+
+  if (containing.length > 0) return containing[0].rect;
+
+  let best: SVGRectElement | null = null;
+  let bestDist = Infinity;
+  for (const rect of rects) {
+    const c = rectCenter(rect);
+    const d = Math.hypot(c.x - tx, c.y - ty);
+    if (d < bestDist) {
+      bestDist = d;
+      best = rect;
+    }
+  }
+  return best;
+}
+
 function zoomToRect(svg: SVGSVGElement, rect: SVGRectElement) {
   const rectX = +rect.getAttribute("x")!;
   const rectY = +rect.getAttribute("y")!;
   const rectW = +rect.getAttribute("width")!;
   const rectH = +rect.getAttribute("height")!;
 
-  const svgW = svg.clientWidth || 800;
-  const svgH = svg.clientHeight || 600;
+  const svgRect = svg.getBoundingClientRect();
+  const vbParts = (svg.getAttribute("viewBox") ?? "0 0 800 600").split(" ").map(Number);
+  const fallbackW = vbParts[2] || 800;
+  const fallbackH = vbParts[3] || 600;
+  const svgW = svgRect.width || svg.clientWidth || fallbackW;
+  const svgH = svgRect.height || svg.clientHeight || fallbackH;
   const containerAspect = svgW / svgH;
 
-  const padX = rectW * 1.5;
-  const padY = rectH * 1.5;
+  // Padding dinamico: adatta lo zoom alla scala complessiva del museo.
+  const mapArea = Math.max(1, fallbackW * fallbackH);
+  const roomArea = Math.max(1, rectW * rectH);
+  const areaRatio = Math.sqrt(mapArea / roomArea);
+  const padFactor = clamp(0.75 + ((areaRatio - 5) / 2.5) * 0.75, 0.75, 1.5);
+  const padX = rectW * padFactor;
+  const padY = rectH * padFactor;
   let vbW = rectW + padX * 2;
   let vbH = rectH + padY * 2;
 
@@ -867,6 +1061,10 @@ function distance(a: Point, b: Point) {
 
 function normalize(s: string) {
   return s.toLowerCase().trim();
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 /* ===================== URL HELPERS ===================== */

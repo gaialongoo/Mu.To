@@ -306,6 +306,45 @@
           ]
         }
       ]
+    },
+    {
+      "nome": "Museo Demo QA",
+      "citta": "Firenze",
+      "oggetti": [
+        {
+          "nome": "Vaso Antico",
+          "stanza": "sala 1",
+          "connessi": [
+            "Statua in Bronzo"
+          ],
+          "descrizioni": [
+            [
+              "Vaso etrusco decorato a figure nere."
+            ]
+          ]
+        },
+        {
+          "nome": "Quadro Astratto",
+          "stanza": "sala 3",
+          "connessi": [
+            "Statua in Bronzo"
+          ],
+          "descrizioni": [
+            [
+              "Composizione astratta su tela."
+            ]
+          ]
+        }
+      ],
+      "percorsi": [
+        {
+          "nome": "Percorso Base",
+          "oggetti": [
+            "Vaso Antico",
+            "Quadro Astratto"
+          ]
+        }
+      ]
     }
   ]
 }

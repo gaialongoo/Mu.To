@@ -75,7 +75,7 @@ body {
 #svg-host svg {
   width: 100%;
   height: 100%;
-  #display: block;
+  display: block;
 
   /* Safari / WebKit */
   -webkit-user-select: none;
@@ -138,5 +138,47 @@ rect.corridoio {
 @media (hover: hover) {
   #nav-layer text:hover {
     transform: scale(1.15);
+  }
+}
+
+.exit-room-cta {
+  transform-origin: center;
+  animation: exitPulse 1.05s ease-in-out infinite, exitFlicker 2s linear infinite;
+}
+
+.exit-room-label {
+  fill: #ff2b2b;
+  font-size: 30px;
+  font-weight: 900;
+  stroke: #630000;
+  stroke-width: 1.1px;
+  paint-order: stroke fill;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+  user-select: none;
+  text-shadow:
+    0 0 4px rgba(255, 180, 180, 0.95),
+    0 0 10px rgba(255, 90, 90, 0.9),
+    0 0 18px rgba(255, 58, 58, 0.72);
+}
+
+@keyframes exitPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes exitFlicker {
+  0%, 18%, 22%, 62%, 64%, 100% {
+    opacity: 1;
+  }
+  20%, 63% {
+    opacity: 0.84;
   }
 }
