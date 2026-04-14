@@ -315,7 +315,7 @@
           "nome": "Vaso Antico",
           "stanza": "sala 1",
           "connessi": [
-            "Statua in Bronzo"
+            "Quadro Astratto"
           ],
           "descrizioni": [
             [
@@ -327,11 +327,42 @@
           "nome": "Quadro Astratto",
           "stanza": "sala 3",
           "connessi": [
-            "Statua in Bronzo"
+            "Statua in Bronzo",
+            "Vaso Antico",
+            "Oggetto 3"
           ],
           "descrizioni": [
             [
               "Composizione astratta su tela."
+            ]
+          ]
+        },
+        {
+          "nome": "Oggetto 3",
+          "stanza": "Stanza 5",
+          "connessi": [
+            "Quadro Astratto"
+          ],
+          "descrizioni": [
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              ""
             ]
           ]
         }
@@ -341,7 +372,8 @@
           "nome": "Percorso Base",
           "oggetti": [
             "Vaso Antico",
-            "Quadro Astratto"
+            "Quadro Astratto",
+            "Oggetto 3"
           ]
         }
       ]

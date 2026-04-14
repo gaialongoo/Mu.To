@@ -187,7 +187,7 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
   }
 
   const stanzeList = Object.values(stanzeMap);
-  const corridoi   = buildLayout(stanzeList);
+  const corridoi   = buildLayout(stanzeList, layout.corridoi || []);
 
   for (const o of oggettiList) {
     if (specialTipi.includes(o.stanza.tipo)) {

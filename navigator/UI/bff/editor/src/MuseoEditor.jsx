@@ -70,10 +70,46 @@ const OBJ_TEXT        = "#000000";
 const OBJ_SEL_FILL    = "#1a6fa8";
 const OBJ_PICK_STROKE = "#27ae60";
 
-const MUSEO_VUOTO = { nome: "", stanze: [], oggetti: [], percorsi: [] };
+const MUSEO_VUOTO = { nome: "", stanze: [], oggetti: [], percorsi: [], corridoi: [] };
+
+function autoCorridoiFromStanze(stanze) {
+  const grid = {};
+  for (const s of stanze) grid[`${s.row},${s.col}`] = s;
+  const out = [];
+  for (const s of stanze) {
+    const east = grid[`${s.row},${s.col + 1}`];
+    const south = grid[`${s.row + 1},${s.col}`];
+    if (east) out.push({ a: s.nome, b: east.nome });
+    if (south) out.push({ a: s.nome, b: south.nome });
+  }
+  return out;
+}
+
+function normalizeCorridoi(stanze, corridoiRaw) {
+  const byName = Object.fromEntries(stanze.map((s) => [s.nome, s]));
+  const source = Array.isArray(corridoiRaw) && corridoiRaw.length > 0 ? corridoiRaw : autoCorridoiFromStanze(stanze);
+  const seen = new Set();
+  const out = [];
+  for (const c of source) {
+    const aName = c?.a || c?.from;
+    const bName = c?.b || c?.to;
+    if (!aName || !bName || aName === bName) continue;
+    const a = byName[aName];
+    const b = byName[bName];
+    if (!a || !b) continue;
+    const adjacent = (a.row === b.row && Math.abs(a.col - b.col) === 1)
+      || (a.col === b.col && Math.abs(a.row - b.row) === 1);
+    if (!adjacent) continue;
+    const key = [a.nome, b.nome].sort().join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ a: a.nome, b: b.nome });
+  }
+  return out;
+}
 
 // ─── LAYOUT ────────────────────────────────────────────────────────────────
-function useLayout(stanze, oggetti) {
+function useLayout(stanze, oggetti, corridoiCfg = []) {
   const roomPos = useMemo(() => {
     const m = {};
     for (const s of stanze)
@@ -82,24 +118,32 @@ function useLayout(stanze, oggetti) {
   }, [stanze]);
 
   const corridors = useMemo(() => {
-    const grid = {};
-    for (const s of stanze) grid[`${s.row},${s.col}`] = s;
+    const byName = Object.fromEntries(stanze.map((s) => [s.nome, s]));
+    const links = normalizeCorridoi(stanze, corridoiCfg);
     const list = [];
-    for (const s of stanze) {
-      const p = roomPos[s.nome]; if (!p) continue;
-      const east = grid[`${s.row},${s.col+1}`];
-      if (east) {
-        const ep = roomPos[east.nome];
-        list.push({ x: p.x+ROOM_W, y: p.y+ROOM_H/2-20, w: ep.x-(p.x+ROOM_W), h: 40, a: s.nome, b: east.nome });
-      }
-      const south = grid[`${s.row+1},${s.col}`];
-      if (south) {
-        const sp = roomPos[south.nome];
-        list.push({ x: p.x+ROOM_W/2-20, y: p.y+ROOM_H, w: 40, h: sp.y-(p.y+ROOM_H), a: s.nome, b: south.nome });
+    for (const link of links) {
+      const a = byName[link.a];
+      const b = byName[link.b];
+      if (!a || !b) continue;
+      const pA = roomPos[a.nome];
+      const pB = roomPos[b.nome];
+      if (!pA || !pB) continue;
+      if (a.row === b.row) {
+        const west = a.col < b.col ? a : b;
+        const east = a.col < b.col ? b : a;
+        const pW = roomPos[west.nome];
+        const pE = roomPos[east.nome];
+        list.push({ x: pW.x + ROOM_W, y: pW.y + ROOM_H / 2 - 20, w: pE.x - (pW.x + ROOM_W), h: 40, a: west.nome, b: east.nome });
+      } else if (a.col === b.col) {
+        const north = a.row < b.row ? a : b;
+        const south = a.row < b.row ? b : a;
+        const pN = roomPos[north.nome];
+        const pS = roomPos[south.nome];
+        list.push({ x: pN.x + ROOM_W / 2 - 20, y: pN.y + ROOM_H, w: 40, h: pS.y - (pN.y + ROOM_H), a: north.nome, b: south.nome });
       }
     }
     return list;
-  }, [stanze, roomPos]);
+  }, [stanze, roomPos, corridoiCfg]);
 
   const objPos = useMemo(() => {
     const pos = {};
@@ -540,6 +584,7 @@ export default function MuseoEditor() {
   const [percorsoOggettiEdit, setPercorsoOggettiEdit] = useState([]);
   const [percorsoSaving, setPercorsoSaving]     = useState(false);
   const [percorsoHoverObj, setPercorsoHoverObj] = useState(null);
+  const [rightPanelTab, setRightPanelTab]       = useState("details");
 
   const showPrompt = (message, defaultValue = "") =>
     new Promise(resolve => setModal({ message, defaultValue, onConfirm: resolve }));
@@ -566,7 +611,7 @@ export default function MuseoEditor() {
     setPercorsoHoverObj(null);
   };
 
-  const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti);
+  const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti, museo.corridoi);
 
   // passa previewRefreshKey: quando cambia, il hook ri-fetcha e busta la cache
   const objPreviews = useObjPreviews(museo.nome, museo.oggetti, previewRefreshKey);
@@ -630,6 +675,7 @@ export default function MuseoEditor() {
         nome: data.nome, stanze,
         oggetti: (data.oggetti??[]).map(o=>({...o,visibile:true})),
         percorsi: percorsiData?.percorsi ?? data.percorsi ?? [],
+        corridoi: normalizeCorridoi(stanze, layout?.corridoi || []),
       });
       setSelected(null); setScreen("editor");
     } catch(e) { alert(`Errore caricamento: ${e.message}`); }
@@ -641,10 +687,10 @@ export default function MuseoEditor() {
     if (!nome) return;
     try {
       await apiFetch("/musei", { method:"POST", body:JSON.stringify({ nome, citta }) });
-      setMuseo({ nome, stanze:[], oggetti:[], percorsi:[] });
+      setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[] });
       setSelected(null); setScreen("editor");
     } catch(e) {
-      if (e.message.includes("400")) { setMuseo({ nome, stanze:[], oggetti:[], percorsi:[] }); setScreen("editor"); }
+      if (e.message.includes("400")) { setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[] }); setScreen("editor"); }
       else alert(`Errore creazione: ${e.message}`);
     }
   };
@@ -655,8 +701,9 @@ export default function MuseoEditor() {
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}`,
         { method:"PUT", body:JSON.stringify({ nome:museo.nome }) });
       const grid = Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
+      const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
-        { method:"PUT", body:JSON.stringify({ grid }) });
+        { method:"PUT", body:JSON.stringify({ grid, corridoi }) });
       await Promise.all(museo.oggetti.map(o =>
         apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
           { method:"PUT", body:JSON.stringify({
@@ -678,7 +725,8 @@ export default function MuseoEditor() {
     try {
       await apiFetch(`/musei/${encodeURIComponent(vecchio)}`, { method:"PUT", body:JSON.stringify({ nome:nuovoNomeMuseo }) });
       const grid = Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
-      await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({ grid }) });
+      const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
+      await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({ grid, corridoi }) });
       setMuseList(l => l.map(n => n===vecchio ? nuovoNomeMuseo : n));
       showToast(`✓ Museo rinominato in "${nuovoNomeMuseo}"`);
     } catch(err) { showToast(`⚠ Rename solo locale (${err.message})`, false); }
@@ -700,7 +748,7 @@ export default function MuseoEditor() {
         apiFetch(`/musei/${encodeURIComponent(nomeM)}/oggetti/${encodeURIComponent(o.nome)}`, { method:"DELETE" }).catch(()=>{})
       ));
       await apiFetch(`/musei/${encodeURIComponent(nomeM)}/layout`,
-        { method:"PUT", body:JSON.stringify({ grid: {} }) }
+        { method:"PUT", body:JSON.stringify({ grid: {}, corridoi: [] }) }
       ).catch(()=>{});
       await apiFetch(`/musei/${encodeURIComponent(nomeM)}`, { method:"DELETE" });
       setMuseList(l => l.filter(n => n !== nomeM));
@@ -759,16 +807,34 @@ export default function MuseoEditor() {
   };
 
   const updStanza = useCallback(async (vecchio, patch) => {
-    setMuseo(m => ({...m,
-      stanze:  m.stanze.map(s=>s.nome===vecchio?{...s,...patch}:s),
-      oggetti: patch.nome ? m.oggetti.map(o=>o.stanza===vecchio?{...o,stanza:patch.nome}:o) : m.oggetti,
-    }));
+    setMuseo(m => {
+      const stanze = m.stanze.map(s=>s.nome===vecchio?{...s,...patch}:s);
+      const corridoiBase = m.corridoi || [];
+      const corridoi = patch.nome
+        ? corridoiBase.map(c => ({
+            a: c.a === vecchio ? patch.nome : c.a,
+            b: c.b === vecchio ? patch.nome : c.b,
+          }))
+        : corridoiBase;
+      return {...m,
+        stanze,
+        oggetti: patch.nome ? m.oggetti.map(o=>o.stanza===vecchio?{...o,stanza:patch.nome}:o) : m.oggetti,
+        corridoi: normalizeCorridoi(stanze, corridoi),
+      };
+    });
     if (patch.nome) setSelected(s=>s?.nome===vecchio?{...s,nome:patch.nome}:s);
     if (patch.nome) {
       try {
         const nuove = museo.stanze.map(s=>s.nome===vecchio?{...s,...patch}:s);
         const grid = Object.fromEntries(nuove.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
-        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid})});
+        const corridoi = normalizeCorridoi(
+          nuove,
+          (museo.corridoi || []).map(c => ({
+            a: c.a === vecchio ? patch.nome : c.a,
+            b: c.b === vecchio ? patch.nome : c.b,
+          }))
+        );
+        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid, corridoi})});
         await Promise.all(museo.oggetti.filter(o=>o.stanza===vecchio).map(o=>
           apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
             {method:"PUT",body:JSON.stringify({...o,stanza:patch.nome})})
@@ -817,6 +883,7 @@ export default function MuseoEditor() {
         stanze:   m.stanze.filter(s => s.nome !== selected.nome),
         oggetti:  m.oggetti.filter(o => o.stanza !== selected.nome),
         percorsi: percorsiAggiornati,
+        corridoi: m.corridoi.filter(c => c.a !== selected.nome && c.b !== selected.nome),
       }));
       setSelected(null);
       try {
@@ -824,7 +891,9 @@ export default function MuseoEditor() {
           apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(n)}`, { method:"DELETE" })
         ));
         const grid = Object.fromEntries(museo.stanze.filter(s=>s.nome!==selected.nome).map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
-        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({grid}) });
+        const stanzeAgg = museo.stanze.filter(s=>s.nome!==selected.nome);
+        const corridoiAgg = normalizeCorridoi(stanzeAgg, museo.corridoi.filter(c => c.a !== selected.nome && c.b !== selected.nome));
+        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({grid, corridoi: corridoiAgg}) });
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
         showToast(`✓ Stanza eliminata`);
       } catch(err) { showToast(`⚠ Eliminazione parziale (${err.message})`, false); }
@@ -899,11 +968,12 @@ export default function MuseoEditor() {
     if (!n) return;
     const nuova = { nome:n, row, col, tipo:"normale" };
     let prev = [];
-    setMuseo(m=>{ prev=m.stanze; return {...m,stanze:[...m.stanze,nuova]}; });
+    setMuseo(m=>{ prev=m.stanze; return {...m,stanze:[...m.stanze,nuova], corridoi: normalizeCorridoi([...m.stanze,nuova], m.corridoi || [])}; });
     setSelected({type:"stanza",nome:n}); setMode("select");
     try {
       const grid = Object.fromEntries([...prev,nuova].map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
-      await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid})});
+      const corridoi = normalizeCorridoi([...prev,nuova], museo.corridoi || []);
+      await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid, corridoi})});
       showToast(`✓ Stanza "${n}" creata`);
     } catch(err){showToast(`⚠ Stanza solo locale (${err.message})`,false);}
   };
@@ -952,6 +1022,36 @@ export default function MuseoEditor() {
     : mode==="addObject"   ? "Clicca una stanza per aggiungere l'oggetto"
     : mode==="connectPick" ? `Clicca un oggetto da collegare a "${selected?.nome}"`
     : null;
+
+  const hasCorridoio = useCallback((a, b) => {
+    const key = [a, b].sort().join("|");
+    return (museo.corridoi || []).some((c) => [c.a, c.b].sort().join("|") === key);
+  }, [museo.corridoi]);
+
+  const toggleCorridoio = useCallback((a, b) => {
+    setMuseo((m) => {
+      const key = [a, b].sort().join("|");
+      const corridoi = m.corridoi || [];
+      const exists = corridoi.some((c) => [c.a, c.b].sort().join("|") === key);
+      const next = exists
+        ? corridoi.filter((c) => [c.a, c.b].sort().join("|") !== key)
+        : [...corridoi, { a, b }];
+      return { ...m, corridoi: normalizeCorridoi(m.stanze, next) };
+    });
+  }, []);
+
+  const stanzaAdiacentiSel = useMemo(() => {
+    if (!selItem || selected?.type !== "stanza") return [];
+    return museo.stanze.filter((s) =>
+      s.nome !== selItem.nome &&
+      ((s.row === selItem.row && Math.abs(s.col - selItem.col) === 1) ||
+       (s.col === selItem.col && Math.abs(s.row - selItem.row) === 1))
+    );
+  }, [museo.stanze, selItem, selected?.type]);
+
+  useEffect(() => {
+    if (percorsoEdit || selItem) setRightPanelTab("details");
+  }, [percorsoEdit, selItem]);
 
   // ─── RENDER: WELCOME / NUOVO ──────────────────────────────────────────
   if (screen === "welcome" || screen === "nuovo") {
@@ -1020,18 +1120,39 @@ export default function MuseoEditor() {
       )}
 
       {/* ── TOOLBAR ── */}
-      <div style={{width:52,background:"#2c3e50",display:"flex",flexDirection:"column",alignItems:"center",padding:"12px 0",gap:6}}>
-        {[{m:"select",icon:"↖",tip:"Seleziona"},{m:"addRoom",icon:"⊞",tip:"Aggiungi Stanza"},{m:"addObject",icon:"⊕",tip:"Aggiungi Oggetto"}].map(({m,icon,tip})=>(
-          <button key={m} title={tip} onClick={()=>{setMode(m);closePercorsoEditor();}}
-            style={{width:38,height:38,borderRadius:6,border:`2px solid ${mode===m&&!percorsoEdit?"#4ade80":"#3d5166"}`,background:mode===m&&!percorsoEdit?"#1a3a2a":"transparent",color:mode===m&&!percorsoEdit?"#4ade80":"#7f8c8d",fontSize:18,cursor:"pointer"}}>
-            {icon}
+      <div style={{width:140,background:"#2c3e50",display:"flex",flexDirection:"column",padding:"12px 10px",gap:8}}>
+        <div style={{fontSize:9,letterSpacing:1.4,color:"#7f8c8d",padding:"0 2px 4px"}}>STRUMENTI</div>
+        {[
+          {m:"select",icon:"↖",label:"Seleziona"},
+          {m:"addRoom",icon:"⊞",label:"Aggiungi stanza"},
+          {m:"addObject",icon:"⊕",label:"Aggiungi oggetto"},
+        ].map(({m,icon,label})=>(
+          <button key={m} onClick={()=>{setMode(m);closePercorsoEditor();}}
+            style={{
+              width:"100%",height:36,borderRadius:7,border:`1px solid ${mode===m&&!percorsoEdit?"#4ade80":"#3d5166"}`,
+              background:mode===m&&!percorsoEdit?"#1a3a2a":"#34495e",color:mode===m&&!percorsoEdit?"#4ade80":"#c7d2db",
+              fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,padding:"0 10px",textAlign:"left"
+            }}>
+            <span style={{fontSize:16,lineHeight:1}}>{icon}</span>
+            <span>{label}</span>
           </button>
         ))}
+        <div style={{fontSize:10,color:"#95a5a6",lineHeight:1.5,padding:"8px 2px 2px"}}>
+          {mode==="select" && !percorsoEdit ? "Modalita: selezione e modifica" : null}
+          {mode==="addRoom" && !percorsoEdit ? "Modalita: clicca una cella vuota per creare stanza" : null}
+          {mode==="addObject" && !percorsoEdit ? "Modalita: clicca una stanza per inserire oggetto" : null}
+          {mode==="connectPick" && !percorsoEdit ? "Modalita: clicca un oggetto da collegare" : null}
+        </div>
         <div style={{flex:1}}/>
-        <div title={apiStatus==="ok"?"API connessa":apiStatus==="err"?"API non raggiungibile":"..."}
-          style={{width:10,height:10,borderRadius:"50%",marginBottom:6,background:apiStatus==="ok"?"#2ecc71":apiStatus==="err"?"#e74c3c":"#f39c12"}}/>
-        <button title="Esporta" onClick={()=>setShowExport(v=>!v)}
-          style={{width:38,height:38,borderRadius:6,border:`2px solid ${showExport?"#3498db":"#3d5166"}`,background:"transparent",color:showExport?"#3498db":"#7f8c8d",fontSize:18,cursor:"pointer"}}>⤓</button>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <span style={{fontSize:10,color:"#95a5a6"}}>API</span>
+          <div title={apiStatus==="ok"?"API connessa":apiStatus==="err"?"API non raggiungibile":"..."}
+            style={{width:10,height:10,borderRadius:"50%",background:apiStatus==="ok"?"#2ecc71":apiStatus==="err"?"#e74c3c":"#f39c12"}}/>
+        </div>
+        <button onClick={()=>setShowExport(v=>!v)}
+          style={{width:"100%",height:34,borderRadius:7,border:`1px solid ${showExport?"#3498db":"#3d5166"}`,background:"#34495e",color:showExport?"#3498db":"#c7d2db",fontSize:12,cursor:"pointer"}}>
+          ⤓ Export
+        </button>
       </div>
 
       {/* ── CANVAS ── */}
@@ -1172,15 +1293,37 @@ export default function MuseoEditor() {
       </div>
 
       {/* ── PANNELLO DESTRO ── */}
-      <div style={{width:290,background:"white",borderLeft:"1px solid #dce1e7",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{width:320,background:"white",borderLeft:"1px solid #dce1e7",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"14px 16px",borderBottom:"1px solid #eaecef",background:"#2c3e50"}}>
           <div style={{fontSize:10,letterSpacing:2,color:"#7f8c8d",marginBottom:6}}>MUSEO</div>
           <input value={museo.nome} onChange={e=>setMuseo(m=>({...m,nome:e.target.value}))} onBlur={e=>updMuseoNome(e.target.value)} style={INP}/>
         </div>
 
-        <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
+        <div style={{display:"flex",padding:"8px 10px",gap:6,borderBottom:"1px solid #eaecef",background:"#f8f9fa"}}>
+          <button
+            onClick={() => setRightPanelTab("details")}
+            style={{
+              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="details"?"#2c3e50":"#dce1e7"}`,
+              background:rightPanelTab==="details"?"#2c3e50":"white",color:rightPanelTab==="details"?"white":"#7f8c8d",
+              fontSize:11,cursor:"pointer"
+            }}
+          >
+            Dettagli
+          </button>
+          <button
+            onClick={() => setRightPanelTab("lists")}
+            style={{
+              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="lists"?"#2c3e50":"#dce1e7"}`,
+              background:rightPanelTab==="lists"?"#2c3e50":"white",color:rightPanelTab==="lists"?"white":"#7f8c8d",
+              fontSize:11,cursor:"pointer"
+            }}
+          >
+            Liste
+          </button>
+        </div>
 
-          {percorsoEdit !== null && (
+        <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
+          {rightPanelTab === "details" && percorsoEdit !== null && (
             <PercorsoEditor
               museo={museo}
               percorso={percorsoEdit === "nuovo" ? null : percorsoEdit}
@@ -1195,7 +1338,7 @@ export default function MuseoEditor() {
             />
           )}
 
-          {!percorsoEdit && selItem && selected.type==="stanza" && (
+          {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="stanza" && (
             <Card title="STANZA" color="#27ae60">
               <FLabel>Nome</FLabel>
               <input
@@ -1219,11 +1362,39 @@ export default function MuseoEditor() {
                 <div style={{flex:1}}><FLabel>Riga</FLabel><input type="number" min={0} value={selItem.row} onChange={e=>updStanza(selItem.nome,{row:+e.target.value})} style={INP}/></div>
                 <div style={{flex:1}}><FLabel>Col</FLabel><input type="number" min={0} value={selItem.col} onChange={e=>updStanza(selItem.nome,{col:+e.target.value})} style={INP}/></div>
               </div>
+              <FLabel>Corridoi adiacenti</FLabel>
+              {stanzaAdiacentiSel.length === 0 ? (
+                <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:8}}>
+                  Nessuna stanza adiacente
+                </div>
+              ) : (
+                <div style={{marginBottom:8}}>
+                  {stanzaAdiacentiSel.map((adj) => {
+                    const active = hasCorridoio(selItem.nome, adj.nome);
+                    return (
+                      <button
+                        key={adj.nome}
+                        type="button"
+                        onClick={() => toggleCorridoio(selItem.nome, adj.nome)}
+                        style={{
+                          width:"100%",marginBottom:4,padding:"6px 8px",borderRadius:4,
+                          border:`1px solid ${active ? "#27ae60" : "#dce1e7"}`,
+                          background:active ? "#eafaf1" : "transparent",
+                          color:active ? "#27ae60" : "#7f8c8d",
+                          fontSize:12,cursor:"pointer",textAlign:"left",
+                        }}
+                      >
+                        {active ? "✓" : "○"} {adj.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <button onClick={deleteSelected} style={DELBTN}>✕ Elimina stanza</button>
             </Card>
           )}
 
-          {!percorsoEdit && selItem && selected.type==="oggetto" && (<>
+          {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="oggetto" && (<>
             <Card title="OGGETTO" color="#3498db">
               <FLabel>Nome</FLabel>
               <input
@@ -1297,7 +1468,7 @@ export default function MuseoEditor() {
             </Card>
           </>)}
 
-          {!percorsoEdit && selItem && selected.type==="percorso" && (
+          {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="percorso" && (
             <Card title="PERCORSO" color="#e67e22">
               <div style={{fontSize:15,fontWeight:"bold",color:"#2c3e50",marginBottom:8}}>{selItem.nome}</div>
               <FLabel>Oggetti ({selItem.oggetti.length})</FLabel>
@@ -1317,12 +1488,14 @@ export default function MuseoEditor() {
             </Card>
           )}
 
-          {!percorsoEdit && !selItem && (
+          {rightPanelTab === "details" && !percorsoEdit && !selItem && (
             <div style={{color:"#bdc3c7",fontSize:12,textAlign:"center",marginTop:30,lineHeight:2}}>
               Seleziona una stanza,<br/>un oggetto o un percorso
             </div>
           )}
 
+          {rightPanelTab === "lists" && (
+          <>
           <Section label={`Stanze (${museo.stanze.length})`}>
             {museo.stanze.map(s=>(
               <ListRow key={s.nome} active={!percorsoEdit&&selected?.nome===s.nome&&selected?.type==="stanza"} accent={TIPO_COLORS[s.tipo]?.stroke||"#2c3e50"}
@@ -1374,6 +1547,8 @@ export default function MuseoEditor() {
                 </ListRow>
               ))}
             </Section>
+          )}
+          </>
           )}
         </div>
 

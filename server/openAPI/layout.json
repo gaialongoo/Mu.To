@@ -1,23 +1,116 @@
 {
   "Uffizi": {
     "grid": {
-      "IN": { "row": 0, "col": 0, "tipo": "ingresso" },
-      "sala A": { "row": 1, "col": 0 },
-      "sala B": { "row": 1, "col": 1 },
-      "sala C": { "row": 2, "col": 0 },
-      "OUT": { "row": 2, "col": 1, "tipo": "uscita" }
+      "IN": {
+        "row": 0,
+        "col": 0,
+        "tipo": "ingresso"
+      },
+      "sala A": {
+        "row": 1,
+        "col": 0
+      },
+      "sala B": {
+        "row": 1,
+        "col": 1
+      },
+      "sala C": {
+        "row": 2,
+        "col": 0
+      },
+      "OUT": {
+        "row": 2,
+        "col": 1,
+        "tipo": "uscita"
+      }
     }
   },
   "Museo di Torino": {
     "grid": {
-      "IN": { "row": 0, "col": 1, "tipo": "ingresso" },
-      "stanza 1": { "row": 1, "col": 1 },
-      "stanza 2": { "row": 2, "col": 1 },
-      "stanza 4": { "row": 2, "col": 0, "tipo": "servizio" },
-      "stanza 3": { "row": 3, "col": 1 },
-      "WC": { "row": 2, "col": 2, "tipo": "bagno" },
-      "SHOP": { "row": 3, "col": 2, "tipo": "servizio" },
-      "OUT": { "row": 4, "col": 1, "tipo": "uscita" }
+      "IN": {
+        "row": 0,
+        "col": 1,
+        "tipo": "ingresso"
+      },
+      "stanza 1": {
+        "row": 1,
+        "col": 1
+      },
+      "stanza 2": {
+        "row": 2,
+        "col": 1
+      },
+      "stanza 4": {
+        "row": 2,
+        "col": 0,
+        "tipo": "servizio"
+      },
+      "stanza 3": {
+        "row": 3,
+        "col": 1
+      },
+      "WC": {
+        "row": 2,
+        "col": 2,
+        "tipo": "bagno"
+      },
+      "SHOP": {
+        "row": 3,
+        "col": 2,
+        "tipo": "servizio"
+      },
+      "OUT": {
+        "row": 4,
+        "col": 1,
+        "tipo": "uscita"
+      }
     }
+  },
+  "Museo Demo QA": {
+    "grid": {
+      "IN": {
+        "row": 0,
+        "col": 0,
+        "tipo": "ingresso"
+      },
+      "sala 1": {
+        "row": 1,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "sala 3": {
+        "row": 2,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "OUT": {
+        "row": 2,
+        "col": 1,
+        "tipo": "uscita"
+      },
+      "Stanza 5": {
+        "row": 1,
+        "col": 1,
+        "tipo": "normale"
+      }
+    },
+    "corridoi": [
+      {
+        "a": "IN",
+        "b": "sala 1"
+      },
+      {
+        "a": "sala 3",
+        "b": "OUT"
+      },
+      {
+        "a": "sala 1",
+        "b": "sala 3"
+      },
+      {
+        "a": "OUT",
+        "b": "Stanza 5"
+      }
+    ]
   }
 }
