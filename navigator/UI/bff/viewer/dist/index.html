@@ -200,6 +200,9 @@
       .nav-links { display: none; }
       .hamburger { display: flex; }
       .navbar { padding: 1.25rem 1.5rem; }
+      .navbar.scrolled { padding: .9rem 1.2rem; }
+      .nav-logo { font-size: 1.05rem; letter-spacing: .16em; }
+      .mobile-menu a { font-size: clamp(1.5rem, 7vw, 2rem); }
     }
 
     /* ── HERO ──────────────────────────────────────── */
@@ -244,6 +247,30 @@
     .hero-arc:nth-child(1) { width: 500px; height: 500px; top: 50%; left: 50%; transform: translate(-50%,-50%); }
     .hero-arc:nth-child(2) { width: 700px; height: 700px; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(30deg); opacity: .5; }
     .hero-arc:nth-child(3) { width: 900px; height: 900px; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-15deg); opacity: .3; }
+    @media (max-width: 1024px) {
+      .hero-arc:nth-child(1) { width: 420px; height: 420px; }
+      .hero-arc:nth-child(2) { width: 580px; height: 580px; }
+      .hero-arc:nth-child(3) { width: 760px; height: 760px; }
+      .hero-grid { background-size: 56px 56px; }
+    }
+    @media (max-width: 640px) {
+      .hero { min-height: 100svh; padding: 0 1rem; }
+      .hero-content { gap: 1.1rem; }
+      .hero-eyebrow { letter-spacing: .22em; font-size: .62rem; }
+      .hero-title {
+        font-size: clamp(2.15rem, 14vw, 3.4rem);
+        line-height: 1;
+      }
+      .hero-sub { font-size: .72rem; letter-spacing: .14em; }
+      .hero-divider { width: 140px; }
+      .hero-arc:nth-child(1) { width: 300px; height: 300px; }
+      .hero-arc:nth-child(2) { width: 430px; height: 430px; }
+      .hero-arc:nth-child(3) { width: 560px; height: 560px; }
+      .scroll-hint { bottom: 1.2rem; }
+    }
+    @media (max-width: 420px) {
+      .hero-title { font-size: clamp(1.9rem, 12vw, 2.7rem); }
+    }
 
     .hero-content {
       position: relative;
@@ -272,6 +299,9 @@
       line-height: .9;
       letter-spacing: -.01em;
       color: var(--text);
+      max-width: 100%;
+      text-wrap: balance;
+      overflow-wrap: normal;
       opacity: 0;
       transform: translateY(20px);
       animation: fadeUp .9s .5s var(--ease) forwards;
@@ -458,6 +488,22 @@
       gap: .75rem;
       width: 100%;
     }
+    @media (max-width: 640px) {
+      .section-about {
+        padding: clamp(4rem, 11vw, 6rem) 1.1rem;
+        gap: 2.3rem;
+      }
+      .about-body { max-width: none; }
+      .cta-box { padding: 1.2rem; gap: 1.1rem; }
+      .cta-box::before { left: 1rem; right: 1rem; }
+      .cta-heading { font-size: 1.3rem; line-height: 1.25; }
+      .cta-desc { font-size: .8rem; line-height: 1.55; }
+      .select-group { flex-direction: column; gap: .6rem; }
+      .btn-primary, .btn-secondary {
+        width: 100%;
+        min-height: 44px;
+      }
+    }
     .museum-select {
       flex: 1;
       background: rgba(240,234,216,.04);
@@ -531,6 +577,31 @@
       transition: transform .4s var(--ease-back);
     }
     .overlay.active .overlay-panel { transform: none; }
+    @media (max-width: 640px) {
+      .overlay {
+        align-items: flex-end;
+        padding: 0;
+      }
+      .overlay-panel {
+        width: 100%;
+        max-width: none;
+        max-height: 92svh;
+        overflow-y: auto;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        border-radius: 16px 16px 0 0;
+        padding: 1.25rem 1rem 1.1rem;
+      }
+      .overlay-panel::before {
+        left: 1rem;
+        right: 1rem;
+      }
+      .overlay-title { font-size: 1.28rem; margin-bottom: 1.2rem; }
+      .choice-grid { grid-template-columns: 1fr; gap: .75rem; }
+      .choice-card { padding: 1rem .9rem; }
+      .overlay-actions { margin-top: 1rem; }
+    }
 
     .overlay-panel::before {
       content: '';
@@ -807,6 +878,15 @@
       justify-content: center;
       gap: 1.25rem;
     }
+    @media (max-width: 640px) {
+      .section-project {
+        padding: clamp(3rem, 9vw, 4.5rem) 1.1rem;
+      }
+      .project-image-col { min-height: 280px; }
+      .project-text-col { padding: 1.25rem 1.1rem; gap: 1rem; }
+      .project-feature { font-size: .78rem; }
+      .project-link { font-size: .73rem; letter-spacing: .12em; }
+    }
 
     .project-badge {
       display: inline-flex;
@@ -878,6 +958,15 @@
       gap: 1rem;
       flex-wrap: wrap;
     }
+    @media (max-width: 640px) {
+      footer {
+        padding: 2rem 1.1rem;
+        justify-content: center;
+        text-align: center;
+      }
+      .footer-logo { letter-spacing: .2em; }
+      .footer-copy { font-size: .66rem; }
+    }
     .footer-logo {
       font-family: 'Cinzel', serif;
       font-size: 1.1rem;
@@ -942,7 +1031,7 @@
 
     <div class="hero-content">
       <p class="hero-eyebrow">Esplora l'arte attorno a te</p>
-      <h1 class="hero-title">Art<em>Around</em></h1>
+      <h1 class="hero-title">Art <em>Around</em></h1>
       <p class="hero-sub">Percorsi personalizzati · Marketplace</p>
       <div class="hero-divider"><div class="hero-divider-diamond"></div></div>
     </div>
