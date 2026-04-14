@@ -1,5 +1,17 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 const API_KEY = typeof __API_KEY__ !== "undefined" ? __API_KEY__ : "";
+const THEME = {
+  bg: "#0d0d0d",
+  surface: "#141414",
+  panel: "#181818",
+  border: "rgba(255,255,255,0.08)",
+  text: "#e8e0d4",
+  textDim: "rgba(232,224,212,0.62)",
+  textFaint: "rgba(232,224,212,0.35)",
+  accent: "#5cbf80",
+  accentSoft: "rgba(92,191,128,0.12)",
+  danger: "#e05a4a",
+};
 
 // ─── CONFIG API ────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
@@ -270,19 +282,20 @@ function useObjPreviews(nomeMuseo, oggetti, refreshKey = 0) {
 
 // ─── MODAL PROMPT ─────────────────────────────────────────────────────────
 function ModalPrompt({ modal, setModal }) {
+  const isMobile = window.innerWidth <= 768;
   const [value, setValue] = useState(modal.defaultValue ?? "");
   const confirm = () => { setModal(null); modal.onConfirm(value); };
   const cancel  = () => { setModal(null); modal.onConfirm(null); };
   return (
-    <div style={{position:"fixed",inset:0,zIndex:99999,background:"#00000066",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={cancel}>
-      <div style={{background:"white",borderRadius:12,padding:"28px 32px",minWidth:340,boxShadow:"0 20px 60px #00000055"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontSize:14,color:"#2c3e50",marginBottom:14,fontWeight:"bold"}}>{modal.message}</div>
+    <div style={{position:"fixed",inset:0,zIndex:99999,background:"#00000080",display:"flex",alignItems:"center",justifyContent:"center",padding:isMobile?12:0}} onClick={cancel}>
+      <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:12,padding:isMobile?"18px 16px":"28px 32px",minWidth:isMobile?0:340,width:isMobile?"100%":"auto",maxWidth:isMobile?"100%":"none",boxShadow:"0 20px 60px #00000055"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:14,color:THEME.text,marginBottom:14,fontWeight:"bold"}}>{modal.message}</div>
         <input autoFocus value={value} onChange={e=>setValue(e.target.value)}
           onKeyDown={e=>{if(e.key==="Enter")confirm();if(e.key==="Escape")cancel();}}
-          style={{width:"100%",padding:"8px 10px",border:"1px solid #dce1e7",borderRadius:6,fontSize:13,boxSizing:"border-box",outline:"none",marginBottom:16}}/>
+          style={{width:"100%",padding:"8px 10px",border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,borderRadius:6,fontSize:13,boxSizing:"border-box",outline:"none",marginBottom:16}}/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button onClick={cancel} style={{padding:"7px 18px",borderRadius:6,border:"1px solid #dce1e7",background:"transparent",color:"#95a5a6",fontSize:12,cursor:"pointer"}}>Annulla</button>
-          <button onClick={confirm} style={{padding:"7px 18px",borderRadius:6,border:"none",background:"#2c3e50",color:"white",fontSize:12,cursor:"pointer",fontWeight:"bold"}}>OK</button>
+          <button onClick={cancel} style={{padding:"7px 18px",borderRadius:6,border:`1px solid ${THEME.border}`,background:"transparent",color:THEME.textDim,fontSize:12,cursor:"pointer"}}>Annulla</button>
+          <button onClick={confirm} style={{padding:"7px 18px",borderRadius:6,border:"none",background:THEME.accent,color:"#0d0d0d",fontSize:12,cursor:"pointer",fontWeight:"bold"}}>OK</button>
         </div>
       </div>
     </div>
@@ -290,17 +303,18 @@ function ModalPrompt({ modal, setModal }) {
 }
 
 function ModalConfirm({ modal, setModal }) {
+  const isMobile = window.innerWidth <= 768;
   const confirm = () => { setModal(null); modal.onConfirm(true); };
   const cancel  = () => { setModal(null); modal.onConfirm(false); };
   return (
-    <div style={{position:"fixed",inset:0,zIndex:99999,background:"#00000066",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={cancel}>
-      <div style={{background:"white",borderRadius:12,padding:"28px 32px",minWidth:360,boxShadow:"0 20px 60px #00000055"}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,zIndex:99999,background:"#00000080",display:"flex",alignItems:"center",justifyContent:"center",padding:isMobile?12:0}} onClick={cancel}>
+      <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:12,padding:isMobile?"18px 16px":"28px 32px",minWidth:isMobile?0:360,width:isMobile?"100%":"auto",maxWidth:isMobile?"100%":"none",boxShadow:"0 20px 60px #00000055"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:18,marginBottom:8}}>⚠️</div>
-        <div style={{fontSize:15,color:"#2c3e50",marginBottom:8,fontWeight:"bold"}}>{modal.title}</div>
-        <div style={{fontSize:13,color:"#7f8c8d",marginBottom:20,lineHeight:1.6}}>{modal.message}</div>
+        <div style={{fontSize:15,color:THEME.text,marginBottom:8,fontWeight:"bold"}}>{modal.title}</div>
+        <div style={{fontSize:13,color:THEME.textDim,marginBottom:20,lineHeight:1.6,whiteSpace:"pre-line"}}>{modal.message}</div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button onClick={cancel} style={{padding:"8px 20px",borderRadius:6,border:"1px solid #dce1e7",background:"transparent",color:"#95a5a6",fontSize:13,cursor:"pointer"}}>Annulla</button>
-          <button onClick={confirm} style={{padding:"8px 20px",borderRadius:6,border:"none",background:"#e74c3c",color:"white",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Elimina definitivamente</button>
+          <button onClick={cancel} style={{padding:"8px 20px",borderRadius:6,border:`1px solid ${THEME.border}`,background:"transparent",color:THEME.textDim,fontSize:13,cursor:"pointer"}}>Annulla</button>
+          <button onClick={confirm} style={{padding:"8px 20px",borderRadius:6,border:"none",background:THEME.danger,color:"white",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Elimina definitivamente</button>
         </div>
       </div>
     </div>
@@ -309,6 +323,7 @@ function ModalConfirm({ modal, setModal }) {
 
 // ─── IMAGE MANAGER CARD ───────────────────────────────────────────────────
 function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
+  const isMobile = window.innerWidth <= 768;
   const [immagini, setImmagini]         = useState([]);
   const [loading, setLoading]           = useState(false);
   const [uploading, setUploading]       = useState(null);
@@ -389,25 +404,27 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
 
   return (
     <Card title="IMMAGINI" color="#16a085">
-
-      {loading && <div style={{fontSize:11,color:"#95a5a6",marginBottom:8}}>⏳ Caricamento...</div>}
+      <div style={{fontSize:11,color:THEME.textDim,marginBottom:10,padding:"8px 10px",background:"rgba(22,160,133,0.12)",border:`1px solid ${THEME.border}`,borderRadius:6}}>
+        Gestisci preview e immagini aggiuntive dell'oggetto selezionato.
+      </div>
+      {loading && <div style={{fontSize:11,color:THEME.textDim,marginBottom:8}}>⏳ Caricamento...</div>}
 
       {!loading && immagini.length === 0 && (
-        <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:10}}>
+        <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic",marginBottom:10}}>
           Nessuna immagine caricata
         </div>
       )}
 
       {immagini.map(img => (
-        <div key={img.tipo} style={{border:"1px solid #a2d9ce",borderRadius:6,marginBottom:8,overflow:"hidden",background:"#f0faf8"}}>
+        <div key={img.tipo} style={{border:`1px solid ${THEME.border}`,borderRadius:6,marginBottom:8,overflow:"hidden",background:THEME.surface}}>
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px"}}>
             <span style={{fontSize:12,fontWeight:"bold",color:"#16a085",flex:1}}>{tipoLabel(img.tipo)}</span>
-            <span style={{fontSize:10,color:"#95a5a6"}}>{formatSize(img.size)}</span>
+            <span style={{fontSize:10,color:THEME.textDim}}>{formatSize(img.size)}</span>
             <button
               title="Sostituisci"
               onClick={() => replaceRefs.current[img.tipo]?.click()}
               disabled={uploading === img.tipo || deleting === img.tipo}
-              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #16a085",background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #16a085",background:"transparent",color:"#16a085",fontSize:11,cursor:"pointer"}}>
               {uploading === img.tipo ? "⏳" : "↑"}
             </button>
             <input
@@ -419,36 +436,36 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
               title="Elimina"
               onClick={() => handleDelete(img.tipo)}
               disabled={deleting === img.tipo || uploading === img.tipo}
-              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #e74c3c",background:"#fdecea",color:"#e74c3c",fontSize:11,cursor:"pointer"}}>
+              style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${THEME.danger}`,background:"rgba(224,90,74,0.12)",color:THEME.danger,fontSize:11,cursor:"pointer"}}>
               {deleting === img.tipo ? "⏳" : "✕"}
             </button>
           </div>
           <img
             src={imgUrl(img.url)}
             alt={img.tipo}
-            style={{width:"100%",maxHeight:100,objectFit:"cover",display:"block",borderTop:"1px solid #a2d9ce"}}
+            style={{width:"100%",maxHeight:100,objectFit:"cover",display:"block",borderTop:`1px solid ${THEME.border}`}}
           />
         </div>
       ))}
 
-      <div style={{marginTop:10,borderTop:"1px solid #a2d9ce",paddingTop:10}}>
+      <div style={{marginTop:10,borderTop:`1px solid ${THEME.border}`,paddingTop:10}}>
         <div style={{fontSize:10,letterSpacing:1,color:"#16a085",marginBottom:6}}>AGGIUNGI NUOVA</div>
 
         <FLabel>Tipo</FLabel>
-        <div style={{display:"flex",gap:6,marginBottom:8}}>
+        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
           <button onClick={() => setNewTipo("preview")}
-            style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
-              border:`1px solid ${newTipo==="preview"?"#16a085":"#dce1e7"}`,
-              background:newTipo==="preview"?"#16a085":"white",
-              color:newTipo==="preview"?"white":"#7f8c8d",fontWeight:newTipo==="preview"?"bold":"normal"}}>
+            style={{flex:1,padding:"5px",minWidth:isMobile?70:undefined,borderRadius:4,fontSize:11,cursor:"pointer",
+              border:`1px solid ${newTipo==="preview"?"#16a085":THEME.border}`,
+              background:newTipo==="preview"?"#16a085":"transparent",
+              color:newTipo==="preview"?"white":THEME.textDim,fontWeight:newTipo==="preview"?"bold":"normal"}}>
             preview
           </button>
           {["1","2","3","4"].map(n => (
             <button key={n} onClick={() => setNewTipo(n)}
-              style={{flex:1,padding:"5px",borderRadius:4,fontSize:11,cursor:"pointer",
-                border:`1px solid ${newTipo===n?"#16a085":"#dce1e7"}`,
-                background:newTipo===n?"#16a085":"white",
-                color:newTipo===n?"white":"#7f8c8d",fontWeight:newTipo===n?"bold":"normal"}}>
+              style={{flex:1,padding:"5px",minWidth:isMobile?44:undefined,borderRadius:4,fontSize:11,cursor:"pointer",
+                border:`1px solid ${newTipo===n?"#16a085":THEME.border}`,
+                background:newTipo===n?"#16a085":"transparent",
+                color:newTipo===n?"white":THEME.textDim,fontWeight:newTipo===n?"bold":"normal"}}>
               {n}
             </button>
           ))}
@@ -456,7 +473,7 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
             value={!["","preview","1","2","3","4"].includes(newTipo) ? newTipo : ""}
             onChange={e => setNewTipo(e.target.value)}
             placeholder="altro"
-            style={{width:44,padding:"4px 6px",border:"1px solid #dce1e7",borderRadius:4,fontSize:11,outline:"none",textAlign:"center"}}
+            style={{width:56,padding:"4px 6px",border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,borderRadius:4,fontSize:11,outline:"none",textAlign:"center"}}
           />
         </div>
 
@@ -467,17 +484,17 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
         />
 
         {previewSrc && (
-          <div style={{marginBottom:8,borderRadius:6,overflow:"hidden",border:"1px solid #a2d9ce"}}>
+          <div style={{marginBottom:8,borderRadius:6,overflow:"hidden",border:`1px solid ${THEME.border}`}}>
             <img src={previewSrc} alt="anteprima" style={{width:"100%",maxHeight:120,objectFit:"cover",display:"block"}}/>
-            <div style={{fontSize:10,color:"#16a085",padding:"4px 8px",background:"#f0faf8"}}>
+            <div style={{fontSize:10,color:"#16a085",padding:"4px 8px",background:"rgba(22,160,133,0.1)"}}>
               Anteprima locale — non ancora caricata
             </div>
           </div>
         )}
 
-        <div style={{display:"flex",gap:6}}>
+        <div style={{display:"flex",gap:6,flexDirection:isMobile?"column":"row"}}>
           <button onClick={() => fileInputRef.current?.click()}
-            style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #16a085",background:"white",color:"#16a085",fontSize:11,cursor:"pointer"}}>
+            style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #16a085",background:"transparent",color:"#16a085",fontSize:11,cursor:"pointer"}}>
             {previewSrc ? "📂 Cambia file" : "📂 Scegli file"}
           </button>
           <button
@@ -495,6 +512,7 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
 
 // ─── PERCORSO EDITOR PANEL ────────────────────────────────────────────────
 function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeChange, nomeEdit, onSave, onCancel, saving }) {
+  const isMobile = window.innerWidth <= 768;
   const [hovered, setHovered] = useState(null);
   const oggettiDisponibili = museo.oggetti.map(o => o.nome).filter(n => !oggettiEdit.includes(n));
   const removeOggetto = (i) => onOggettiChange(oggettiEdit.filter((_,j) => j !== i));
@@ -503,23 +521,23 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
 
   return (
     <Card title={percorso ? "MODIFICA PERCORSO" : "NUOVO PERCORSO"} color="#e67e22">
-      <div style={{fontSize:10,color:"#e67e22",background:"#fef9f0",border:"1px solid #fad7a0",borderRadius:4,padding:"5px 8px",marginBottom:10}}>
+      <div style={{fontSize:10,color:"#e67e22",background:"rgba(230,126,34,0.12)",border:`1px solid ${THEME.border}`,borderRadius:4,padding:"5px 8px",marginBottom:10}}>
         💡 Clicca gli oggetti sul canvas per aggiungerli/rimuoverli
       </div>
       <FLabel>Nome percorso</FLabel>
       <input value={nomeEdit} onChange={e=>onNomeChange(e.target.value)} style={INP} placeholder="es. Tour Rinascimento"/>
       <FLabel>Oggetti nel percorso ({oggettiEdit.length})</FLabel>
       {oggettiEdit.length === 0
-        ? <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:8}}>Nessun oggetto — clicca sul canvas o usa la lista</div>
+        ? <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic",marginBottom:8}}>Nessun oggetto — clicca sul canvas o usa la lista</div>
         : <div style={{marginBottom:8}}>
             {oggettiEdit.map((n, i) => (
               <div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 6px",
-                background:"#fef9f0",border:"1px solid #fad7a0",borderRadius:4,marginBottom:3}}>
+                background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:4,marginBottom:3}}>
                 <span style={{fontSize:10,color:"#e67e22",minWidth:18,textAlign:"center",fontWeight:"bold"}}>{i+1}</span>
-                <span style={{flex:1,fontSize:12,color:"#2c3e50"}}>{n}</span>
-                <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▲</button>
-                <button onClick={()=>moveDown(i)} disabled={i===oggettiEdit.length-1} style={{background:"none",border:"none",cursor:i===oggettiEdit.length-1?"default":"pointer",color:i===oggettiEdit.length-1?"#dce1e7":"#7f8c8d",fontSize:12,padding:"0 2px"}}>▼</button>
-                <button onClick={()=>removeOggetto(i)} style={{background:"none",border:"none",color:"#e74c3c",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 2px"}}>×</button>
+                <span style={{flex:1,fontSize:12,color:THEME.text}}>{n}</span>
+                <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?THEME.textFaint:THEME.textDim,fontSize:12,padding:"0 2px"}}>▲</button>
+                <button onClick={()=>moveDown(i)} disabled={i===oggettiEdit.length-1} style={{background:"none",border:"none",cursor:i===oggettiEdit.length-1?"default":"pointer",color:i===oggettiEdit.length-1?THEME.textFaint:THEME.textDim,fontSize:12,padding:"0 2px"}}>▼</button>
+                <button onClick={()=>removeOggetto(i)} style={{background:"none",border:"none",color:THEME.danger,cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 2px"}}>×</button>
               </div>
             ))}
           </div>
@@ -527,23 +545,23 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
       {oggettiDisponibili.length > 0 && (
         <>
           <FLabel>Aggiungi oggetto {hovered ? <span style={{color:"#e67e22"}}>— preview: {hovered}</span> : ""}</FLabel>
-          <div style={{border:"1px solid #dce1e7",borderRadius:5,overflow:"hidden",marginBottom:8,maxHeight:120,overflowY:"auto"}}>
+          <div style={{border:`1px solid ${THEME.border}`,borderRadius:5,overflow:"hidden",marginBottom:8,maxHeight:120,overflowY:"auto"}}>
             {oggettiDisponibili.map(n => (
               <div key={n}
                 onMouseEnter={()=>setHovered(n)} onMouseLeave={()=>setHovered(null)}
                 onClick={()=>{ onOggettiChange([...oggettiEdit, n]); setHovered(null); }}
                 style={{padding:"5px 10px",fontSize:12,cursor:"pointer",
-                  background:hovered===n?"#fad7a0":"white",borderBottom:"1px solid #f0f0f0",
-                  color:"#2c3e50",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  background:hovered===n?"rgba(230,126,34,0.16)":THEME.surface,borderBottom:`1px solid ${THEME.border}`,
+                  color:THEME.text,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span>{n}</span>
-                <span style={{fontSize:10,color:"#bdc3c7"}}>{museo.oggetti.find(o=>o.nome===n)?.stanza}</span>
+                <span style={{fontSize:10,color:THEME.textFaint}}>{museo.oggetti.find(o=>o.nome===n)?.stanza}</span>
               </div>
             ))}
           </div>
         </>
       )}
-      <div style={{display:"flex",gap:8,marginTop:4}}>
-        <button onClick={onCancel} style={{flex:1,padding:"7px",borderRadius:5,border:"1px solid #dce1e7",background:"transparent",color:"#95a5a6",fontSize:12,cursor:"pointer"}}>Annulla</button>
+      <div style={{display:"flex",gap:8,marginTop:4,flexDirection:isMobile?"column":"row"}}>
+        <button onClick={onCancel} style={{flex:1,padding:"7px",borderRadius:5,border:`1px solid ${THEME.border}`,background:"transparent",color:THEME.textDim,fontSize:12,cursor:"pointer"}}>Annulla</button>
         <button onClick={onSave} disabled={saving||!nomeEdit.trim()||oggettiEdit.length===0}
           style={{flex:2,padding:"7px",borderRadius:5,border:"none",
             background:(saving||!nomeEdit.trim()||oggettiEdit.length===0)?"#f5cba7":"#e67e22",
@@ -557,6 +575,19 @@ function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeC
 
 // ─── MAIN ──────────────────────────────────────────────────────────────────
 export default function MuseoEditor() {
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  const [viewportH, setViewportH] = useState(() => window.innerHeight);
+  useEffect(() => {
+    const onResize = () => {
+      setViewportW(window.innerWidth);
+      setViewportH(window.innerHeight);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isTablet = viewportW <= 1024;
+  const isMobile = viewportW <= 768;
+
   const [screen, setScreen]             = useState("welcome");
   const [museo, setMuseo]               = useState(MUSEO_VUOTO);
   const [selected, setSelected]         = useState(null);
@@ -585,6 +616,7 @@ export default function MuseoEditor() {
   const [percorsoSaving, setPercorsoSaving]     = useState(false);
   const [percorsoHoverObj, setPercorsoHoverObj] = useState(null);
   const [rightPanelTab, setRightPanelTab]       = useState("details");
+  const [mobileSection, setMobileSection]       = useState("canvas");
 
   const showPrompt = (message, defaultValue = "") =>
     new Promise(resolve => setModal({ message, defaultValue, onConfirm: resolve }));
@@ -602,6 +634,7 @@ export default function MuseoEditor() {
     setPercorsoNomeEdit(p?.nome ?? "");
     setPercorsoOggettiEdit(p?.oggetti ? [...p.oggetti] : []);
     setSelected(null);
+    if (isMobile) setMobileSection("panel");
   };
 
   const closePercorsoEditor = () => {
@@ -609,6 +642,7 @@ export default function MuseoEditor() {
     setPercorsoNomeEdit("");
     setPercorsoOggettiEdit([]);
     setPercorsoHoverObj(null);
+    if (isMobile) setMobileSection("canvas");
   };
 
   const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti, museo.corridoi);
@@ -944,6 +978,7 @@ export default function MuseoEditor() {
       } catch(err){showToast(`⚠ Oggetto solo locale (${err.message})`,false);}
     } else if (!percorsoEdit) {
       setSelected({type:"stanza",nome});
+      if (isMobile) setMobileSection("panel");
     }
   };
 
@@ -960,6 +995,7 @@ export default function MuseoEditor() {
       setMode("select");
     } else {
       setSelected({type:"oggetto",nome});
+      if (isMobile) setMobileSection("panel");
     }
   };
 
@@ -1056,47 +1092,47 @@ export default function MuseoEditor() {
   // ─── RENDER: WELCOME / NUOVO ──────────────────────────────────────────
   if (screen === "welcome" || screen === "nuovo") {
     return (
-      <div style={{display:"flex",height:"100vh",background:"#1a252f",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif"}}>
-        <div style={{width:520,background:"#2c3e50",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px #00000066"}}>
-          <div style={{padding:"32px 40px 24px",borderBottom:"1px solid #3d5166"}}>
-            <div style={{fontSize:11,letterSpacing:3,color:"#7f8c8d",marginBottom:8}}>MUSEO EDITOR</div>
-            <div style={{fontSize:26,fontWeight:"bold",color:"#ecf0f1"}}>{screen==="nuovo"?"Nuovo Museo":"Benvenuto"}</div>
-            {screen==="welcome"&&<div style={{fontSize:13,color:"#95a5a6",marginTop:6}}>
+      <div style={{display:"flex",height:"100vh",background:THEME.bg,alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",padding:isMobile?12:20}}>
+        <div style={{width:isMobile?"100%":520,maxWidth:520,background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px #00000066"}}>
+          <div style={{padding:isMobile?"20px 16px 16px":"32px 40px 24px",borderBottom:`1px solid ${THEME.border}`}}>
+            <div style={{fontSize:11,letterSpacing:3,color:THEME.accent,marginBottom:8}}>MUSEO EDITOR</div>
+            <div style={{fontSize:26,fontWeight:"bold",color:THEME.text}}>{screen==="nuovo"?"Nuovo Museo":"Benvenuto"}</div>
+            {screen==="welcome"&&<div style={{fontSize:13,color:THEME.textDim,marginTop:6}}>
               {apiStatus==="ok"?`${museList.length} museo${museList.length!==1?"i":""} trovato${museList.length!==1?"i":""} sul server`:apiStatus==="err"?"Server non raggiungibile":"Connessione in corso..."}
             </div>}
           </div>
-          <div style={{padding:"28px 40px 36px"}}>
+          <div style={{padding:isMobile?"16px 16px 20px":"28px 40px 36px"}}>
             {screen==="welcome"&&<>
-              <button onClick={()=>setScreen("nuovo")} style={{width:"100%",padding:"14px",borderRadius:8,border:"2px solid #27ae60",background:"#1a3a2a",color:"#2ecc71",fontSize:14,fontWeight:"bold",cursor:"pointer",marginBottom:16,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+              <button onClick={()=>setScreen("nuovo")} style={{width:"100%",padding:"14px",borderRadius:8,border:`1px solid ${THEME.accent}`,background:THEME.accentSoft,color:THEME.accent,fontSize:14,fontWeight:"bold",cursor:"pointer",marginBottom:16,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
                 <span style={{fontSize:24}}>⊞</span>
-                <div><div>Crea nuovo museo</div><div style={{fontSize:11,color:"#27ae60",fontWeight:"normal",marginTop:2}}>Inizia da zero</div></div>
+                <div><div>Crea nuovo museo</div><div style={{fontSize:11,color:THEME.accent,fontWeight:"normal",marginTop:2}}>Inizia da zero</div></div>
               </button>
               {museList.length>0&&<>
-                <div style={{fontSize:10,letterSpacing:2,color:"#7f8c8d",marginBottom:10,marginTop:8}}>OPPURE CARICA ESISTENTE</div>
+                <div style={{fontSize:10,letterSpacing:2,color:THEME.textFaint,marginBottom:10,marginTop:8}}>OPPURE CARICA ESISTENTE</div>
                 <div style={{maxHeight:240,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
                   {museList.map(n=>(
                     <button key={n} onClick={()=>loadMuseoFromApi(n)} disabled={loadingMuseo!==null}
-                      style={{width:"100%",padding:"12px 16px",borderRadius:8,border:"1px solid #3d5166",background:loadingMuseo===n?"#2980b9":"#34495e",color:"#ecf0f1",fontSize:13,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",opacity:loadingMuseo&&loadingMuseo!==n?0.5:1}}>
-                      <span>{n}</span><span style={{fontSize:11,color:"#7f8c8d"}}>{loadingMuseo===n?"⏳ caricamento...":"→ apri"}</span>
+                      style={{width:"100%",padding:"12px 16px",borderRadius:8,border:`1px solid ${THEME.border}`,background:loadingMuseo===n?THEME.accentSoft:THEME.panel,color:THEME.text,fontSize:13,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",opacity:loadingMuseo&&loadingMuseo!==n?0.5:1}}>
+                      <span>{n}</span><span style={{fontSize:11,color:THEME.textFaint}}>{loadingMuseo===n?"⏳ caricamento...":"→ apri"}</span>
                     </button>
                   ))}
                 </div>
               </>}
-              {apiStatus==="err"&&<div style={{marginTop:16,padding:"12px 16px",borderRadius:8,background:"#2d1515",border:"1px solid #e74c3c",color:"#e74c3c",fontSize:12}}>
+              {apiStatus==="err"&&<div style={{marginTop:16,padding:"12px 16px",borderRadius:8,background:"rgba(224,90,74,0.1)",border:`1px solid ${THEME.danger}`,color:THEME.danger,fontSize:12}}>
                 ⚠️ Impossibile raggiungere il server API.
-                <button onClick={()=>{setMuseo(MUSEO_VUOTO);setScreen("nuovo");}} style={{display:"block",marginTop:10,padding:"8px 16px",borderRadius:6,border:"1px solid #e74c3c",background:"transparent",color:"#e74c3c",fontSize:12,cursor:"pointer"}}>Continua offline →</button>
+                <button onClick={()=>{setMuseo(MUSEO_VUOTO);setScreen("nuovo");}} style={{display:"block",marginTop:10,padding:"8px 16px",borderRadius:6,border:`1px solid ${THEME.danger}`,background:"transparent",color:THEME.danger,fontSize:12,cursor:"pointer"}}>Continua offline →</button>
               </div>}
             </>}
             {screen==="nuovo"&&<>
-              <div style={{fontSize:10,letterSpacing:1,color:"#95a5a6",marginBottom:4}}>NOME MUSEO</div>
+              <div style={{fontSize:10,letterSpacing:1,color:THEME.textDim,marginBottom:4}}>NOME MUSEO</div>
               <input autoFocus value={nuovoNome} onChange={e=>setNuovoNome(e.target.value)} onKeyDown={e=>e.key==="Enter"&&creaMuseoNuovo()} placeholder="es. Museo Egizio"
-                style={{width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid #3d5166",background:"#34495e",color:"#ecf0f1",fontSize:14,boxSizing:"border-box",outline:"none",marginBottom:16}}/>
-              <div style={{fontSize:10,letterSpacing:1,color:"#95a5a6",marginBottom:4}}>CITTÀ</div>
+                style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,fontSize:14,boxSizing:"border-box",outline:"none",marginBottom:16}}/>
+              <div style={{fontSize:10,letterSpacing:1,color:THEME.textDim,marginBottom:4}}>CITTÀ</div>
               <input value={nuovaCitta} onChange={e=>setNuovaCitta(e.target.value)} onKeyDown={e=>e.key==="Enter"&&creaMuseoNuovo()} placeholder="es. Torino"
-                style={{width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid #3d5166",background:"#34495e",color:"#ecf0f1",fontSize:14,boxSizing:"border-box",outline:"none",marginBottom:24}}/>
-              <div style={{display:"flex",gap:10}}>
-                <button onClick={()=>setScreen("welcome")} style={{flex:1,padding:"11px",borderRadius:7,border:"1px solid #3d5166",background:"transparent",color:"#95a5a6",fontSize:13,cursor:"pointer"}}>← Indietro</button>
-                <button onClick={creaMuseoNuovo} disabled={!nuovoNome.trim()} style={{flex:2,padding:"11px",borderRadius:7,border:"none",background:nuovoNome.trim()?"#27ae60":"#1e5a34",color:nuovoNome.trim()?"white":"#7f8c8d",fontSize:13,fontWeight:"bold",cursor:nuovoNome.trim()?"pointer":"default"}}>Crea museo</button>
+                style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,fontSize:14,boxSizing:"border-box",outline:"none",marginBottom:24}}/>
+              <div style={{display:"flex",gap:10,flexDirection:isMobile?"column":"row"}}>
+                <button onClick={()=>setScreen("welcome")} style={{flex:1,padding:"11px",borderRadius:7,border:`1px solid ${THEME.border}`,background:"transparent",color:THEME.textDim,fontSize:13,cursor:"pointer"}}>← Indietro</button>
+                <button onClick={creaMuseoNuovo} disabled={!nuovoNome.trim()} style={{flex:2,padding:"11px",borderRadius:7,border:"none",background:nuovoNome.trim()?THEME.accent:"#2f5d43",color:nuovoNome.trim()?"#0d0d0d":THEME.textFaint,fontSize:13,fontWeight:"bold",cursor:nuovoNome.trim()?"pointer":"default"}}>Crea museo</button>
               </div>
             </>}
           </div>
@@ -1107,60 +1143,96 @@ export default function MuseoEditor() {
 
   // ─── RENDER: EDITOR ───────────────────────────────────────────────────
   return (
-    <div style={{display:"flex",height:"100vh",fontFamily:"Arial,sans-serif",overflow:"hidden",position:"relative"}}>
+    <div style={{display:"flex",flexDirection:isMobile?"column":"row",height:"100vh",fontFamily:"Arial,sans-serif",overflow:"hidden",position:"relative",background:THEME.bg,color:THEME.text}}>
 
       {modal && <ModalPrompt modal={modal} setModal={setModal} />}
       {confirmModal && <ModalConfirm modal={confirmModal} setModal={setConfirmModal} />}
 
       {toast && (
-        <div style={{position:"fixed",bottom:24,right:24,zIndex:9999,padding:"10px 18px",borderRadius:8,fontSize:13,fontWeight:"bold",
+        <div style={{position:"fixed",bottom:isMobile?14:24,right:isMobile?12:24,left:isMobile?12:"auto",zIndex:9999,padding:"10px 18px",borderRadius:8,fontSize:13,fontWeight:"bold",
           background:toast.ok?"#27ae60":"#e74c3c",color:"white",boxShadow:"0 4px 16px #00000044"}}>
           {toast.msg}
         </div>
       )}
 
       {/* ── TOOLBAR ── */}
-      <div style={{width:140,background:"#2c3e50",display:"flex",flexDirection:"column",padding:"12px 10px",gap:8}}>
-        <div style={{fontSize:9,letterSpacing:1.4,color:"#7f8c8d",padding:"0 2px 4px"}}>STRUMENTI</div>
+      <div style={{width:isMobile?"100%":160,background:THEME.surface,borderRight:isMobile?"none":`1px solid ${THEME.border}`,borderBottom:isMobile?`1px solid ${THEME.border}`:"none",display:"flex",flexDirection:isMobile?"row":"column",flexWrap:isMobile?"wrap":"nowrap",padding:isMobile?"10px 8px":"12px 10px",gap:8,overflow:"hidden"}}>
+        <div style={{fontSize:9,letterSpacing:1.4,color:THEME.textFaint,padding:"0 2px 4px",width:isMobile?"100%":"auto"}}>STRUMENTI</div>
         {[
           {m:"select",icon:"↖",label:"Seleziona"},
           {m:"addRoom",icon:"⊞",label:"Aggiungi stanza"},
           {m:"addObject",icon:"⊕",label:"Aggiungi oggetto"},
         ].map(({m,icon,label})=>(
+          (() => {
+            const isActive = mode===m&&!percorsoEdit;
+            return (
           <button key={m} onClick={()=>{setMode(m);closePercorsoEditor();}}
             style={{
-              width:"100%",height:36,borderRadius:7,border:`1px solid ${mode===m&&!percorsoEdit?"#4ade80":"#3d5166"}`,
-              background:mode===m&&!percorsoEdit?"#1a3a2a":"#34495e",color:mode===m&&!percorsoEdit?"#4ade80":"#c7d2db",
-              fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,padding:"0 10px",textAlign:"left"
+              width:isMobile?"auto":"100%",flex:isMobile?"1 1 0":undefined,minWidth:isMobile?0:"auto",height:36,borderRadius:7,border:`1px solid ${isActive?THEME.accent:THEME.border}`,
+              background:isActive?THEME.accentSoft:THEME.panel,color:isActive?THEME.accent:THEME.textDim,
+              fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:isMobile?"center":"flex-start",gap:isMobile?(isActive?8:0):8,padding:isMobile?"0 10px":"0 10px",textAlign:"left"
             }}>
             <span style={{fontSize:16,lineHeight:1}}>{icon}</span>
-            <span>{label}</span>
+            {(!isMobile || isActive) && <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>}
           </button>
+            );
+          })()
         ))}
-        <div style={{fontSize:10,color:"#95a5a6",lineHeight:1.5,padding:"8px 2px 2px"}}>
+        <div style={{fontSize:10,color:THEME.textDim,lineHeight:1.5,padding:"8px 2px 2px",display:isMobile?"none":"block"}}>
           {mode==="select" && !percorsoEdit ? "Modalita: selezione e modifica" : null}
           {mode==="addRoom" && !percorsoEdit ? "Modalita: clicca una cella vuota per creare stanza" : null}
           {mode==="addObject" && !percorsoEdit ? "Modalita: clicca una stanza per inserire oggetto" : null}
           {mode==="connectPick" && !percorsoEdit ? "Modalita: clicca un oggetto da collegare" : null}
         </div>
-        <div style={{flex:1}}/>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-          <span style={{fontSize:10,color:"#95a5a6"}}>API</span>
+        <div style={{flex:1,display:isMobile?"none":"block"}}/>
+        <div style={{display:isMobile?"none":"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{fontSize:10,color:THEME.textDim}}>API</span>
           <div title={apiStatus==="ok"?"API connessa":apiStatus==="err"?"API non raggiungibile":"..."}
             style={{width:10,height:10,borderRadius:"50%",background:apiStatus==="ok"?"#2ecc71":apiStatus==="err"?"#e74c3c":"#f39c12"}}/>
         </div>
         <button onClick={()=>setShowExport(v=>!v)}
-          style={{width:"100%",height:34,borderRadius:7,border:`1px solid ${showExport?"#3498db":"#3d5166"}`,background:"#34495e",color:showExport?"#3498db":"#c7d2db",fontSize:12,cursor:"pointer"}}>
-          ⤓ Export
+          style={{width:isMobile?40:"100%",height:34,borderRadius:7,border:`1px solid ${showExport?THEME.accent:THEME.border}`,background:THEME.panel,color:showExport?THEME.accent:THEME.textDim,fontSize:12,cursor:"pointer",flexShrink:0}}>
+          {isMobile ? "⤓" : "⤓ Export"}
         </button>
       </div>
 
+      {isMobile && (
+        <div style={{display:"flex",gap:8,padding:"8px",background:THEME.panel,borderBottom:`1px solid ${THEME.border}`}}>
+          <button
+            onClick={() => setMobileSection("canvas")}
+            style={{
+              flex:1,padding:"8px 10px",borderRadius:7,cursor:"pointer",
+              border:`1px solid ${mobileSection==="canvas"?THEME.accent:THEME.border}`,
+              background:mobileSection==="canvas"?THEME.accentSoft:"transparent",
+              color:mobileSection==="canvas"?THEME.accent:THEME.textDim,fontSize:12
+            }}
+          >
+            Canvas
+          </button>
+          <button
+            onClick={() => setMobileSection("panel")}
+            style={{
+              flex:1,padding:"8px 10px",borderRadius:7,cursor:"pointer",
+              border:`1px solid ${mobileSection==="panel"?THEME.accent:THEME.border}`,
+              background:mobileSection==="panel"?THEME.accentSoft:"transparent",
+              color:mobileSection==="panel"?THEME.accent:THEME.textDim,fontSize:12
+            }}
+          >
+            Pannello
+          </button>
+        </div>
+      )}
+
       {/* ── CANVAS ── */}
-      <div style={{flex:1,overflow:"auto",background:"#ecf0f1",position:"relative"}}>
+      <div style={{
+        display: isMobile && mobileSection !== "canvas" ? "none" : "block",
+        flex:1,overflow:"auto",background:"#ecf0f1",position:"relative",
+        minHeight:0
+      }}>
         {hint&&(
           <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",zIndex:10,
             background: percorsoEdit?"#e67e22dd":"#2c3e50dd",
-            color:"white",padding:"6px 18px",borderRadius:20,fontSize:12,pointerEvents:"none",whiteSpace:"nowrap"}}>
+            color:"white",padding:"6px 14px",borderRadius:20,fontSize:12,pointerEvents:"none",whiteSpace:isMobile?"normal":"nowrap",maxWidth:isMobile?"92%":"none",textAlign:"center"}}>
             {hint}
           </div>
         )}
@@ -1293,18 +1365,23 @@ export default function MuseoEditor() {
       </div>
 
       {/* ── PANNELLO DESTRO ── */}
-      <div style={{width:320,background:"white",borderLeft:"1px solid #dce1e7",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"14px 16px",borderBottom:"1px solid #eaecef",background:"#2c3e50"}}>
-          <div style={{fontSize:10,letterSpacing:2,color:"#7f8c8d",marginBottom:6}}>MUSEO</div>
+      <div style={{
+        display: isMobile && mobileSection !== "panel" ? "none" : "flex",
+        width:isMobile?"100%":340,flex:isMobile?1:undefined,minHeight:isMobile?0:undefined,
+        background:THEME.surface,borderLeft:isMobile?"none":`1px solid ${THEME.border}`,
+        borderTop:isMobile?`1px solid ${THEME.border}`:"none",flexDirection:"column",overflow:"hidden"
+      }}>
+        <div style={{padding:"14px 16px",borderBottom:`1px solid ${THEME.border}`,background:THEME.panel}}>
+          <div style={{fontSize:10,letterSpacing:2,color:THEME.textFaint,marginBottom:6}}>MUSEO</div>
           <input value={museo.nome} onChange={e=>setMuseo(m=>({...m,nome:e.target.value}))} onBlur={e=>updMuseoNome(e.target.value)} style={INP}/>
         </div>
 
-        <div style={{display:"flex",padding:"8px 10px",gap:6,borderBottom:"1px solid #eaecef",background:"#f8f9fa"}}>
+        <div style={{display:"flex",padding:"8px 10px",gap:6,borderBottom:`1px solid ${THEME.border}`,background:THEME.panel}}>
           <button
             onClick={() => setRightPanelTab("details")}
             style={{
-              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="details"?"#2c3e50":"#dce1e7"}`,
-              background:rightPanelTab==="details"?"#2c3e50":"white",color:rightPanelTab==="details"?"white":"#7f8c8d",
+              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="details"?THEME.accent:THEME.border}`,
+              background:rightPanelTab==="details"?THEME.accentSoft:THEME.surface,color:rightPanelTab==="details"?THEME.accent:THEME.textDim,
               fontSize:11,cursor:"pointer"
             }}
           >
@@ -1313,8 +1390,8 @@ export default function MuseoEditor() {
           <button
             onClick={() => setRightPanelTab("lists")}
             style={{
-              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="lists"?"#2c3e50":"#dce1e7"}`,
-              background:rightPanelTab==="lists"?"#2c3e50":"white",color:rightPanelTab==="lists"?"white":"#7f8c8d",
+              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="lists"?THEME.accent:THEME.border}`,
+              background:rightPanelTab==="lists"?THEME.accentSoft:THEME.surface,color:rightPanelTab==="lists"?THEME.accent:THEME.textDim,
               fontSize:11,cursor:"pointer"
             }}
           >
@@ -1340,6 +1417,9 @@ export default function MuseoEditor() {
 
           {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="stanza" && (
             <Card title="STANZA" color="#27ae60">
+              <div style={{fontSize:11,color:THEME.textDim,marginBottom:10,padding:"8px 10px",background:THEME.accentSoft,border:`1px solid ${THEME.border}`,borderRadius:6}}>
+                Modifica nome, tipo e posizione. I corridoi si attivano/disattivano sotto.
+              </div>
               <FLabel>Nome</FLabel>
               <input
                 value={nomeStanzaEdit}
@@ -1354,21 +1434,31 @@ export default function MuseoEditor() {
                   if (e.key === "Escape") { setNomeStanzaEdit(selItem.nome); e.currentTarget.blur(); }
                 }}
                 style={INP}
-              />              <FLabel>Tipo</FLabel>
+              />
+              <FLabel>Tipo stanza</FLabel>
               <select value={selItem.tipo} onChange={e=>updStanza(selItem.nome,{tipo:e.target.value})} style={INP}>
                 {["normale","ingresso","uscita","bagno","servizio"].map(t=><option key={t}>{t}</option>)}
               </select>
-              <div style={{display:"flex",gap:8}}>
-                <div style={{flex:1}}><FLabel>Riga</FLabel><input type="number" min={0} value={selItem.row} onChange={e=>updStanza(selItem.nome,{row:+e.target.value})} style={INP}/></div>
-                <div style={{flex:1}}><FLabel>Col</FLabel><input type="number" min={0} value={selItem.col} onChange={e=>updStanza(selItem.nome,{col:+e.target.value})} style={INP}/></div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Riga</FLabel>
+                  <input type="number" min={0} value={selItem.row} onChange={e=>updStanza(selItem.nome,{row:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Colonna</FLabel>
+                  <input type="number" min={0} value={selItem.col} onChange={e=>updStanza(selItem.nome,{col:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                </div>
               </div>
-              <FLabel>Corridoi adiacenti</FLabel>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+                <FLabel>Corridoi adiacenti</FLabel>
+                <span style={{fontSize:10,color:THEME.textFaint}}>{stanzaAdiacentiSel.length} collegabili</span>
+              </div>
               {stanzaAdiacentiSel.length === 0 ? (
-                <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic",marginBottom:8}}>
+                <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic",marginBottom:8}}>
                   Nessuna stanza adiacente
                 </div>
               ) : (
-                <div style={{marginBottom:8}}>
+                <div style={{marginBottom:8,display:"grid",gap:6}}>
                   {stanzaAdiacentiSel.map((adj) => {
                     const active = hasCorridoio(selItem.nome, adj.nome);
                     return (
@@ -1377,25 +1467,29 @@ export default function MuseoEditor() {
                         type="button"
                         onClick={() => toggleCorridoio(selItem.nome, adj.nome)}
                         style={{
-                          width:"100%",marginBottom:4,padding:"6px 8px",borderRadius:4,
-                          border:`1px solid ${active ? "#27ae60" : "#dce1e7"}`,
-                          background:active ? "#eafaf1" : "transparent",
-                          color:active ? "#27ae60" : "#7f8c8d",
-                          fontSize:12,cursor:"pointer",textAlign:"left",
+                          width:"100%",padding:"9px 10px",borderRadius:6,
+                          border:`1px solid ${active ? THEME.accent : THEME.border}`,
+                          background:active ? THEME.accentSoft : THEME.surface,
+                          color:active ? THEME.accent : THEME.textDim,
+                          fontSize:12,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"
                         }}
                       >
-                        {active ? "✓" : "○"} {adj.nome}
+                        <span>{adj.nome}</span>
+                        <span style={{fontSize:11}}>{active ? "Attivo" : "Disattivo"}</span>
                       </button>
                     );
                   })}
                 </div>
               )}
-              <button onClick={deleteSelected} style={DELBTN}>✕ Elimina stanza</button>
+              <button onClick={deleteSelected} style={{...DELBTN,marginTop:6}}>✕ Elimina stanza</button>
             </Card>
           )}
 
           {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="oggetto" && (<>
             <Card title="OGGETTO" color="#3498db">
+              <div style={{fontSize:11,color:THEME.textDim,marginBottom:10,padding:"8px 10px",background:"rgba(52,152,219,0.12)",border:`1px solid ${THEME.border}`,borderRadius:6}}>
+                Gestisci dati base, visibilita e connessioni dell'oggetto selezionato.
+              </div>
               <FLabel>Nome</FLabel>
               <input
                 value={nomeOggettoEdit}
@@ -1410,25 +1504,32 @@ export default function MuseoEditor() {
                   if (e.key === "Escape") { setNomeOggettoEdit(selItem.nome); e.currentTarget.blur(); }
                 }}
                 style={INP}
-              />              <FLabel>Stanza</FLabel>
-              <select value={selItem.stanza} onChange={e=>updOggetto(selItem.nome,{stanza:e.target.value})} style={INP}>
-                {museo.stanze.map(s=><option key={s.nome}>{s.nome}</option>)}
-              </select>
-              <FLabel>Visibile</FLabel>
-              <select value={selItem.visibile?"si":"no"} onChange={e=>updOggetto(selItem.nome,{visibile:e.target.value==="si"})} style={INP}>
-                <option value="si">Sì</option><option value="no">No</option>
-              </select>
+              />
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Stanza</FLabel>
+                  <select value={selItem.stanza} onChange={e=>updOggetto(selItem.nome,{stanza:e.target.value})} style={{...INP,marginBottom:0}}>
+                    {museo.stanze.map(s=><option key={s.nome}>{s.nome}</option>)}
+                  </select>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Visibile</FLabel>
+                  <select value={selItem.visibile?"si":"no"} onChange={e=>updOggetto(selItem.nome,{visibile:e.target.value==="si"})} style={{...INP,marginBottom:0}}>
+                    <option value="si">Sì</option><option value="no">No</option>
+                  </select>
+                </div>
+              </div>
               <div style={{marginTop:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <FLabel>Connessioni ({selItem.connessi.length})</FLabel>
-                  <button onClick={()=>setMode("connectPick")} style={{fontSize:11,padding:"3px 10px",borderRadius:4,border:"1px solid #27ae60",background:"#eafaf1",color:"#27ae60",cursor:"pointer"}}>+ Collega</button>
+                  <button onClick={()=>setMode("connectPick")} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:`1px solid ${THEME.accent}`,background:THEME.accentSoft,color:THEME.accent,cursor:"pointer"}}>+ Collega</button>
                 </div>
                 {selItem.connessi.length===0
-                  ? <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic"}}>Nessuna connessione</div>
+                  ? <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic"}}>Nessuna connessione</div>
                   : selItem.connessi.map(cn=>(
-                    <div key={cn} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",background:"#fef9f9",border:"1px solid #fadbd8",borderRadius:4,marginBottom:3}}>
-                      <span style={{fontSize:12,color:"#2c3e50"}}>↔ {cn}</span>
-                      <button onClick={()=>disconnect(selItem.nome,cn)} style={{background:"none",border:"none",color:"#e74c3c",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
+                    <div key={cn} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,marginBottom:5}}>
+                      <span style={{fontSize:12,color:THEME.text}}>↔ {cn}</span>
+                      <button onClick={()=>disconnect(selItem.nome,cn)} style={{background:"none",border:"none",color:THEME.danger,cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
                     </div>
                   ))
                 }
@@ -1444,13 +1545,13 @@ export default function MuseoEditor() {
             />
 
             <Card title="DESCRIZIONI" color="#8e44ad">
-              <div style={{fontSize:10,color:"#8e44ad",background:"#f5eef8",border:"1px solid #d2b4de",borderRadius:4,padding:"5px 8px",marginBottom:10}}>
+              <div style={{fontSize:10,color:"#8e44ad",background:"rgba(142,68,173,0.14)",border:`1px solid ${THEME.border}`,borderRadius:4,padding:"5px 8px",marginBottom:10}}>
                 💾 Le descrizioni vengono salvate con "Salva su API"
               </div>
               <div style={{display:"flex",gap:4,marginBottom:12}}>
                 {["🧒","📖","🎓","🔬"].map((icon,i)=>(
                   <button key={i} onClick={()=>setDescTab(i)}
-                    style={{flex:1,padding:"4px 2px",fontSize:13,borderRadius:4,cursor:"pointer",border:`1px solid ${descTab===i?"#8e44ad":"#dce1e7"}`,background:descTab===i?"#8e44ad":"transparent",color:descTab===i?"white":"#95a5a6"}}>
+                    style={{flex:1,padding:"6px 2px",fontSize:13,borderRadius:4,cursor:"pointer",border:`1px solid ${descTab===i?"#8e44ad":THEME.border}`,background:descTab===i?"#8e44ad":"transparent",color:descTab===i?"white":THEME.textDim}}>
                     {icon}
                   </button>
                 ))}
@@ -1458,10 +1559,10 @@ export default function MuseoEditor() {
               {["🔹 Breve","🔸 Medio","🔴 Lungo"].map((lbl,lungh)=>{
                 const val = selItem.descrizioni?.[descTab]?.[lungh]??"";
                 return (
-                  <div key={lungh} style={{marginBottom:10}}>
-                    <div style={{fontSize:10,color:"#95a5a6",marginBottom:3}}>{lbl}</div>
+                  <div key={lungh} style={{marginBottom:10,padding:"8px 10px",border:`1px solid ${THEME.border}`,borderRadius:6,background:THEME.surface}}>
+                    <div style={{fontSize:10,color:THEME.textDim,marginBottom:5}}>{lbl}</div>
                     <textarea value={val} onChange={e=>updDescrizione(selItem.nome,descTab,lungh,e.target.value)} rows={3}
-                      style={{width:"100%",padding:"6px 8px",border:"1px solid #dce1e7",borderRadius:5,fontSize:11,boxSizing:"border-box",resize:"vertical",outline:"none",fontFamily:"Arial,sans-serif",lineHeight:1.5}}/>
+                      style={{width:"100%",padding:"6px 8px",border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,borderRadius:5,fontSize:11,boxSizing:"border-box",resize:"vertical",outline:"none",fontFamily:"Arial,sans-serif",lineHeight:1.5}}/>
                   </div>
                 );
               })}
@@ -1470,20 +1571,20 @@ export default function MuseoEditor() {
 
           {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="percorso" && (
             <Card title="PERCORSO" color="#e67e22">
-              <div style={{fontSize:15,fontWeight:"bold",color:"#2c3e50",marginBottom:8}}>{selItem.nome}</div>
+              <div style={{fontSize:15,fontWeight:"bold",color:THEME.text,marginBottom:8}}>{selItem.nome}</div>
               <FLabel>Oggetti ({selItem.oggetti.length})</FLabel>
               {selItem.oggetti.map((n,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"#fef9f0",border:"1px solid #fad7a0",borderRadius:4,marginBottom:3}}>
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 8px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:4,marginBottom:5}}>
                   <span style={{fontSize:10,color:"#e67e22",minWidth:18,fontWeight:"bold",textAlign:"center"}}>{i+1}</span>
-                  <span style={{fontSize:12,color:"#2c3e50",flex:1}}>{n}</span>
-                  <span style={{fontSize:10,color:"#bdc3c7"}}>{museo.oggetti.find(o=>o.nome===n)?.stanza??""}</span>
+                  <span style={{fontSize:12,color:THEME.text,flex:1}}>{n}</span>
+                  <span style={{fontSize:10,color:THEME.textFaint}}>{museo.oggetti.find(o=>o.nome===n)?.stanza??""}</span>
                 </div>
               ))}
-              <div style={{display:"flex",gap:8,marginTop:12}}>
+              <div style={{display:"flex",gap:8,marginTop:12,flexDirection:isMobile?"column":"row"}}>
                 <button onClick={()=>openPercorsoEditor(selItem)}
-                  style={{flex:1,padding:"7px",borderRadius:5,border:"1px solid #e67e22",background:"white",color:"#e67e22",fontSize:12,cursor:"pointer"}}>✎ Modifica</button>
+                  style={{flex:1,padding:"7px",borderRadius:5,border:"1px solid #e67e22",background:"transparent",color:"#e67e22",fontSize:12,cursor:"pointer"}}>✎ Modifica</button>
                 <button onClick={()=>eliminaPercorso(selItem.nome)}
-                  style={{flex:1,padding:"7px",borderRadius:5,border:"none",background:"#fdecea",color:"#e74c3c",fontSize:12,cursor:"pointer"}}>✕ Elimina</button>
+                  style={{flex:1,padding:"7px",borderRadius:5,border:"none",background:"rgba(224,90,74,0.12)",color:THEME.danger,fontSize:12,cursor:"pointer"}}>✕ Elimina</button>
               </div>
             </Card>
           )}
@@ -1500,7 +1601,7 @@ export default function MuseoEditor() {
             {museo.stanze.map(s=>(
               <ListRow key={s.nome} active={!percorsoEdit&&selected?.nome===s.nome&&selected?.type==="stanza"} accent={TIPO_COLORS[s.tipo]?.stroke||"#2c3e50"}
                 onClick={()=>{if(percorsoEdit)return;setMode("select");setSelected({type:"stanza",nome:s.nome});}}>
-                <span>{s.nome}</span><span style={{fontSize:10,color:"#95a5a6"}}>{s.tipo}</span>
+                <span>{s.nome}</span><span style={{fontSize:10,color:THEME.textDim}}>{s.tipo}</span>
               </ListRow>
             ))}
           </Section>
@@ -1517,23 +1618,23 @@ export default function MuseoEditor() {
                   }
                   setMode("select");setSelected({type:"oggetto",nome:o.nome});
                 }}>
-                <span>{o.nome}</span><span style={{fontSize:10,color:"#95a5a6"}}>{o.stanza}</span>
+                <span>{o.nome}</span><span style={{fontSize:10,color:THEME.textDim}}>{o.stanza}</span>
               </ListRow>
             ))}
           </Section>
 
           <Section label={`Percorsi (${museo.percorsi.length})`}>
             <button onClick={()=>openPercorsoEditor(null)}
-              style={{width:"100%",marginBottom:8,padding:"6px",borderRadius:5,border:"1px dashed #e67e22",background:"#fef9f0",color:"#e67e22",fontSize:11,cursor:"pointer",fontWeight:"bold"}}>
+              style={{width:"100%",marginBottom:8,padding:"6px",borderRadius:5,border:"1px dashed #e67e22",background:"rgba(230,126,34,0.12)",color:"#e67e22",fontSize:11,cursor:"pointer",fontWeight:"bold"}}>
               + Nuovo percorso
             </button>
             {museo.percorsi.length===0
-              ? <div style={{fontSize:11,color:"#bdc3c7",fontStyle:"italic"}}>Nessun percorso</div>
+              ? <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic"}}>Nessun percorso</div>
               : museo.percorsi.map(p=>(
                 <ListRow key={p.nome} active={!percorsoEdit&&selected?.nome===p.nome&&selected?.type==="percorso"} accent="#e67e22"
                   onClick={()=>{if(percorsoEdit)return;setSelected({type:"percorso",nome:p.nome});}}>
                   <span>🗺 {p.nome}</span>
-                  <span style={{fontSize:10,color:"#95a5a6"}}>{p.oggetti.length} oggetti</span>
+                  <span style={{fontSize:10,color:THEME.textDim}}>{p.oggetti.length} oggetti</span>
                 </ListRow>
               ))
             }
@@ -1543,7 +1644,7 @@ export default function MuseoEditor() {
             <Section label="MUSEI (API)">
               {museList.map(n=>(
                 <ListRow key={n} active={museo.nome===n} accent="#9b59b6" onClick={()=>loadMuseoFromApi(n)}>
-                  <span>{n}</span><span style={{fontSize:10,color:"#95a5a6"}}>↓ carica</span>
+                  <span>{n}</span><span style={{fontSize:10,color:THEME.textDim}}>&#8595; carica</span>
                 </ListRow>
               ))}
             </Section>
@@ -1553,10 +1654,10 @@ export default function MuseoEditor() {
         </div>
 
         {/* ── Footer ── */}
-        <div style={{borderTop:"1px solid #eaecef",padding:"12px 16px",background:"#f8f9fa"}}>
+        <div style={{borderTop:`1px solid ${THEME.border}`,padding:"12px 16px",background:THEME.panel}}>
           {showExport && (
             <div style={{marginBottom:10}}>
-              <div style={{fontSize:10,letterSpacing:2,color:"#95a5a6",marginBottom:8}}>ESPORTA</div>
+              <div style={{fontSize:10,letterSpacing:2,color:THEME.textDim,marginBottom:8}}>ESPORTA</div>
               <div style={{display:"flex",gap:8,marginBottom:8}}>
                 <EBtn color="#27ae60" onClick={()=>downloadJSON("layout")}>layout.json</EBtn>
                 <EBtn color="#3498db" onClick={()=>downloadJSON("museo")}>museo.json</EBtn>
@@ -1566,15 +1667,15 @@ export default function MuseoEditor() {
           <div style={{display:"flex",gap:8}}>
             <button onClick={saveMuseoToApi} disabled={savingAll||deletingMuseo}
               style={{flex:1,padding:"10px",borderRadius:7,border:"none",
-                background:(savingAll||deletingMuseo)?"#7f8c8d":"#2c3e50",color:"white",fontSize:13,
+                background:(savingAll||deletingMuseo)?"#7f8c8d":THEME.accent,color:(savingAll||deletingMuseo)?"white":"#0d0d0d",fontSize:13,
                 fontWeight:"bold",cursor:(savingAll||deletingMuseo)?"default":"pointer"}}>
               {savingAll ? "⏳ Salvataggio..." : "↑ Salva su API"}
             </button>
             <button onClick={eliminaMuseo} disabled={savingAll||deletingMuseo}
               title={`Elimina museo "${museo.nome}"`}
-              style={{padding:"10px 12px",borderRadius:7,border:"1px solid #e74c3c",
+              style={{padding:"10px 12px",borderRadius:7,border:`1px solid ${THEME.danger}`,
                 background:deletingMuseo?"#7f8c8d":"#fdecea",
-                color:deletingMuseo?"white":"#e74c3c",fontSize:16,
+                color:deletingMuseo?"white":THEME.danger,fontSize:16,
                 cursor:(savingAll||deletingMuseo)?"default":"pointer",flexShrink:0}}>
               {deletingMuseo ? "⏳" : "🗑"}
             </button>
@@ -1586,28 +1687,28 @@ export default function MuseoEditor() {
 }
 
 // ─── MICRO COMPONENTS ─────────────────────────────────────────────────────
-const INP    = {width:"100%",padding:"6px 8px",border:"1px solid #dce1e7",borderRadius:5,fontSize:12,boxSizing:"border-box",marginTop:2,marginBottom:8,outline:"none"};
-const DELBTN = {width:"100%",padding:"7px",border:"none",borderRadius:5,background:"#fdecea",color:"#e74c3c",fontSize:12,cursor:"pointer"};
-const FLabel = ({children})=><div style={{fontSize:10,letterSpacing:1,color:"#95a5a6",marginBottom:2,marginTop:4}}>{children}</div>;
+const INP    = {width:"100%",padding:"6px 8px",border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,borderRadius:5,fontSize:12,boxSizing:"border-box",marginTop:2,marginBottom:8,outline:"none"};
+const DELBTN = {width:"100%",padding:"7px",border:"none",borderRadius:5,background:"rgba(224,90,74,0.12)",color:THEME.danger,fontSize:12,cursor:"pointer"};
+const FLabel = ({children})=><div style={{fontSize:10,letterSpacing:1,color:THEME.textDim,marginBottom:2,marginTop:4}}>{children}</div>;
 const Card   = ({title,color,children})=>(
-  <div style={{background:"#f8f9fa",border:`1px solid ${color}44`,borderRadius:8,padding:12,marginBottom:16,borderTop:`3px solid ${color}`}}>
+  <div style={{background:THEME.panel,border:`1px solid ${THEME.border}`,borderRadius:8,padding:12,marginBottom:16,borderTop:`3px solid ${color}`}}>
     <div style={{fontSize:10,letterSpacing:2,color,marginBottom:10}}>{title}</div>
     {children}
   </div>
 );
 const Section = ({label,children})=>(
   <div style={{marginTop:20}}>
-    <div style={{fontSize:10,letterSpacing:1,color:"#95a5a6",marginBottom:6,paddingBottom:4,borderBottom:"1px solid #eaecef"}}>{label}</div>
+    <div style={{fontSize:10,letterSpacing:1,color:THEME.textDim,marginBottom:6,paddingBottom:4,borderBottom:`1px solid ${THEME.border}`}}>{label}</div>
     {children}
   </div>
 );
 const ListRow = ({children,active,accent,onClick})=>(
-  <div onClick={onClick} style={{padding:"5px 8px",marginBottom:2,borderRadius:4,cursor:"pointer",background:active?"#eaf4fb":"transparent",borderLeft:`3px solid ${active?accent:"transparent"}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12}}>
+  <div onClick={onClick} style={{padding:"5px 8px",marginBottom:2,borderRadius:4,cursor:"pointer",background:active?"rgba(92,191,128,0.14)":"transparent",borderLeft:`3px solid ${active?accent:"transparent"}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:THEME.text}}>
     {children}
   </div>
 );
 const EBtn = ({children,onClick,color})=>(
-  <button onClick={onClick} style={{flex:1,padding:"7px",border:`1px solid ${color}`,borderRadius:5,background:"white",color,fontSize:11,cursor:"pointer"}}>
+  <button onClick={onClick} style={{flex:1,padding:"7px",border:`1px solid ${color}`,borderRadius:5,background:"transparent",color,fontSize:11,cursor:"pointer"}}>
     {children}
   </button>
 );
