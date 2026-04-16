@@ -100,6 +100,12 @@ type Link = {
 };
 
 type RectBox = { x: number; y: number; w: number; h: number };
+type NavigatorZoomProfile = {
+  extraLeftRatio: number;
+  extraRightRatio: number;
+  extraTopRatio: number;
+  extraBottomRatio: number;
+};
 
 /* ===================== COMPONENT ===================== */
 
@@ -755,9 +761,9 @@ function renderNavigation(svg: SVGSVGElement) {
   }
   if (!current) return;
 
-  zoomToRect(svg, current.rect);
-
   const links = computeLinks(current, rooms, corridors);
+  const zoomProfile = computeNavigatorZoomProfile(rooms, corridors);
+  zoomToRect(svg, current.rect, current.label, zoomProfile);
   for (const l of links) drawArrowText(navLayer, l);
 }
 
@@ -819,6 +825,56 @@ function computeLinks(from: Room, rooms: Room[], corridors: Corridor[]): Link[] 
     }
   }
   return links;
+}
+
+function computeNavigatorZoomProfile(
+  rooms: Room[],
+  corridors: Corridor[]
+): NavigatorZoomProfile {
+  const profile: NavigatorZoomProfile = {
+    extraLeftRatio: 0,
+    extraRightRatio: 0,
+    extraTopRatio: 0,
+    extraBottomRatio: 0,
+  };
+
+  const arrowOffset = 35;
+  const arrowHalfSize = 20;
+
+  for (const room of rooms) {
+    if (normalize(room.label) === "home") continue;
+
+    const rectX = +room.rect.getAttribute("x")!;
+    const rectY = +room.rect.getAttribute("y")!;
+    const rectW = +room.rect.getAttribute("width")!;
+    const rectH = +room.rect.getAttribute("height")!;
+    const links = computeLinks(room, rooms, corridors);
+
+    let minX = rectX;
+    let maxX = rectX + rectW;
+    let minY = rectY;
+    let maxY = rectY + rectH;
+
+    for (const link of links) {
+      const dx = link.to.x - link.from.x;
+      const dy = link.to.y - link.from.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const arrowX = link.from.x - (dx / len) * arrowOffset;
+      const arrowY = link.from.y - (dy / len) * arrowOffset;
+
+      minX = Math.min(minX, arrowX - arrowHalfSize);
+      maxX = Math.max(maxX, arrowX + arrowHalfSize);
+      minY = Math.min(minY, arrowY - arrowHalfSize);
+      maxY = Math.max(maxY, arrowY + arrowHalfSize);
+    }
+
+    profile.extraLeftRatio = Math.max(profile.extraLeftRatio, (rectX - minX) / rectW);
+    profile.extraRightRatio = Math.max(profile.extraRightRatio, (maxX - (rectX + rectW)) / rectW);
+    profile.extraTopRatio = Math.max(profile.extraTopRatio, (rectY - minY) / rectH);
+    profile.extraBottomRatio = Math.max(profile.extraBottomRatio, (maxY - (rectY + rectH)) / rectH);
+  }
+
+  return profile;
 }
 
 /* ===================== DRAW ARROWS ===================== */
@@ -1022,7 +1078,12 @@ function findBestRoomRectForLabel(rects: SVGRectElement[], tx: number, ty: numbe
   return best;
 }
 
-function zoomToRect(svg: SVGSVGElement, rect: SVGRectElement) {
+function zoomToRect(
+  svg: SVGSVGElement,
+  rect: SVGRectElement,
+  roomLabel: string,
+  zoomProfile: NavigatorZoomProfile
+) {
   const rectX = +rect.getAttribute("x")!;
   const rectY = +rect.getAttribute("y")!;
   const rectW = +rect.getAttribute("width")!;
@@ -1040,17 +1101,46 @@ function zoomToRect(svg: SVGSVGElement, rect: SVGRectElement) {
   const mapArea = Math.max(1, fallbackW * fallbackH);
   const roomArea = Math.max(1, rectW * rectH);
   const areaRatio = Math.sqrt(mapArea / roomArea);
-  const padFactor = clamp(0.75 + ((areaRatio - 5) / 2.5) * 0.75, 0.75, 1.5);
-  const padX = rectW * padFactor;
-  const padY = rectH * padFactor;
-  let vbW = rectW + padX * 2;
-  let vbH = rectH + padY * 2;
+  const basePadFactor = clamp(0.75 + ((areaRatio - 5) / 2.5) * 0.75, 0.75, 1.5);
+
+  // HOME deve restare identica al comportamento originale.
+  if (normalize(roomLabel) === "home") {
+    const padX = rectW * basePadFactor;
+    const padY = rectH * basePadFactor;
+    let vbW = rectW + padX * 2;
+    let vbH = rectH + padY * 2;
+    if (vbW / vbH < containerAspect) vbW = vbH * containerAspect;
+    else vbH = vbW / containerAspect;
+    const cx = rectX + rectW / 2;
+    const cy = rectY + rectH / 2 + rectH * 0.6;
+    svg.setAttribute("viewBox", `${cx - vbW / 2} ${cy - vbH / 2} ${vbW} ${vbH}`);
+    return;
+  }
+
+  const isSmallMobile = svgW <= 420;
+  const isMobile = svgW <= 700;
+
+  // Zoom costante per il museo: aggiunge la riserva massima necessaria per
+  // ospitare i navigator laterali in qualunque stanza non-home.
+  const mobileBoost = isSmallMobile ? 1.18 : isMobile ? 1.1 : 1;
+  const padFactor = clamp(basePadFactor * mobileBoost, 0.75, 1.7);
+
+  const padLeft = rectW * (padFactor + zoomProfile.extraLeftRatio);
+  const padRight = rectW * (padFactor + zoomProfile.extraRightRatio);
+  const padTop = rectH * (padFactor + zoomProfile.extraTopRatio);
+  const padBottom = rectH * (padFactor + zoomProfile.extraBottomRatio + (isMobile ? 0.04 : 0));
+  let vbW = rectW + padLeft + padRight;
+  let vbH = rectH + padTop + padBottom;
 
   if (vbW / vbH < containerAspect) vbW = vbH * containerAspect;
   else vbH = vbW / containerAspect;
 
-  const cx = rectX + rectW / 2;
-  const cy = rectY + rectH / 2 + rectH * 0.6;
+  const contentMinX = rectX - padLeft;
+  const contentMinY = rectY - padTop;
+  const contentW = rectW + padLeft + padRight;
+  const contentH = rectH + padTop + padBottom;
+  const cx = contentMinX + contentW / 2;
+  const cy = contentMinY + contentH / 2;
 
   svg.setAttribute("viewBox", `${cx - vbW / 2} ${cy - vbH / 2} ${vbW} ${vbH}`);
 }
