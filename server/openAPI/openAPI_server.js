@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: __dirname + "/.env" });
 const multer = require("multer");
+const sharp = require("sharp");
 const pkg = require("./package.json");
 
 // ============================================================
@@ -626,6 +627,20 @@ async function startServer(cliOptions) {
         await client.connect();
         const col = client.db("musei").collection("oggetti_immagini");
 
+        let buffer = req.file.buffer;
+        let mimeType = req.file.mimetype;
+        let size = req.file.size;
+        
+        if (mimeType !== 'image/webp' && !mimeType.startsWith('image/svg')) {
+            try {
+               buffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
+               mimeType = 'image/webp';
+               size = buffer.length;
+            } catch (e) {
+               console.error("Errore conversione in webp durante upload:", e);
+            }
+        }
+
         await col.replaceOne(
           { _id: imgDocId(nome_museo, oggetto, tipo) },
           {
@@ -633,15 +648,15 @@ async function startServer(cliOptions) {
             museo:     nome_museo,
             oggetto,
             tipo,
-            mimeType:  req.file.mimetype,
-            data:      req.file.buffer,
-            size:      req.file.size,
+            mimeType:  mimeType,
+            data:      buffer,
+            size:      size,
             updatedAt: new Date(),
           },
           { upsert: true }
         );
 
-        console.log(`✅ Immagine '${imgDocId(nome_museo, oggetto, tipo)}' salvata (${req.file.size} B)`);
+        console.log(`✅ Immagine '${imgDocId(nome_museo, oggetto, tipo)}' salvata (${size} B)`);
         res.status(201).json({ id: imgDocId(nome_museo, oggetto, tipo) });
       } catch (err) {
         console.error("Errore immagine POST:", err.message);
@@ -711,9 +726,25 @@ async function startServer(cliOptions) {
       const doc = await col.findOne({ _id: imgDocId(nome_museo, oggetto, tipo) });
       if (!doc) return res.status(404).json({ error: "Immagine non trovata" });
 
-      res.set("Content-Type", doc.mimeType);
-      res.set("Cache-Control", "public, max-age=3600");
-      res.send(doc.data.buffer ?? doc.data);
+      let data = doc.data.buffer ?? doc.data;
+      let mimeType = doc.mimeType;
+
+      if (mimeType !== 'image/webp' && !mimeType.startsWith('image/svg')) {
+          try {
+             data = await sharp(data).webp({ quality: 80 }).toBuffer();
+             mimeType = 'image/webp';
+             await col.updateOne(
+                 { _id: doc._id },
+                 { $set: { data: data, mimeType: mimeType, size: data.length } }
+             );
+          } catch(e) {
+             console.error("Errore conversione lazy API image a webp:", e);
+          }
+      }
+
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(data);
     } catch (err) {
       console.error("Errore immagine GET:", err.message);
       res.status(500).json({ error: "Errore recupero immagine" });

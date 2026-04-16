@@ -34,11 +34,13 @@
       },
       "stanza 1": {
         "row": 1,
-        "col": 1
+        "col": 1,
+        "tipo": "normale"
       },
       "stanza 2": {
         "row": 2,
-        "col": 1
+        "col": 1,
+        "tipo": "normale"
       },
       "stanza 4": {
         "row": 2,
@@ -47,7 +49,8 @@
       },
       "stanza 3": {
         "row": 3,
-        "col": 1
+        "col": 1,
+        "tipo": "normale"
       },
       "WC": {
         "row": 2,
@@ -64,7 +67,41 @@
         "col": 1,
         "tipo": "uscita"
       }
-    }
+    },
+    "corridoi": [
+      {
+        "a": "IN",
+        "b": "stanza 1"
+      },
+      {
+        "a": "stanza 1",
+        "b": "stanza 2"
+      },
+      {
+        "a": "stanza 2",
+        "b": "WC"
+      },
+      {
+        "a": "stanza 2",
+        "b": "stanza 3"
+      },
+      {
+        "a": "stanza 4",
+        "b": "stanza 2"
+      },
+      {
+        "a": "stanza 3",
+        "b": "SHOP"
+      },
+      {
+        "a": "stanza 3",
+        "b": "OUT"
+      },
+      {
+        "a": "WC",
+        "b": "SHOP"
+      }
+    ]
   },
   "Museo Demo QA": {
     "grid": {
