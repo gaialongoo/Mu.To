@@ -260,8 +260,13 @@ export default function App() {
         <header style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr 1fr" : "1fr 1fr 1fr", alignItems: "center", padding: isMobile ? "18px 0 22px" : "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: isMobile ? 26 : 44, gap: isMobile ? 14 : 24 }}>
           {/* Left */}
           <div style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 18, letterSpacing: isMobile ? "0.12em" : "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? "center" : "left", flexWrap: "wrap" }}>
-            <div style={{ width: 26, height: 26, border: "1.5px solid var(--gold)", borderRadius: "50%", position: "relative" }} />
-            MU.TO <span style={{ color: "var(--gold)" }}>MARKETPLACE</span>
+            <div style={{ position: "relative", width: 34, height: 34, display: "grid", placeItems: "center", border: "1.5px solid var(--gold)", borderRadius: "50%", boxShadow: "0 0 18px var(--gold-glow)" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.14em", transform: "translateX(-1px)" }}>
+                <span style={{ color: "var(--text)" }}>A</span>
+                <span style={{ color: "var(--gold)" }}>A</span>
+              </span>
+            </div>
+            <span style={{ color: "var(--gold)", fontWeight: 600, letterSpacing: "0.18em" }}>MARKETPLACE</span>
           </div>
 
           {/* Center */}

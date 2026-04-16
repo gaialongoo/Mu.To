@@ -1,4 +1,4 @@
-# Mu.To
+# Art Around
 
 Progetto TW 2025/26 per la navigazione museale guidata, con:
 - API backend (`server/openAPI`)
