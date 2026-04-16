@@ -107,6 +107,13 @@ type NavigatorZoomProfile = {
   extraBottomRatio: number;
 };
 
+type NavigatorGraphCache = {
+  // corridorsNearRoom[i] = indici delle corridor con distanza <= 230 da room i
+  corridorsNearRoom: number[][];
+  // roomsWithinCorridor[j] = indici delle room con distanza < 230 dalla corridor j
+  roomsWithinCorridor: number[][];
+};
+
 /* ===================== COMPONENT ===================== */
 
 export default function SvgViewer() {
@@ -123,6 +130,7 @@ export default function SvgViewer() {
 
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
   const [freeExplore, setFreeExplore] = useState(false);
+  const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
   const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
@@ -146,11 +154,34 @@ export default function SvgViewer() {
     loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
   }, [session]);
 
+  // HOME: blocca zoom/pan e disabilita la modalità esplora.
+  useEffect(() => {
+    if (!session) return;
+    const sync = () => {
+      const { stanza } = parseStanzaFromUrl(session);
+      setCurrentStanzaLabel(stanza);
+    };
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, [session]);
+
+  useEffect(() => {
+    if (!currentStanzaLabel) return;
+    if (normalize(currentStanzaLabel) === "home") {
+      setFreeExplore(false);
+    }
+  }, [currentStanzaLabel]);
+
   useEffect(() => {
     if (!session) return;
     ensureDefaultStanza(session);
     const onPop = () => {
-      if (!freeExplore) loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
+      const { stanza } = parseStanzaFromUrl(session);
+      const isHome = normalize(stanza) === "home";
+      if (!freeExplore || isHome) {
+        loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
+      }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -441,8 +472,17 @@ export default function SvgViewer() {
       </button>
 
       <button
-        onClick={() => setFreeExplore(prev => !prev)}
-        title={freeExplore ? "Torna alla stanza" : "Esplora mappa"}
+        onClick={() => {
+          if (normalize(currentStanzaLabel ?? "") === "home") return;
+          setFreeExplore(prev => !prev);
+        }}
+        title={
+          normalize(currentStanzaLabel ?? "") === "home"
+            ? "Zoom disabilitato in HOME"
+            : freeExplore
+              ? "Torna alla stanza"
+              : "Esplora mappa"
+        }
         style={{
           position: "fixed",
           bottom: 16,
@@ -761,9 +801,11 @@ function renderNavigation(svg: SVGSVGElement) {
   }
   if (!current) return;
 
-  const links = computeLinks(current, rooms, corridors);
-  const zoomProfile = computeNavigatorZoomProfile(rooms, corridors);
+  const graphCache = buildNavigatorGraphCache(rooms, corridors);
+  const zoomProfile = computeNavigatorZoomProfile(rooms, corridors, graphCache);
   zoomToRect(svg, current.rect, current.label, zoomProfile);
+
+  const links = computeNavigatorLinks(current, rooms, corridors, graphCache);
   for (const l of links) drawArrowText(navLayer, l);
 }
 
@@ -813,23 +855,36 @@ function extractCorridors(svg: SVGSVGElement): Corridor[] {
 
 /* ===================== NAV LOGIC ===================== */
 
-function computeLinks(from: Room, rooms: Room[], corridors: Corridor[]): Link[] {
-  const links: Link[] = [];
-  for (const c of corridors) {
-    if (distance(from.center, c.center) > 230) continue;
-    for (const r of rooms) {
-      if (r === from) continue;
-      if (distance(r.center, c.center) < 230) {
-        links.push({ from: c.center, to: r.center, label: r.label, corridor: c });
-      }
+function buildNavigatorGraphCache(rooms: Room[], corridors: Corridor[]): NavigatorGraphCache {
+  const THRESH = 230;
+  const corridorsNearRoom: number[][] = Array.from({ length: rooms.length }, () => []);
+  const roomsWithinCorridor: number[][] = Array.from({ length: corridors.length }, () => []);
+
+  // Primo: per ogni room, quali corridor sono abbastanza vicine?
+  for (let i = 0; i < rooms.length; i++) {
+    const rc = rooms[i].center;
+    for (let j = 0; j < corridors.length; j++) {
+      const cc = corridors[j].center;
+      if (distance(rc, cc) <= THRESH) corridorsNearRoom[i].push(j);
     }
   }
-  return links;
+
+  // Secondo: per ogni corridor, quali room sono abbastanza vicine?
+  for (let j = 0; j < corridors.length; j++) {
+    const cc = corridors[j].center;
+    for (let i = 0; i < rooms.length; i++) {
+      const rc = rooms[i].center;
+      if (distance(rc, cc) < THRESH) roomsWithinCorridor[j].push(i);
+    }
+  }
+
+  return { corridorsNearRoom, roomsWithinCorridor };
 }
 
 function computeNavigatorZoomProfile(
   rooms: Room[],
-  corridors: Corridor[]
+  corridors: Corridor[],
+  graphCache: NavigatorGraphCache
 ): NavigatorZoomProfile {
   const profile: NavigatorZoomProfile = {
     extraLeftRatio: 0,
@@ -841,31 +896,43 @@ function computeNavigatorZoomProfile(
   const arrowOffset = 35;
   const arrowHalfSize = 20;
 
-  for (const room of rooms) {
-    if (normalize(room.label) === "home") continue;
+  for (let i = 0; i < rooms.length; i++) {
+    const room = rooms[i];
+    const isHome = normalize(room.label) === "home";
+    if (isHome) continue;
 
     const rectX = +room.rect.getAttribute("x")!;
     const rectY = +room.rect.getAttribute("y")!;
     const rectW = +room.rect.getAttribute("width")!;
     const rectH = +room.rect.getAttribute("height")!;
-    const links = computeLinks(room, rooms, corridors);
 
     let minX = rectX;
     let maxX = rectX + rectW;
     let minY = rectY;
     let maxY = rectY + rectH;
 
-    for (const link of links) {
-      const dx = link.to.x - link.from.x;
-      const dy = link.to.y - link.from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const arrowX = link.from.x - (dx / len) * arrowOffset;
-      const arrowY = link.from.y - (dy / len) * arrowOffset;
+    // Esamina direttamente tutti i link che esisterebbero per la room i.
+    for (const corridorIdx of graphCache.corridorsNearRoom[i]) {
+      const corridor = corridors[corridorIdx];
+      const from = corridor.center;
+      const toRoomIndices = graphCache.roomsWithinCorridor[corridorIdx];
 
-      minX = Math.min(minX, arrowX - arrowHalfSize);
-      maxX = Math.max(maxX, arrowX + arrowHalfSize);
-      minY = Math.min(minY, arrowY - arrowHalfSize);
-      maxY = Math.max(maxY, arrowY + arrowHalfSize);
+      for (const toIdx of toRoomIndices) {
+        if (toIdx === i) continue;
+        const toRoom = rooms[toIdx];
+        const to = toRoom.center;
+
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const arrowX = from.x - (dx / len) * arrowOffset;
+        const arrowY = from.y - (dy / len) * arrowOffset;
+
+        minX = Math.min(minX, arrowX - arrowHalfSize);
+        maxX = Math.max(maxX, arrowX + arrowHalfSize);
+        minY = Math.min(minY, arrowY - arrowHalfSize);
+        maxY = Math.max(maxY, arrowY + arrowHalfSize);
+      }
     }
 
     profile.extraLeftRatio = Math.max(profile.extraLeftRatio, (rectX - minX) / rectW);
@@ -875,6 +942,32 @@ function computeNavigatorZoomProfile(
   }
 
   return profile;
+}
+
+function computeNavigatorLinks(
+  from: Room,
+  rooms: Room[],
+  corridors: Corridor[],
+  graphCache: NavigatorGraphCache
+): Link[] {
+  const fromIdx = rooms.indexOf(from);
+  if (fromIdx < 0) return [];
+
+  const links: Link[] = [];
+  const toRoomIndicesByCorridor: number[][] = graphCache.roomsWithinCorridor;
+
+  for (const corridorIdx of graphCache.corridorsNearRoom[fromIdx]) {
+    const corridor = corridors[corridorIdx];
+    const fromPoint = corridor.center;
+
+    for (const toIdx of toRoomIndicesByCorridor[corridorIdx]) {
+      if (toIdx === fromIdx) continue;
+      const toRoom = rooms[toIdx];
+      links.push({ from: fromPoint, to: toRoom.center, label: toRoom.label, corridor });
+    }
+  }
+
+  return links;
 }
 
 /* ===================== DRAW ARROWS ===================== */
@@ -919,6 +1012,8 @@ function drawArrowText(layer: SVGGElement, link: Link) {
 //   - dal secondo caricamento dell'SVG il cerchio sparisce immediatamente (niente flash)
 //   - l'immagine viene servita dalla cache HTTP del browser (Cache-Control: max-age=3600)
 const previewExistsCache = new Map<string, boolean>();
+// Deduplica le richieste HEAD in corso per lo stesso oggetto.
+const previewRequestCache = new Map<string, Promise<boolean>>();
 
 function previewCacheKey(museo: string, nome: string): string {
   return `${museo}__${nome}`;
@@ -944,13 +1039,14 @@ function replaceCircleWithImage(
   const previewUrl = `${API_BASE}/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(nome)}/immagini/preview`;
   const cacheKey = previewCacheKey(museo, nome);
 
+  let defsEl = svg.querySelector<SVGDefsElement>("defs");
+
   // Monta clipPath + image nell'SVG corrente.
   // hideCircleImmediately=true → cache hit: il cerchio sparisce subito senza flash.
   function mountImage(hideCircleImmediately: boolean) {
-    let defs = svg.querySelector<SVGDefsElement>("defs");
-    if (!defs) {
-      defs = document.createElementNS(ns, "defs") as SVGDefsElement;
-      svg.insertBefore(defs, svg.firstChild);
+    if (!defsEl) {
+      defsEl = document.createElementNS(ns, "defs") as SVGDefsElement;
+      svg.insertBefore(defsEl, svg.firstChild);
     }
 
     const clipPath = document.createElementNS(ns, "clipPath");
@@ -960,7 +1056,7 @@ function replaceCircleWithImage(
     clipCircle.setAttribute("cy", String(cy));
     clipCircle.setAttribute("r",  String(displayR));
     clipPath.appendChild(clipCircle);
-    defs.appendChild(clipPath);
+    defsEl.appendChild(clipPath);
 
     const imgEl = document.createElementNS(ns, "image") as SVGImageElement;
     imgEl.setAttribute("x",      String(cx - displayR));
@@ -1015,19 +1111,35 @@ function replaceCircleWithImage(
     return;
   }
 
-  // Prima volta per questo oggetto: una sola HEAD request per tutta la sessione
-  fetch(previewUrl, { method: "HEAD" })
+  // Prima volta / in-flight dedup:
+  // - se c'è già una HEAD in corso per questo oggetto, aspettiamo quella
+  // - altrimenti avviamo la HEAD e condividiamo il risultato a tutti i circoli
+  const inFlight = previewRequestCache.get(cacheKey);
+  if (inFlight) {
+    inFlight.then(exists => {
+      if (exists) mountImage(false);
+    });
+    return;
+  }
+
+  const req = fetch(previewUrl, { method: "HEAD" })
     .then(res => {
-      if (!res.ok) {
-        previewExistsCache.set(cacheKey, false);
-        return;
-      }
-      previewExistsCache.set(cacheKey, true);
-      mountImage(false);
+      const ok = !!res.ok;
+      previewExistsCache.set(cacheKey, ok);
+      return ok;
     })
     .catch(() => {
       previewExistsCache.set(cacheKey, false);
+      return false;
+    })
+    .finally(() => {
+      previewRequestCache.delete(cacheKey);
     });
+
+  previewRequestCache.set(cacheKey, req);
+  req.then(exists => {
+    if (exists) mountImage(false);
+  });
 }
 
 /* ===================== UTILS ===================== */
