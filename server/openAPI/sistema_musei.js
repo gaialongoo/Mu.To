@@ -40,6 +40,7 @@ class SistemaMusei {
         oggetti: Array.from(museo.oggetti.values()).map(ogg => ({
           nome: ogg.nome,
           stanza: ogg.stanza,
+          pos: ogg.pos,
           connessi: ogg.connessi || [],
           descrizioni: ogg.descrizioni || []
         })),

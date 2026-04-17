@@ -1,7 +1,7 @@
 const { MongoClient } = require("mongodb");
 const fs = require("fs");
 
-const uri = "mongodb://localhost:27017";
+const uri = process.env.MONGO_URI || "mongodb://localhost:27017";
 const DB_NAME = "musei";
 const COLLECTION = "musei_layout";
 

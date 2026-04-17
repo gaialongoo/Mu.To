@@ -17,6 +17,88 @@ components:
       name: X-API-Key
 
   schemas:
+    PointRel:
+      type: object
+      description: Posizione relativa dentro la stanza (0..1).
+      required: [x, y]
+      properties:
+        x:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.5
+        y:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.5
+
+    DoorSpec:
+      type: object
+      description: Specifica una porta su un lato stanza con offset relativo (0..1).
+      required: [side, offset]
+      properties:
+        side:
+          type: string
+          enum: [N, S, E, W]
+          example: E
+        offset:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.5
+
+    RoomGeom:
+      type: object
+      description: Geometria stanza in coordinate SVG (px).
+      required: [x, y, w, h]
+      properties:
+        x: { type: number, format: float, example: 100 }
+        y: { type: number, format: float, example: 120 }
+        w: { type: number, format: float, example: 220 }
+        h: { type: number, format: float, example: 180 }
+        tipo:
+          type: string
+          enum: [normale, ingresso, uscita, bagno, servizio]
+          example: normale
+
+    CorridorGeom:
+      type: object
+      description: Corridoio modificabile (rettangolo) che collega due stanze e relative porte.
+      required: [a, b]
+      properties:
+        a:
+          type: string
+        b:
+          type: string
+        x:
+          type: number
+          format: float
+          description: x del rettangolo corridoio (px). Se omesso può essere auto-calcolato.
+          example: 320
+        y:
+          type: number
+          format: float
+          description: y del rettangolo corridoio (px). Se omesso può essere auto-calcolato.
+          example: 190
+        w:
+          type: number
+          format: float
+          description: larghezza corridoio (px). Se omesso può essere auto-calcolata.
+          example: 120
+        h:
+          type: number
+          format: float
+          description: altezza corridoio (px). Se omesso può essere auto-calcolata.
+          example: 40
+        aDoor:
+          $ref: '#/components/schemas/DoorSpec'
+        bDoor:
+          $ref: '#/components/schemas/DoorSpec'
+
     ImmagineInfo:
       type: object
       properties:
@@ -88,6 +170,8 @@ paths:
                         type: string
                       stanza:
                         type: string
+                      pos:
+                        $ref: '#/components/schemas/PointRel'
                       connessi:
                         type: array
                         items:
@@ -146,6 +230,8 @@ paths:
                           type: string
                         stanza:
                           type: string
+                        pos:
+                          $ref: '#/components/schemas/PointRel'
                         connessi:
                           type: array
                           items:
@@ -235,6 +321,8 @@ paths:
                   type: string
                 stanza:
                   type: string
+                pos:
+                  $ref: '#/components/schemas/PointRel'
                 connessi:
                   type: array
                   items:
@@ -280,6 +368,8 @@ paths:
                     type: string
                   stanza:
                     type: string
+                  pos:
+                    $ref: '#/components/schemas/PointRel'
                   connessi:
                     type: array
                     items:
@@ -318,6 +408,8 @@ paths:
                   type: string
                 stanza:
                   type: string
+                pos:
+                  $ref: '#/components/schemas/PointRel'
                 connessi:
                   type: array
                   items:
@@ -569,6 +661,8 @@ paths:
                           type: string
                         stanza:
                           type: string
+                        pos:
+                          $ref: '#/components/schemas/PointRel'
                         connessi:
                           type: array
                           items:
@@ -739,15 +833,24 @@ paths:
             application/json:
               schema:
                 type: object
-                description: >
-                  Documento layout del museo. La struttura esatta dipende dal contenuto
-                  di layout.json sincronizzato su MongoDB. Il campo _id corrisponde al nome del museo.
                 properties:
                   _id:
                     type: string
                     description: Nome del museo (chiave primaria MongoDB)
                     example: "Uffizi"
-                additionalProperties: true
+                  rooms:
+                    type: object
+                    description: Mappa nome stanza -> geometria/metadata
+                    additionalProperties:
+                      $ref: '#/components/schemas/RoomGeom'
+                  corridoi:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CorridorGeom'
+                  grid:
+                    type: object
+                    description: Formato legacy (row/col). Supportato per compatibilità.
+                    additionalProperties: true
         '404':
           description: Layout non trovato per questo museo
         '500':
@@ -772,15 +875,22 @@ paths:
           application/json:
             schema:
               type: object
-              description: >
-                Campi del layout da aggiornare. La struttura è libera e dipende
-                dal formato usato in layout.json.
+              description: Layout (parziale o completo) da salvare.
               additionalProperties: true
               example:
-                stanze:
-                  - id: "sala1"
-                    x: 100
+                rooms:
+                  IN:  { x: 100, y: 120, w: 220, h: 180, tipo: ingresso }
+                  "sala A": { x: 100, y: 360, w: 320, h: 220, tipo: normale }
+                  OUT: { x: 520, y: 360, w: 220, h: 180, tipo: uscita }
+                corridoi:
+                  - a: IN
+                    b: "sala A"
+                    x: 240
                     y: 200
+                    w: 40
+                    h: 180
+                    aDoor: { side: S, offset: 0.9 }
+                    bDoor: { side: N, offset: 0.1 }
       responses:
         '200':
           description: Layout aggiornato con successo

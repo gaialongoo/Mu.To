@@ -107,27 +107,69 @@ def route_between(o, t, stanze, corridoi):
 
     pts = [o.pos]
 
+    def push_point(p):
+        if not p:
+            return
+        if pts and pts[-1][0] == p[0] and pts[-1][1] == p[1]:
+            return
+        pts.append(p)
+
     for i in range(len(path) - 1):
         A, B = path[i], path[i + 1]
         c = corr_map[(A, B)]
 
-        if B.col > A.col: pts.append(A.porta["E"])
-        elif B.col < A.col: pts.append(A.porta["W"])
-        elif B.row > A.row: pts.append(A.porta["S"])
-        else: pts.append(A.porta["N"])
+        from_door = infer_legacy_door(A, B)
+        to_door = infer_legacy_door(B, A)
 
-        pts.append((c.x + c.w / 2, c.y + c.h / 2))
-
-        if A.col > B.col: pts.append(B.porta["E"])
-        elif A.col < B.col: pts.append(B.porta["W"])
-        elif A.row > B.row: pts.append(B.porta["S"])
-        else: pts.append(B.porta["N"])
+        push_point(from_door)
+        for p in corridor_transit_points(c, from_door, to_door):
+            push_point(p)
+        push_point(to_door)
 
         if i + 1 < len(path) - 1:
-            pts.append((B.x + B.w / 2, B.y + B.h / 2))
+            C = path[i + 2]
+            next_from_door = infer_legacy_door(B, C)
+            for p in room_transit_points(B, to_door, next_from_door):
+                push_point(p)
 
-    pts.append(t.pos)
+    push_point(t.pos)
     return pts
+
+
+def infer_legacy_door(from_room, to_room):
+    if to_room.col > from_room.col:
+        return from_room.porta["E"]
+    if to_room.col < from_room.col:
+        return from_room.porta["W"]
+    if to_room.row > from_room.row:
+        return from_room.porta["S"]
+    return from_room.porta["N"]
+
+
+def corridor_transit_points(corr, from_door, to_door):
+    if not corr or not from_door or not to_door:
+        return []
+    if (corr.w or 0) >= (corr.h or 0):
+        y = corr.y + corr.h / 2
+        return [(from_door[0], y), (to_door[0], y)]
+    x = corr.x + corr.w / 2
+    return [(x, from_door[1]), (x, to_door[1])]
+
+
+def room_transit_points(room, in_door, out_door):
+    if not room or not in_door or not out_door:
+        return []
+    if in_door[0] == out_door[0] or in_door[1] == out_door[1]:
+        return [out_door]
+
+    bend_a = (in_door[0], out_door[1])
+    bend_b = (out_door[0], in_door[1])
+    center = (room.x + room.w / 2, room.y + room.h / 2)
+    dist_a = abs(bend_a[0] - center[0]) + abs(bend_a[1] - center[1])
+    dist_b = abs(bend_b[0] - center[0]) + abs(bend_b[1] - center[1])
+    bend = bend_a if dist_a <= dist_b else bend_b
+
+    return [bend, out_door]
 
 
 # ---------- DRAW ----------

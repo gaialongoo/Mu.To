@@ -377,11 +377,14 @@ async function startServer(cliOptions) {
     if (!oggetto.nome) return res.status(400).json({ error: "Nome oggetto obbligatorio" });
     if (museo.get_oggetto(oggetto.nome)) return res.status(400).json({ error: "Oggetto già esistente" });
 
+    // default posizione (centrata) se non fornita
+    if (!oggetto.pos || typeof oggetto.pos !== "object") oggetto.pos = { x: 0.5, y: 0.5 };
+
     museo.aggiungi_oggetto(oggetto);
     sistema.salvaSuFile(FILE_JSON);
 
     try {
-      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()) });
+      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()), percorsi: museo.percorsi || [] });
       console.log(`Oggetto '${oggetto.nome}' aggiunto a '${museo.nome}'`);
     } catch (err) {
       console.error("Errore MongoDB:", err.message);
@@ -443,7 +446,7 @@ async function startServer(cliOptions) {
     sistema.salvaSuFile(FILE_JSON);
 
     try {
-      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()) });
+      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()), percorsi: museo.percorsi || [] });
       console.log(`Museo '${museo.nome}' aggiornato`);
     } catch (err) {
       console.error("Errore MongoDB:", err.message);
@@ -460,13 +463,14 @@ async function startServer(cliOptions) {
     const oggetto = museo.get_oggetto(req.params.oggetto);
     if (!oggetto) return res.status(404).json({ error: "Oggetto non trovato" });
 
-    const { nome, stanza, connessi, descrizioni } = req.body;
+    const { nome, stanza, connessi, descrizioni, pos } = req.body;
     if (nome && nome !== oggetto.nome) {
       museo.oggetti.delete(oggetto.nome);
       oggetto.nome = nome;
       museo.oggetti.set(nome, oggetto);
     }
     if (stanza)      oggetto.stanza = stanza;
+    if (pos && typeof pos === "object") oggetto.pos = pos;
     if (connessi) {
       oggetto.connessi = connessi;
       oggetto.connessi.forEach(c => museo.collega_oggetti(oggetto.nome, c));
@@ -476,7 +480,7 @@ async function startServer(cliOptions) {
     sistema.salvaSuFile(FILE_JSON);
 
     try {
-      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()) });
+      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()), percorsi: museo.percorsi || [] });
       console.log(`Oggetto '${oggetto.nome}' aggiornato`);
     } catch (err) {
       console.error("Errore MongoDB:", err.message);
@@ -555,7 +559,7 @@ async function startServer(cliOptions) {
     const client = new MongoClient(MONGO_URI);
     try {
       await client.connect();
-      await client.db("musei_db").collection("musei")
+      await client.db(DB_NAME).collection(MUSEI_COLLECTION)
         .updateOne({ nome: museo.nome }, { $pull: { oggetti: { nome: oggetto.nome } } });
       console.log(`Oggetto '${oggetto.nome}' eliminato da '${museo.nome}'`);
     } catch (err) {

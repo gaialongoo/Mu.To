@@ -12,7 +12,7 @@ class Stanza {
     this.y = 0;
     this.w = 0;
     this.h = 0;
-    this.porta = {};
+    this.porta = {}; // punti assoluti {N,S,E,W} usati dal routing legacy
   }
 
   computeSize() {
@@ -20,16 +20,7 @@ class Stanza {
     this.h = 180;
   }
 
-  layoutObjects() {
-    if (!this.oggetti.length) return;
-    const cx = this.x + this.w / 2;
-    const cy = this.y + this.h / 2;
-    const r = Math.min(this.w, this.h) * 0.3;
-    this.oggetti.forEach((o, i) => {
-      const a = (2 * Math.PI * i) / this.oggetti.length;
-      o.pos = [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-    });
-  }
+  layoutObjects() {}
 }
 
 class Oggetto {
@@ -37,7 +28,10 @@ class Oggetto {
     this.nome = nome;
     this.stanza = stanza;
     this.connessi = connessi;
+    // pos è assoluta (px) nello spazio SVG
     this.pos = [0, 0];
+    // posRel è relativa alla stanza (0..1). Se presente ha priorità.
+    this.posRel = null;
     this.visibile = true;
   }
 }

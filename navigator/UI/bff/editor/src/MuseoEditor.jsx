@@ -64,9 +64,30 @@ async function apiListImages(museo, oggetto) {
 }
 
 // ─── COSTANTI LAYOUT ───────────────────────────────────────────────────────
-const ROOM_W = 220, ROOM_H = 180;
+const DEFAULT_ROOM_W = 220, DEFAULT_ROOM_H = 180;
 const START_X = 100, START_Y = 120;
 const GAP_X = 120, GAP_Y = 140;
+
+function clamp01(n) {
+  if (typeof n !== "number" || Number.isNaN(n)) return 0.5;
+  return Math.max(0, Math.min(1, n));
+}
+
+function inferSide(a, b) {
+  const dx = (b.x + b.w / 2) - (a.x + a.w / 2);
+  const dy = (b.y + b.h / 2) - (a.y + a.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "E" : "W";
+  return dy >= 0 ? "S" : "N";
+}
+
+function doorPoint(room, doorSpec, fallbackSide) {
+  const side = doorSpec?.side || fallbackSide;
+  const offset = clamp01(doorSpec?.offset);
+  if (side === "N") return [room.x + room.w * offset, room.y];
+  if (side === "S") return [room.x + room.w * offset, room.y + room.h];
+  if (side === "W") return [room.x, room.y + room.h * offset];
+  return [room.x + room.w, room.y + room.h * offset];
+}
 
 const TIPO_COLORS = {
   normale:  { fill: "#ffffff", stroke: "#2c3e50" },
@@ -83,23 +104,15 @@ const OBJ_SEL_FILL    = "#1a6fa8";
 const OBJ_PICK_STROKE = "#27ae60";
 
 const MUSEO_VUOTO = { nome: "", stanze: [], oggetti: [], percorsi: [], corridoi: [] };
+const DOOR_SIDES = ["N", "E", "S", "W"];
 
-function autoCorridoiFromStanze(stanze) {
-  const grid = {};
-  for (const s of stanze) grid[`${s.row},${s.col}`] = s;
-  const out = [];
-  for (const s of stanze) {
-    const east = grid[`${s.row},${s.col + 1}`];
-    const south = grid[`${s.row + 1},${s.col}`];
-    if (east) out.push({ a: s.nome, b: east.nome });
-    if (south) out.push({ a: s.nome, b: south.nome });
-  }
-  return out;
+function corridoioKey(a, b) {
+  return [a, b].sort().join("|");
 }
 
 function normalizeCorridoi(stanze, corridoiRaw) {
   const byName = Object.fromEntries(stanze.map((s) => [s.nome, s]));
-  const source = Array.isArray(corridoiRaw) && corridoiRaw.length > 0 ? corridoiRaw : autoCorridoiFromStanze(stanze);
+  const source = Array.isArray(corridoiRaw) ? corridoiRaw : [];
   const seen = new Set();
   const out = [];
   for (const c of source) {
@@ -109,23 +122,61 @@ function normalizeCorridoi(stanze, corridoiRaw) {
     const a = byName[aName];
     const b = byName[bName];
     if (!a || !b) continue;
-    const adjacent = (a.row === b.row && Math.abs(a.col - b.col) === 1)
-      || (a.col === b.col && Math.abs(a.row - b.row) === 1);
-    if (!adjacent) continue;
     const key = [a.nome, b.nome].sort().join("|");
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ a: a.nome, b: b.nome });
+    out.push({
+      a: a.nome,
+      b: b.nome,
+      x: c.x, y: c.y, w: c.w, h: c.h,
+      aDoor: c.aDoor, bDoor: c.bDoor,
+    });
   }
   return out;
+}
+
+function computeAutoCorridoioGeom(stanze, corridoio) {
+  const byName = Object.fromEntries((stanze || []).map((s) => [s.nome, s]));
+  const a = byName[corridoio?.a];
+  const b = byName[corridoio?.b];
+  if (!a || !b) return { x: 0, y: 0, w: 40, h: 40 };
+
+  const aSide = corridoio?.aDoor?.side || inferSide(a, b);
+  const bSide = corridoio?.bDoor?.side || inferSide(b, a);
+  const pA = doorPoint(a, corridoio?.aDoor, aSide);
+  const pB = doorPoint(b, corridoio?.bDoor, bSide);
+  const dx = pB[0] - pA[0];
+  const dy = pB[1] - pA[1];
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: Math.min(pA[0], pB[0]), y: pA[1] - 20, w: Math.max(10, Math.abs(dx)), h: 40 };
+  }
+  return { x: pA[0] - 20, y: Math.min(pA[1], pB[1]), w: 40, h: Math.max(10, Math.abs(dy)) };
+}
+
+function withResolvedCorridoioGeom(stanze, corridoio) {
+  const hasGeom =
+    typeof corridoio?.x === "number" &&
+    typeof corridoio?.y === "number" &&
+    typeof corridoio?.w === "number" &&
+    typeof corridoio?.h === "number";
+  if (hasGeom) return corridoio;
+  const g = computeAutoCorridoioGeom(stanze, corridoio);
+  return { ...corridoio, ...g };
 }
 
 // ─── LAYOUT ────────────────────────────────────────────────────────────────
 function useLayout(stanze, oggetti, corridoiCfg = []) {
   const roomPos = useMemo(() => {
     const m = {};
-    for (const s of stanze)
-      m[s.nome] = { x: START_X + s.col*(ROOM_W+GAP_X), y: START_Y + s.row*(ROOM_H+GAP_Y), w: ROOM_W, h: ROOM_H };
+    for (const s of stanze) {
+      if (typeof s.x === "number" && typeof s.y === "number" && typeof s.w === "number" && typeof s.h === "number") {
+        m[s.nome] = { x: s.x, y: s.y, w: s.w, h: s.h };
+      } else {
+        // legacy: row/col
+        m[s.nome] = { x: START_X + (s.col ?? 0) * (DEFAULT_ROOM_W + GAP_X), y: START_Y + (s.row ?? 0) * (DEFAULT_ROOM_H + GAP_Y), w: DEFAULT_ROOM_W, h: DEFAULT_ROOM_H };
+      }
+    }
     return m;
   }, [stanze]);
 
@@ -140,18 +191,23 @@ function useLayout(stanze, oggetti, corridoiCfg = []) {
       const pA = roomPos[a.nome];
       const pB = roomPos[b.nome];
       if (!pA || !pB) continue;
-      if (a.row === b.row) {
-        const west = a.col < b.col ? a : b;
-        const east = a.col < b.col ? b : a;
-        const pW = roomPos[west.nome];
-        const pE = roomPos[east.nome];
-        list.push({ x: pW.x + ROOM_W, y: pW.y + ROOM_H / 2 - 20, w: pE.x - (pW.x + ROOM_W), h: 40, a: west.nome, b: east.nome });
-      } else if (a.col === b.col) {
-        const north = a.row < b.row ? a : b;
-        const south = a.row < b.row ? b : a;
-        const pN = roomPos[north.nome];
-        const pS = roomPos[south.nome];
-        list.push({ x: pN.x + ROOM_W / 2 - 20, y: pN.y + ROOM_H, w: 40, h: pS.y - (pN.y + ROOM_H), a: north.nome, b: south.nome });
+      const roomA = { ...pA, nome: a.nome };
+      const roomB = { ...pB, nome: b.nome };
+      const aSide = link.aDoor?.side || inferSide(roomA, roomB);
+      const bSide = link.bDoor?.side || inferSide(roomB, roomA);
+      const pDoorA = doorPoint(roomA, link.aDoor, aSide);
+      const pDoorB = doorPoint(roomB, link.bDoor, bSide);
+
+      if (typeof link.x === "number" && typeof link.y === "number" && typeof link.w === "number" && typeof link.h === "number") {
+        list.push({ x: link.x, y: link.y, w: link.w, h: link.h, a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+      } else {
+        const dx = pDoorB[0] - pDoorA[0];
+        const dy = pDoorB[1] - pDoorA[1];
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          list.push({ x: Math.min(pDoorA[0], pDoorB[0]), y: pDoorA[1] - 20, w: Math.abs(dx), h: 40, a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+        } else {
+          list.push({ x: pDoorA[0] - 20, y: Math.min(pDoorA[1], pDoorB[1]), w: 40, h: Math.abs(dy), a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+        }
       }
     }
     return list;
@@ -162,18 +218,30 @@ function useLayout(stanze, oggetti, corridoiCfg = []) {
     for (const s of stanze) {
       const p = roomPos[s.nome]; if (!p) continue;
       const ro = oggetti.filter(o => o.stanza === s.nome);
-      const cx = p.x + ROOM_W/2, cy = p.y + ROOM_H/2;
-      const r  = Math.min(ROOM_W, ROOM_H) * 0.3;
       ro.forEach((o, i) => {
-        const a = (2 * Math.PI * i) / ro.length;
-        pos[o.nome] = [cx + r*Math.cos(a), cy + r*Math.sin(a)];
+        const rel = o.pos && typeof o.pos === "object" ? o.pos : null;
+        if (rel && typeof rel.x === "number" && typeof rel.y === "number") {
+          pos[o.nome] = [p.x + p.w * clamp01(rel.x), p.y + p.h * clamp01(rel.y)];
+        } else {
+          // fallback: distribuzione circolare
+          const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+          const r = Math.min(p.w, p.h) * 0.3;
+          const a = (2 * Math.PI * i) / Math.max(1, ro.length);
+          pos[o.nome] = [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+        }
       });
     }
     return pos;
   }, [stanze, oggetti, roomPos]);
 
-  const svgW = useMemo(() => stanze.length ? Math.max(...stanze.map(s=>START_X+s.col*(ROOM_W+GAP_X)+ROOM_W))+200 : 800, [stanze]);
-  const svgH = useMemo(() => stanze.length ? Math.max(...stanze.map(s=>START_Y+s.row*(ROOM_H+GAP_Y)+ROOM_H))+200 : 600, [stanze]);
+  const svgW = useMemo(() => {
+    const xs = Object.values(roomPos).map(p => p.x + p.w);
+    return xs.length ? Math.max(...xs) + 200 : 800;
+  }, [roomPos]);
+  const svgH = useMemo(() => {
+    const ys = Object.values(roomPos).map(p => p.y + p.h);
+    return ys.length ? Math.max(...ys) + 200 : 600;
+  }, [roomPos]);
 
   return { roomPos, corridors, objPos, svgW, svgH };
 }
@@ -208,14 +276,36 @@ function routedPath(fromRoom, toRoom, fromPos, toPos, stanze, corridors, roomPos
     const corr = edgeUsed[B];
     const pA = roomPos[A], pB = roomPos[B];
     let exitA, enterB;
-    if      (pB.x > pA.x) { exitA=[pA.x+ROOM_W, pA.y+ROOM_H/2]; enterB=[pB.x,          pB.y+ROOM_H/2]; }
-    else if (pB.x < pA.x) { exitA=[pA.x,         pA.y+ROOM_H/2]; enterB=[pB.x+ROOM_W,   pB.y+ROOM_H/2]; }
-    else if (pB.y > pA.y) { exitA=[pA.x+ROOM_W/2,pA.y+ROOM_H];   enterB=[pB.x+ROOM_W/2, pB.y];          }
-    else                   { exitA=[pA.x+ROOM_W/2,pA.y];           enterB=[pB.x+ROOM_W/2, pB.y+ROOM_H];  }
-    pts.push(exitA, [corr.x+corr.w/2, corr.y+corr.h/2], enterB);
+    // usa porte corridoio se presenti
+    if (corr?.pA && corr?.pB) {
+      if (corr.a === A && corr.b === B) {
+        exitA = corr.pA;
+        enterB = corr.pB;
+      } else {
+        exitA = corr.pB;
+        enterB = corr.pA;
+      }
+    } else {
+      if      (pB.x > pA.x) { exitA=[pA.x+pA.w, pA.y+pA.h/2]; enterB=[pB.x,        pB.y+pB.h/2]; }
+      else if (pB.x < pA.x) { exitA=[pA.x,      pA.y+pA.h/2]; enterB=[pB.x+pB.w,   pB.y+pB.h/2]; }
+      else if (pB.y > pA.y) { exitA=[pA.x+pA.w/2,pA.y+pA.h];  enterB=[pB.x+pB.w/2, pB.y];        }
+      else                   { exitA=[pA.x+pA.w/2,pA.y];      enterB=[pB.x+pB.w/2, pB.y+pB.h];    }
+    }
+    pts.push(exitA, ...corridorTransitPoints(corr, exitA, enterB), enterB);
   }
   pts.push([...toPos]);
   return smoothPath(pts);
+}
+
+function corridorTransitPoints(corr, fromDoor, toDoor) {
+  if (!corr || !fromDoor || !toDoor) return [];
+  // Evita scorciatoie diagonali: attraversa il corridoio lungo il suo asse.
+  if ((corr.w || 0) >= (corr.h || 0)) {
+    const y = corr.y + corr.h / 2;
+    return [[fromDoor[0], y], [toDoor[0], y]];
+  }
+  const x = corr.x + corr.w / 2;
+  return [[x, fromDoor[1]], [x, toDoor[1]]];
 }
 
 function smoothPath(pts) {
@@ -650,9 +740,7 @@ export default function MuseoEditor() {
   // passa previewRefreshKey: quando cambia, il hook ri-fetcha e busta la cache
   const objPreviews = useObjPreviews(museo.nome, museo.oggetti, previewRefreshKey);
 
-  const maxRow   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.row))+2, [museo.stanze]);
-  const maxCol   = useMemo(() => Math.max(0,...museo.stanze.map(s=>s.col))+2, [museo.stanze]);
-  const occupied = useMemo(() => new Set(museo.stanze.map(s=>`${s.row},${s.col}`)), [museo.stanze]);
+  // legacy: maxRow/maxCol/occupied rimossi (stanze a posizione libera)
 
   const percorsoEditLines = useMemo(() => {
     if (!percorsoEdit) return [];
@@ -702,12 +790,21 @@ export default function MuseoEditor() {
         apiFetch(`/musei/${encodeURIComponent(nome)}/percorsi`).catch(()=>null),
       ]);
       if (!data) return;
-      const stanze = layout?.grid
-        ? Object.entries(layout.grid).map(([n,v])=>({ nome:n, row:v.row, col:v.col, tipo:v.tipo??"normale" }))
-        : [];
+      const stanze = layout?.rooms
+        ? Object.entries(layout.rooms).map(([n,v])=>({ nome:n, x:v.x, y:v.y, w:v.w, h:v.h, tipo:v.tipo??"normale" }))
+        : layout?.grid
+          ? Object.entries(layout.grid).map(([n,v])=>({
+              nome:n,
+              x: START_X + (v.col ?? 0) * (DEFAULT_ROOM_W + GAP_X),
+              y: START_Y + (v.row ?? 0) * (DEFAULT_ROOM_H + GAP_Y),
+              w: DEFAULT_ROOM_W,
+              h: DEFAULT_ROOM_H,
+              tipo:v.tipo??"normale"
+            }))
+          : [];
       setMuseo({
         nome: data.nome, stanze,
-        oggetti: (data.oggetti??[]).map(o=>({...o,visibile:true})),
+        oggetti: (data.oggetti??[]).map(o=>({...o,visibile:true, pos: o.pos ?? {x:0.5,y:0.5}})),
         percorsi: percorsiData?.percorsi ?? data.percorsi ?? [],
         corridoi: normalizeCorridoi(stanze, layout?.corridoi || []),
       });
@@ -734,14 +831,17 @@ export default function MuseoEditor() {
     try {
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}`,
         { method:"PUT", body:JSON.stringify({ nome:museo.nome }) });
-      const grid = Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
-        { method:"PUT", body:JSON.stringify({ grid, corridoi }) });
+        { method:"PUT", body:JSON.stringify({
+            rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+            corridoi
+          })
+        });
       await Promise.all(museo.oggetti.map(o =>
         apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
           { method:"PUT", body:JSON.stringify({
-              stanza: o.stanza, connessi: o.connessi, visibile: o.visibile,
+              stanza: o.stanza, pos: o.pos, connessi: o.connessi, visibile: o.visibile,
               descrizioni: o.descrizioni ?? Array.from({length:4},()=>Array(3).fill(""))
             })
           }
@@ -758,9 +858,11 @@ export default function MuseoEditor() {
     setMuseo(m => ({...m, nome: nuovoNomeMuseo}));
     try {
       await apiFetch(`/musei/${encodeURIComponent(vecchio)}`, { method:"PUT", body:JSON.stringify({ nome:nuovoNomeMuseo }) });
-      const grid = Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
-      await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({ grid, corridoi }) });
+      await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({
+        rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+        corridoi
+      }) });
       setMuseList(l => l.map(n => n===vecchio ? nuovoNomeMuseo : n));
       showToast(`✓ Museo rinominato in "${nuovoNomeMuseo}"`);
     } catch(err) { showToast(`⚠ Rename solo locale (${err.message})`, false); }
@@ -860,18 +962,21 @@ export default function MuseoEditor() {
     if (patch.nome) {
       try {
         const nuove = museo.stanze.map(s=>s.nome===vecchio?{...s,...patch}:s);
-        const grid = Object.fromEntries(nuove.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
         const corridoi = normalizeCorridoi(
           nuove,
           (museo.corridoi || []).map(c => ({
             a: c.a === vecchio ? patch.nome : c.a,
             b: c.b === vecchio ? patch.nome : c.b,
+            x: c.x, y: c.y, w: c.w, h: c.h, aDoor: c.aDoor, bDoor: c.bDoor,
           }))
         );
-        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid, corridoi})});
+        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({
+          rooms: Object.fromEntries(nuove.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+          corridoi
+        })});
         await Promise.all(museo.oggetti.filter(o=>o.stanza===vecchio).map(o=>
           apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
-            {method:"PUT",body:JSON.stringify({...o,stanza:patch.nome})})
+            {method:"PUT",body:JSON.stringify({...o,stanza:patch.nome, pos: o.pos})})
         ));
         showToast(`✓ Stanza rinominata in "${patch.nome}"`);
       } catch(err) { showToast(`⚠ Rename solo locale (${err.message})`, false); }
@@ -924,10 +1029,12 @@ export default function MuseoEditor() {
         await Promise.all(oggettiDaEliminare.map(n =>
           apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(n)}`, { method:"DELETE" })
         ));
-        const grid = Object.fromEntries(museo.stanze.filter(s=>s.nome!==selected.nome).map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
         const stanzeAgg = museo.stanze.filter(s=>s.nome!==selected.nome);
         const corridoiAgg = normalizeCorridoi(stanzeAgg, museo.corridoi.filter(c => c.a !== selected.nome && c.b !== selected.nome));
-        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({grid, corridoi: corridoiAgg}) });
+        await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({
+          rooms: Object.fromEntries(stanzeAgg.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+          corridoi: corridoiAgg
+        }) });
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
         showToast(`✓ Stanza eliminata`);
       } catch(err) { showToast(`⚠ Eliminazione parziale (${err.message})`, false); }
@@ -948,6 +1055,12 @@ export default function MuseoEditor() {
       } catch(err) { showToast(`⚠ Eliminazione parziale (${err.message})`, false); }
     } else if (selected.type === "percorso") {
       await eliminaPercorso(selected.nome);
+    } else if (selected.type === "corridoio") {
+      setMuseo((m) => ({
+        ...m,
+        corridoi: (m.corridoi || []).filter((c) => corridoioKey(c.a, c.b) !== selected.key),
+      }));
+      setSelected(null);
     }
   }, [selected, museo]);
 
@@ -966,15 +1079,37 @@ export default function MuseoEditor() {
   // ─── CLICK HANDLERS ───────────────────────────────────────────────────
   const onRoomClick = async (e, nome) => {
     e.stopPropagation();
+    const svgEl = e.currentTarget.ownerSVGElement;
+    const toLocalPoint = () => {
+      if (!svgEl) return null;
+      const pt = svgEl.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const m = svgEl.getScreenCTM();
+      return m ? pt.matrixTransform(m.inverse()) : null;
+    };
+
+    if (mode==="addRoom") {
+      const p = toLocalPoint();
+      if (!p) return;
+      await addRoomAt(p.x, p.y);
+      return;
+    }
+
     if (mode==="addObject") {
       const n = await showPrompt("Nome oggetto:", `Oggetto ${museo.oggetti.length+1}`);
       if (!n) return;
-      const nuovoOggetto = { nome:n, stanza:nome, connessi:[], visibile:true, descrizioni:Array.from({length:4},()=>Array(3).fill("")) };
+      const room = roomPos[nome];
+      const p = toLocalPoint();
+      const posRel = (room && p)
+        ? { x: clamp01((p.x - room.x) / room.w), y: clamp01((p.y - room.y) / room.h) }
+        : { x: 0.5, y: 0.5 };
+      const nuovoOggetto = { nome:n, stanza:nome, pos:posRel, connessi:[], visibile:true, descrizioni:Array.from({length:4},()=>Array(3).fill("")) };
       setMuseo(m=>({...m,oggetti:[...m.oggetti,nuovoOggetto]}));
       setSelected({type:"oggetto",nome:n}); setMode("select");
       try {
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti`,
-          {method:"POST",body:JSON.stringify({nome:n,stanza:nome,connessi:[],visibile:true,descrizioni:nuovoOggetto.descrizioni})});
+          {method:"POST",body:JSON.stringify({nome:n,stanza:nome,pos:nuovoOggetto.pos,connessi:[],visibile:true,descrizioni:nuovoOggetto.descrizioni})});
       } catch(err){showToast(`⚠ Oggetto solo locale (${err.message})`,false);}
     } else if (!percorsoEdit) {
       setSelected({type:"stanza",nome});
@@ -999,19 +1134,186 @@ export default function MuseoEditor() {
     }
   };
 
-  const onGhostClick = async (row, col) => {
+  const addRoomAt = async (centerX, centerY) => {
     const n = await showPrompt("Nome stanza:", `Stanza ${museo.stanze.length+1}`);
     if (!n) return;
-    const nuova = { nome:n, row, col, tipo:"normale" };
-    let prev = [];
-    setMuseo(m=>{ prev=m.stanze; return {...m,stanze:[...m.stanze,nuova], corridoi: normalizeCorridoi([...m.stanze,nuova], m.corridoi || [])}; });
+    const wRaw = await showPrompt("Larghezza stanza (px):", String(DEFAULT_ROOM_W));
+    if (!wRaw) return;
+    const hRaw = await showPrompt("Altezza stanza (px):", String(DEFAULT_ROOM_H));
+    if (!hRaw) return;
+    const tipoRaw = await showPrompt("Tipo stanza (normale/ingresso/uscita/bagno/servizio):", "normale");
+    if (!tipoRaw) return;
+
+    const w = Math.max(40, Number(wRaw) || DEFAULT_ROOM_W);
+    const h = Math.max(40, Number(hRaw) || DEFAULT_ROOM_H);
+    const tipo = ["normale", "ingresso", "uscita", "bagno", "servizio"].includes(tipoRaw.trim())
+      ? tipoRaw.trim()
+      : "normale";
+    const nuova = { nome:n, x: centerX - w / 2, y: centerY - h / 2, w, h, tipo };
+    setMuseo(m=>({...m,stanze:[...m.stanze,nuova]}));
     setSelected({type:"stanza",nome:n}); setMode("select");
     try {
-      const grid = Object.fromEntries([...prev,nuova].map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}]));
-      const corridoi = normalizeCorridoi([...prev,nuova], museo.corridoi || []);
-      await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({grid, corridoi})});
+      const rooms = Object.fromEntries([...museo.stanze, nuova].map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}]));
+      await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({rooms, corridoi: normalizeCorridoi([...museo.stanze,nuova], museo.corridoi || [])})});
       showToast(`✓ Stanza "${n}" creata`);
     } catch(err){showToast(`⚠ Stanza solo locale (${err.message})`,false);}
+  };
+
+  const updateCorridoio = useCallback((key, patch) => {
+    setMuseo((m) => {
+      const next = (m.corridoi || []).map((c) => {
+        if (corridoioKey(c.a, c.b) !== key) return c;
+        const base = withResolvedCorridoioGeom(m.stanze, c);
+        return {
+          ...base,
+          x: typeof patch.x === "number" ? patch.x : base.x,
+          y: typeof patch.y === "number" ? patch.y : base.y,
+          w: typeof patch.w === "number" ? Math.max(10, patch.w) : base.w,
+          h: typeof patch.h === "number" ? Math.max(10, patch.h) : base.h,
+        };
+      });
+      return { ...m, corridoi: normalizeCorridoi(m.stanze, next) };
+    });
+  }, []);
+
+  const autoFitCorridoioToDoors = useCallback((key, forcedThickness = null) => {
+    setMuseo((m) => {
+      const next = (m.corridoi || []).map((c) => {
+        if (corridoioKey(c.a, c.b) !== key) return c;
+        const a = m.stanze.find((s) => s.nome === c.a);
+        const b = m.stanze.find((s) => s.nome === c.b);
+        if (!a || !b) return c;
+
+        const aSide = c.aDoor?.side || inferSide(a, b);
+        const bSide = c.bDoor?.side || inferSide(b, a);
+        const pA = doorPoint(a, c.aDoor, aSide);
+        const pB = doorPoint(b, c.bDoor, bSide);
+        const dx = pB[0] - pA[0];
+        const dy = pB[1] - pA[1];
+
+        const fallbackThickness = Math.max(10, Math.min(80, Math.round((Math.min(c.w || 40, c.h || 40) || 40))));
+        const thickness = typeof forcedThickness === "number"
+          ? Math.max(10, Math.min(120, Math.round(forcedThickness)))
+          : fallbackThickness;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          const yMid = (pA[1] + pB[1]) / 2;
+          return { ...c, x: Math.min(pA[0], pB[0]), y: yMid - thickness / 2, w: Math.max(10, Math.abs(dx)), h: thickness };
+        }
+        const xMid = (pA[0] + pB[0]) / 2;
+        return { ...c, x: xMid - thickness / 2, y: Math.min(pA[1], pB[1]), w: thickness, h: Math.max(10, Math.abs(dy)) };
+      });
+      return { ...m, corridoi: normalizeCorridoi(m.stanze, next) };
+    });
+  }, []);
+
+  // ─── DRAG/RESIZE (stanze + oggetti) ───────────────────────────────────
+  const dragRef = useRef(null);
+
+  const svgPointFromEvent = (e, svgEl) => {
+    const pt = svgEl.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const m = svgEl.getScreenCTM();
+    const local = m ? pt.matrixTransform(m.inverse()) : { x: e.nativeEvent?.offsetX ?? 0, y: e.nativeEvent?.offsetY ?? 0 };
+    return { x: local.x, y: local.y };
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const svgEl = d.svg;
+      if (!svgEl) return;
+      const p = svgPointFromEvent(e, svgEl);
+
+      if (d.type === "room") {
+        const dx = p.x - d.start.x;
+        const dy = p.y - d.start.y;
+        setMuseo((m) => ({
+          ...m,
+          stanze: m.stanze.map((s) => s.nome === d.nome ? { ...s, x: d.room.x + dx, y: d.room.y + dy } : s),
+        }));
+      } else if (d.type === "room-resize") {
+        const dx = p.x - d.start.x;
+        const dy = p.y - d.start.y;
+        setMuseo((m) => ({
+          ...m,
+          stanze: m.stanze.map((s) => s.nome === d.nome ? {
+            ...s,
+            w: Math.max(40, d.room.w + dx),
+            h: Math.max(40, d.room.h + dy),
+          } : s),
+        }));
+      } else if (d.type === "obj") {
+        const room = d.room;
+        const xRel = clamp01((p.x - room.x) / room.w);
+        const yRel = clamp01((p.y - room.y) / room.h);
+        setMuseo((m) => ({
+          ...m,
+          oggetti: m.oggetti.map((o) => o.nome === d.nome ? { ...o, pos: { x: xRel, y: yRel } } : o),
+        }));
+      } else if (d.type === "corridor") {
+        const dx = p.x - d.start.x;
+        const dy = p.y - d.start.y;
+        updateCorridoio(d.key, { x: d.corridor.x + dx, y: d.corridor.y + dy });
+      } else if (d.type === "corridor-resize") {
+        const dx = p.x - d.start.x;
+        const dy = p.y - d.start.y;
+        updateCorridoio(d.key, { w: d.corridor.w + dx, h: d.corridor.h + dy });
+      }
+    };
+
+    const onUp = () => {
+      if (dragRef.current) dragRef.current = null;
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [updateCorridoio]);
+
+  const startDragRoom = (e, nome, kind = "move") => {
+    if (percorsoEdit) return;
+    if (mode !== "select") return;
+    const svgEl = e.currentTarget.ownerSVGElement;
+    if (!svgEl) return;
+    const room = roomPos[nome];
+    if (!room) return;
+    const start = svgPointFromEvent(e, svgEl);
+    dragRef.current = { type: kind === "resize" ? "room-resize" : "room", nome, start, room, svg: svgEl };
+  };
+
+  const startDragObj = (e, nome) => {
+    if (percorsoEdit) return;
+    if (mode !== "select") return;
+    const o = museo.oggetti.find(x => x.nome === nome);
+    if (!o) return;
+    const room = roomPos[o.stanza];
+    if (!room) return;
+    const svgEl = e.currentTarget.ownerSVGElement;
+    if (!svgEl) return;
+    const start = svgPointFromEvent(e, svgEl);
+    dragRef.current = { type: "obj", nome, start, room, svg: svgEl };
+  };
+
+  const startDragCorridor = (e, c, kind = "move") => {
+    if (percorsoEdit) return;
+    if (mode !== "select") return;
+    const svgEl = e.currentTarget.ownerSVGElement;
+    if (!svgEl) return;
+    const start = svgPointFromEvent(e, svgEl);
+    dragRef.current = {
+      type: kind === "resize" ? "corridor-resize" : "corridor",
+      key: corridoioKey(c.a, c.b),
+      start,
+      corridor: { x: c.x, y: c.y, w: c.w, h: c.h },
+      svg: svgEl,
+    };
   };
 
   // ─── CONNESSIONI ──────────────────────────────────────────────────────
@@ -1029,7 +1331,10 @@ export default function MuseoEditor() {
 
   // ─── EXPORT ───────────────────────────────────────────────────────────
   const exportData = useMemo(() => ({
-    layout: { grid: Object.fromEntries(museo.stanze.map(s=>[s.nome,{row:s.row,col:s.col,tipo:s.tipo}])) },
+    layout: {
+      rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+      corridoi: normalizeCorridoi(museo.stanze, museo.corridoi),
+    },
     museo:  { nome: museo.nome, oggetti: museo.oggetti, percorsi: museo.percorsi },
   }), [museo]);
 
@@ -1043,6 +1348,7 @@ export default function MuseoEditor() {
     ? selected.type==="stanza"   ? museo.stanze.find(s=>s.nome===selected.nome)
     : selected.type==="oggetto"  ? museo.oggetti.find(o=>o.nome===selected.nome)
     : selected.type==="percorso" ? museo.percorsi.find(p=>p.nome===selected.nome)
+    : selected.type==="corridoio" ? corridors.find(c=>corridoioKey(c.a, c.b) === selected.key)
     : null : null;
 
   const activePercorsoLines = percorsoEdit ? percorsoEditLines : percorsoViewLines;
@@ -1054,35 +1360,56 @@ export default function MuseoEditor() {
 
   const hint = percorsoEdit
     ? "Clicca un oggetto per aggiungerlo/rimuoverlo dal percorso"
-    : mode==="addRoom"     ? "Clicca una cella vuota per aggiungere la stanza"
-    : mode==="addObject"   ? "Clicca una stanza per aggiungere l'oggetto"
+    : mode==="addRoom"     ? "Clicca nel canvas per creare una stanza libera (no griglia)"
+    : mode==="addObject"   ? "Clicca nel punto della stanza dove vuoi creare l'oggetto"
     : mode==="connectPick" ? `Clicca un oggetto da collegare a "${selected?.nome}"`
     : null;
 
   const hasCorridoio = useCallback((a, b) => {
-    const key = [a, b].sort().join("|");
-    return (museo.corridoi || []).some((c) => [c.a, c.b].sort().join("|") === key);
+    const key = corridoioKey(a, b);
+    return (museo.corridoi || []).some((c) => corridoioKey(c.a, c.b) === key);
   }, [museo.corridoi]);
 
   const toggleCorridoio = useCallback((a, b) => {
     setMuseo((m) => {
-      const key = [a, b].sort().join("|");
+      const key = corridoioKey(a, b);
       const corridoi = m.corridoi || [];
-      const exists = corridoi.some((c) => [c.a, c.b].sort().join("|") === key);
+      const exists = corridoi.some((c) => corridoioKey(c.a, c.b) === key);
       const next = exists
-        ? corridoi.filter((c) => [c.a, c.b].sort().join("|") !== key)
-        : [...corridoi, { a, b }];
+        ? corridoi.filter((c) => corridoioKey(c.a, c.b) !== key)
+        : [...corridoi, { a, b, aDoor: { side: "E", offset: 0.5 }, bDoor: { side: "W", offset: 0.5 } }];
       return { ...m, corridoi: normalizeCorridoi(m.stanze, next) };
+    });
+  }, []);
+
+  const getCorridoio = useCallback((a, b) => {
+    const key = corridoioKey(a, b);
+    return (museo.corridoi || []).find((c) => corridoioKey(c.a, c.b) === key) || null;
+  }, [museo.corridoi]);
+
+  const updateCorridoioDoor = useCallback((a, b, roomName, patch) => {
+    setMuseo((m) => {
+      const key = corridoioKey(a, b);
+      const corridoi = (m.corridoi || []).map((c) => {
+        if (corridoioKey(c.a, c.b) !== key) return c;
+        const isRoomA = c.a === roomName;
+        const doorKey = isRoomA ? "aDoor" : "bDoor";
+        return {
+          ...c,
+          [doorKey]: {
+            side: patch.side ?? c?.[doorKey]?.side ?? "E",
+            offset: clamp01(patch.offset ?? c?.[doorKey]?.offset ?? 0.5),
+          },
+        };
+      });
+      return { ...m, corridoi: normalizeCorridoi(m.stanze, corridoi) };
     });
   }, []);
 
   const stanzaAdiacentiSel = useMemo(() => {
     if (!selItem || selected?.type !== "stanza") return [];
-    return museo.stanze.filter((s) =>
-      s.nome !== selItem.nome &&
-      ((s.row === selItem.row && Math.abs(s.col - selItem.col) === 1) ||
-       (s.col === selItem.col && Math.abs(s.row - selItem.row) === 1))
-    );
+    // in layout libero: puoi collegare qualunque altra stanza
+    return museo.stanze.filter((s) => s.nome !== selItem.nome);
   }, [museo.stanze, selItem, selected?.type]);
 
   useEffect(() => {
@@ -1180,8 +1507,8 @@ export default function MuseoEditor() {
         ))}
         <div style={{fontSize:10,color:THEME.textDim,lineHeight:1.5,padding:"8px 2px 2px",display:isMobile?"none":"block"}}>
           {mode==="select" && !percorsoEdit ? "Modalita: selezione e modifica" : null}
-          {mode==="addRoom" && !percorsoEdit ? "Modalita: clicca una cella vuota per creare stanza" : null}
-          {mode==="addObject" && !percorsoEdit ? "Modalita: clicca una stanza per inserire oggetto" : null}
+          {mode==="addRoom" && !percorsoEdit ? "Modalita: clicca nel canvas per creare una stanza con dimensioni personalizzate" : null}
+          {mode==="addObject" && !percorsoEdit ? "Modalita: clicca nella stanza per posizionare l'oggetto nel punto scelto" : null}
           {mode==="connectPick" && !percorsoEdit ? "Modalita: clicca un oggetto da collegare" : null}
         </div>
         <div style={{flex:1,display:isMobile?"none":"block"}}/>
@@ -1236,8 +1563,24 @@ export default function MuseoEditor() {
             {hint}
           </div>
         )}
-        <svg width={svgW} height={svgH} style={{display:"block",background:"#f8f9fa",cursor:percorsoEdit?"crosshair":"default"}}
-          onClick={()=>{ if(!percorsoEdit){setSelected(null);setMode("select");} }}>
+        <svg
+          width={svgW}
+          height={svgH}
+          style={{display:"block",background:"#f8f9fa",cursor:percorsoEdit?"crosshair":mode==="addRoom"?"crosshair":"default"}}
+          onClick={(e)=>{
+            if (percorsoEdit) return;
+            if (mode === "addRoom") {
+              const svgEl = e.currentTarget;
+              const pt = svgEl.createSVGPoint();
+              pt.x = e.clientX; pt.y = e.clientY;
+              const m = svgEl.getScreenCTM();
+              const local = m ? pt.matrixTransform(m.inverse()) : { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+              addRoomAt(local.x, local.y);
+              return;
+            }
+            setSelected(null);
+            setMode("select");
+          }}>
           <defs>
             <style>{`
               @keyframes flow-red    { to { stroke-dashoffset: -22; } }
@@ -1265,14 +1608,41 @@ export default function MuseoEditor() {
             })}
           </defs>
 
-          {mode==="addRoom"&&!percorsoEdit&&Array.from({length:maxRow},(_,row)=>Array.from({length:maxCol},(_,col)=>{
-            if(occupied.has(`${row},${col}`))return null;
-            return <rect key={`g${row}-${col}`} x={START_X+col*(ROOM_W+GAP_X)} y={START_Y+row*(ROOM_H+GAP_Y)} width={ROOM_W} height={ROOM_H} rx={8}
-              fill="#fff" stroke="#27ae60" strokeWidth={2} strokeDasharray="8 5" opacity={.6} style={{cursor:"pointer"}}
-              onClick={e=>{e.stopPropagation();onGhostClick(row,col);}}/>;
-          }))}
+          {/* addRoom: click su canvas per creare stanza */}
 
-          {corridors.map((c,i)=><rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill="#ecf0f1" stroke="#95a5a6" strokeWidth={1.5}/>)}
+          {corridors.map((c) => {
+            const key = corridoioKey(c.a, c.b);
+            const sel = !percorsoEdit && selected?.type === "corridoio" && selected?.key === key;
+            return (
+              <g key={key} onClick={(e) => { e.stopPropagation(); if (!percorsoEdit) setSelected({ type: "corridoio", key }); }}>
+                <rect
+                  x={c.x}
+                  y={c.y}
+                  width={c.w}
+                  height={c.h}
+                  fill="#ecf0f1"
+                  stroke={sel ? "#f39c12" : "#95a5a6"}
+                  strokeWidth={sel ? 3 : 1.5}
+                  style={{ cursor: "move", filter: sel ? "drop-shadow(0 0 6px #f39c1288)" : undefined }}
+                  onPointerDown={(e) => { e.stopPropagation(); startDragCorridor(e, c, "move"); }}
+                />
+                {sel && (
+                  <rect
+                    x={c.x + c.w - 10}
+                    y={c.y + c.h - 10}
+                    width={8}
+                    height={8}
+                    rx={2}
+                    fill="#f39c12"
+                    stroke="#8a5a00"
+                    strokeWidth={1}
+                    style={{ cursor: "nwse-resize" }}
+                    onPointerDown={(e) => { e.stopPropagation(); startDragCorridor(e, c, "resize"); }}
+                  />
+                )}
+              </g>
+            );
+          })}
 
           {museo.stanze.map(s=>{
             const p=roomPos[s.nome]; if(!p) return null;
@@ -1281,10 +1651,27 @@ export default function MuseoEditor() {
             const inPercorso=percorsoAttivoOggetti.some(on=>museo.oggetti.find(o=>o.nome===on)?.stanza===s.nome);
             return (
               <g key={s.nome} style={{cursor:"pointer"}} onClick={e=>onRoomClick(e,s.nome)}>
-                <rect x={p.x} y={p.y} width={ROOM_W} height={ROOM_H} rx={8}
+                <rect
+                  x={p.x} y={p.y} width={p.w} height={p.h} rx={8}
                   fill={tc.fill} stroke={sel?"#f39c12":inPercorso?"#e67e22":tc.stroke} strokeWidth={sel?4:inPercorso?3:3}
-                  style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":inPercorso?"drop-shadow(0 0 6px #e67e2266)":undefined}}/>
-                <text x={p.x+ROOM_W/2} y={p.y+20} textAnchor="middle" style={{font:"bold 14px Arial",fill:"#2c3e50",pointerEvents:"none"}}>{s.nome}</text>
+                  style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":inPercorso?"drop-shadow(0 0 6px #e67e2266)":undefined}}
+                  onPointerDown={(e)=>{ e.stopPropagation(); startDragRoom(e, s.nome, "move"); }}
+                />
+                <text x={p.x+p.w/2} y={p.y+20} textAnchor="middle" style={{font:"bold 14px Arial",fill:"#2c3e50",pointerEvents:"none"}}>{s.nome}</text>
+                {sel && (
+                  <rect
+                    x={p.x + p.w - 12}
+                    y={p.y + p.h - 12}
+                    width={10}
+                    height={10}
+                    rx={2}
+                    fill="#f39c12"
+                    stroke="#8a5a00"
+                    strokeWidth={1}
+                    style={{cursor:"nwse-resize"}}
+                    onPointerDown={(e)=>{ e.stopPropagation(); startDragRoom(e, s.nome, "resize"); }}
+                  />
+                )}
               </g>
             );
           })}
@@ -1321,7 +1708,15 @@ export default function MuseoEditor() {
             const stroke = isPick ? OBJ_PICK_STROKE : isInEdit||isHoverPreview ? "#d35400" : OBJ_STROKE;
             const hasPreview = objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso;
             return (
-              <g key={o.nome} style={{cursor:"pointer"}} onClick={e=>onObjClick(e,o.nome)}>
+              <g
+                key={o.nome}
+                style={{cursor:"pointer"}}
+                onClick={e=>onObjClick(e,o.nome)}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  startDragObj(e, o.nome);
+                }}
+              >
                 {sel&&<>
                   <circle cx={x} cy={y} r={11} fill="none" stroke="#3498db" strokeWidth={2} className="rp1"/>
                   <circle cx={x} cy={y} r={11} fill="none" stroke="#3498db" strokeWidth={2} className="rp2"/>
@@ -1441,12 +1836,20 @@ export default function MuseoEditor() {
               </select>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
                 <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
-                  <FLabel>Riga</FLabel>
-                  <input type="number" min={0} value={selItem.row} onChange={e=>updStanza(selItem.nome,{row:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                  <FLabel>X</FLabel>
+                  <input type="number" value={selItem.x ?? 0} onChange={e=>updStanza(selItem.nome,{x:+e.target.value})} style={{...INP,marginBottom:0}}/>
                 </div>
                 <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
-                  <FLabel>Colonna</FLabel>
-                  <input type="number" min={0} value={selItem.col} onChange={e=>updStanza(selItem.nome,{col:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                  <FLabel>Y</FLabel>
+                  <input type="number" value={selItem.y ?? 0} onChange={e=>updStanza(selItem.nome,{y:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Larghezza</FLabel>
+                  <input type="number" min={40} value={selItem.w ?? DEFAULT_ROOM_W} onChange={e=>updStanza(selItem.nome,{w:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Altezza</FLabel>
+                  <input type="number" min={40} value={selItem.h ?? DEFAULT_ROOM_H} onChange={e=>updStanza(selItem.nome,{h:+e.target.value})} style={{...INP,marginBottom:0}}/>
                 </div>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
@@ -1461,27 +1864,140 @@ export default function MuseoEditor() {
                 <div style={{marginBottom:8,display:"grid",gap:6}}>
                   {stanzaAdiacentiSel.map((adj) => {
                     const active = hasCorridoio(selItem.nome, adj.nome);
+                    const corr = active ? getCorridoio(selItem.nome, adj.nome) : null;
+                    const isA = corr?.a === selItem.nome;
+                    const door = isA ? corr?.aDoor : corr?.bDoor;
+                    const side = door?.side || inferSide(roomPos[selItem.nome], roomPos[adj.nome]);
+                    const offset = clamp01(door?.offset ?? 0.5);
                     return (
-                      <button
-                        key={adj.nome}
-                        type="button"
-                        onClick={() => toggleCorridoio(selItem.nome, adj.nome)}
-                        style={{
-                          width:"100%",padding:"9px 10px",borderRadius:6,
-                          border:`1px solid ${active ? THEME.accent : THEME.border}`,
-                          background:active ? THEME.accentSoft : THEME.surface,
-                          color:active ? THEME.accent : THEME.textDim,
-                          fontSize:12,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"
-                        }}
-                      >
-                        <span>{adj.nome}</span>
-                        <span style={{fontSize:11}}>{active ? "Attivo" : "Disattivo"}</span>
-                      </button>
+                      <div key={adj.nome} style={{
+                        border:`1px solid ${active ? THEME.accent : THEME.border}`,
+                        background:active ? THEME.accentSoft : THEME.surface,
+                        borderRadius:6,
+                        padding:"8px 10px",
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleCorridoio(selItem.nome, adj.nome)}
+                          style={{
+                            width:"100%",
+                            border:"none",
+                            background:"transparent",
+                            color:active ? THEME.accent : THEME.textDim,
+                            fontSize:12,
+                            cursor:"pointer",
+                            textAlign:"left",
+                            display:"flex",
+                            justifyContent:"space-between",
+                            alignItems:"center",
+                            padding:0,
+                          }}
+                        >
+                          <span>{adj.nome}</span>
+                          <span style={{fontSize:11}}>{active ? "Attivo" : "Disattivo"}</span>
+                        </button>
+                        {active && (
+                          <div style={{marginTop:8,display:"grid",gap:6}}>
+                            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                              <div>
+                                <FLabel>Lato porta</FLabel>
+                                <select
+                                  value={side}
+                                  onChange={(e) => updateCorridoioDoor(selItem.nome, adj.nome, selItem.nome, { side: e.target.value })}
+                                  style={{...INP, marginBottom:0}}
+                                >
+                                  {DOOR_SIDES.map((d) => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <FLabel>Offset</FLabel>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={1}
+                                  step={0.05}
+                                  value={offset}
+                                  onChange={(e) => updateCorridoioDoor(selItem.nome, adj.nome, selItem.nome, { offset: Number(e.target.value) })}
+                                  style={{...INP, marginBottom:0}}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               )}
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:6}}>✕ Elimina stanza</button>
+            </Card>
+          )}
+
+          {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="corridoio" && (
+            <Card title="CORRIDOIO" color="#95a5a6">
+              <div style={{fontSize:11,color:THEME.textDim,marginBottom:10,padding:"8px 10px",background:"rgba(149,165,166,0.12)",border:`1px solid ${THEME.border}`,borderRadius:6}}>
+                Posizione libera del corridoio e porte verso le due stanze.
+              </div>
+              <div style={{fontSize:12,color:THEME.text,marginBottom:8}}>
+                {selItem.a} ↔ {selItem.b}
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <button
+                  onClick={() => autoFitCorridoioToDoors(selected.key)}
+                  style={{padding:"6px 10px",borderRadius:6,border:`1px solid ${THEME.accent}`,background:THEME.accentSoft,color:THEME.accent,cursor:"pointer",fontSize:11,fontWeight:"bold"}}
+                >
+                  Adatta alle porte
+                </button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>X</FLabel>
+                  <input type="number" value={selItem.x ?? 0} onChange={e=>updateCorridoio(selected.key,{x:+e.target.value})} style={{...INP,marginBottom:6}}/>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>updateCorridoio(selected.key,{x:(selItem.x ?? 0)-10})} style={{flex:1,...BTN_SM}}>-10</button>
+                    <button onClick={()=>updateCorridoio(selected.key,{x:(selItem.x ?? 0)+10})} style={{flex:1,...BTN_SM}}>+10</button>
+                  </div>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Y</FLabel>
+                  <input type="number" value={selItem.y ?? 0} onChange={e=>updateCorridoio(selected.key,{y:+e.target.value})} style={{...INP,marginBottom:6}}/>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>updateCorridoio(selected.key,{y:(selItem.y ?? 0)-10})} style={{flex:1,...BTN_SM}}>-10</button>
+                    <button onClick={()=>updateCorridoio(selected.key,{y:(selItem.y ?? 0)+10})} style={{flex:1,...BTN_SM}}>+10</button>
+                  </div>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Larghezza</FLabel>
+                  <input type="number" min={10} value={selItem.w ?? 40} onChange={e=>updateCorridoio(selected.key,{w:+e.target.value})} style={{...INP,marginBottom:6}}/>
+                  <input type="range" min={10} max={Math.max(400, Math.round(svgW || 800))} step={5} value={Math.max(10, Math.round(selItem.w ?? 40))} onChange={e=>updateCorridoio(selected.key,{w:+e.target.value})} style={{width:"100%"}}/>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Altezza</FLabel>
+                  <input type="number" min={10} value={selItem.h ?? 40} onChange={e=>updateCorridoio(selected.key,{h:+e.target.value})} style={{...INP,marginBottom:6}}/>
+                  <input type="range" min={10} max={Math.max(400, Math.round(svgH || 600))} step={5} value={Math.max(10, Math.round(selItem.h ?? 40))} onChange={e=>updateCorridoio(selected.key,{h:+e.target.value})} style={{width:"100%"}}/>
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8,marginTop:10}}>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Porta {selItem.a} (lato/offset)</FLabel>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    <select value={selItem.aDoor?.side || "E"} onChange={e=>updateCorridoioDoor(selItem.a, selItem.b, selItem.a, {side:e.target.value})} style={{...INP,marginBottom:0}}>
+                      {DOOR_SIDES.map((d)=><option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input type="number" min={0} max={1} step={0.05} value={clamp01(selItem.aDoor?.offset ?? 0.5)} onChange={e=>updateCorridoioDoor(selItem.a, selItem.b, selItem.a, {offset:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                  </div>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Porta {selItem.b} (lato/offset)</FLabel>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    <select value={selItem.bDoor?.side || "W"} onChange={e=>updateCorridoioDoor(selItem.a, selItem.b, selItem.b, {side:e.target.value})} style={{...INP,marginBottom:0}}>
+                      {DOOR_SIDES.map((d)=><option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input type="number" min={0} max={1} step={0.05} value={clamp01(selItem.bDoor?.offset ?? 0.5)} onChange={e=>updateCorridoioDoor(selItem.a, selItem.b, selItem.b, {offset:+e.target.value})} style={{...INP,marginBottom:0}}/>
+                  </div>
+                </div>
+              </div>
+              <button onClick={deleteSelected} style={{...DELBTN,marginTop:12}}>✕ Elimina corridoio</button>
             </Card>
           )}
 
@@ -1623,6 +2139,23 @@ export default function MuseoEditor() {
             ))}
           </Section>
 
+          <Section label={`Corridoi (${corridors.length})`}>
+            {corridors.length===0
+              ? <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic"}}>Nessun corridoio</div>
+              : corridors.map(c=>(
+                <ListRow
+                  key={corridoioKey(c.a, c.b)}
+                  active={!percorsoEdit&&selected?.type==="corridoio"&&selected?.key===corridoioKey(c.a,c.b)}
+                  accent="#95a5a6"
+                  onClick={()=>{ if (percorsoEdit) return; setMode("select"); setSelected({type:"corridoio", key:corridoioKey(c.a,c.b)}); }}
+                >
+                  <span>{c.a} ↔ {c.b}</span>
+                  <span style={{fontSize:10,color:THEME.textDim}}>{Math.round(c.w)}×{Math.round(c.h)}</span>
+                </ListRow>
+              ))
+            }
+          </Section>
+
           <Section label={`Percorsi (${museo.percorsi.length})`}>
             <button onClick={()=>openPercorsoEditor(null)}
               style={{width:"100%",marginBottom:8,padding:"6px",borderRadius:5,border:"1px dashed #e67e22",background:"rgba(230,126,34,0.12)",color:"#e67e22",fontSize:11,cursor:"pointer",fontWeight:"bold"}}>
@@ -1688,6 +2221,7 @@ export default function MuseoEditor() {
 
 // ─── MICRO COMPONENTS ─────────────────────────────────────────────────────
 const INP    = {width:"100%",padding:"6px 8px",border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,borderRadius:5,fontSize:12,boxSizing:"border-box",marginTop:2,marginBottom:8,outline:"none"};
+const BTN_SM = {padding:"5px 8px",borderRadius:5,border:`1px solid ${THEME.border}`,background:THEME.panel,color:THEME.text,cursor:"pointer",fontSize:11};
 const DELBTN = {width:"100%",padding:"7px",border:"none",borderRadius:5,background:"rgba(224,90,74,0.12)",color:THEME.danger,fontSize:12,cursor:"pointer"};
 const FLabel = ({children})=><div style={{fontSize:10,letterSpacing:1,color:THEME.textDim,marginBottom:2,marginTop:4}}>{children}</div>;
 const Card   = ({title,color,children})=>(

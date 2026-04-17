@@ -1,7 +1,7 @@
 // mongo_upload.js
 const { MongoClient } = require("mongodb");
 
-const uri = "mongodb://localhost:27017";
+const uri = process.env.MONGO_URI || "mongodb://localhost:27017";
 const dbName = "musei";
 const collectionName = "musei_db";
 

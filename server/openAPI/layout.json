@@ -23,7 +23,52 @@
         "col": 1,
         "tipo": "uscita"
       }
-    }
+    },
+    "rooms": {
+      "IN": {
+        "x": 100,
+        "y": 120,
+        "w": 220,
+        "h": 180,
+        "tipo": "ingresso"
+      },
+      "sala A": {
+        "x": 100,
+        "y": 440,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      },
+      "sala B": {
+        "x": 440,
+        "y": 440,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      },
+      "sala C": {
+        "x": 100,
+        "y": 760,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      },
+      "OUT": {
+        "x": 440,
+        "y": 760,
+        "w": 220,
+        "h": 180,
+        "tipo": "uscita"
+      },
+      "Stanza 6": {
+        "x": 353,
+        "y": 155,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      }
+    },
+    "corridoi": []
   },
   "Museo di Torino": {
     "grid": {
@@ -70,28 +115,12 @@
     },
     "corridoi": [
       {
-        "a": "IN",
-        "b": "stanza 1"
-      },
-      {
-        "a": "stanza 1",
-        "b": "stanza 2"
-      },
-      {
-        "a": "stanza 2",
-        "b": "WC"
-      },
-      {
-        "a": "stanza 2",
-        "b": "stanza 3"
-      },
-      {
-        "a": "stanza 4",
-        "b": "stanza 2"
-      },
-      {
         "a": "stanza 3",
-        "b": "SHOP"
+        "b": "SHOP",
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        }
       },
       {
         "a": "stanza 3",
@@ -100,8 +129,130 @@
       {
         "a": "WC",
         "b": "SHOP"
+      },
+      {
+        "a": "stanza 2",
+        "b": "WC",
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 2",
+        "b": "stanza 4",
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "IN",
+        "b": "stanza 1",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 1",
+        "b": "stanza 2",
+        "x": 456,
+        "y": 625,
+        "w": 40,
+        "h": 113,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 2",
+        "b": "stanza 3",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
       }
-    ]
+    ],
+    "rooms": {
+      "IN": {
+        "x": 372,
+        "y": 138,
+        "w": 392,
+        "h": 191,
+        "tipo": "ingresso"
+      },
+      "stanza 1": {
+        "x": 449,
+        "y": 446,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      },
+      "stanza 2": {
+        "x": 445,
+        "y": 739,
+        "w": 220,
+        "h": 180,
+        "tipo": "normale"
+      },
+      "stanza 4": {
+        "x": 100,
+        "y": 760,
+        "w": 220,
+        "h": 180,
+        "tipo": "servizio"
+      },
+      "stanza 3": {
+        "x": 172,
+        "y": 1122,
+        "w": 476,
+        "h": 308,
+        "tipo": "normale"
+      },
+      "WC": {
+        "x": 780,
+        "y": 760,
+        "w": 220,
+        "h": 180,
+        "tipo": "bagno"
+      },
+      "SHOP": {
+        "x": 864,
+        "y": 1134,
+        "w": 220,
+        "h": 180,
+        "tipo": "servizio"
+      },
+      "OUT": {
+        "x": 319,
+        "y": 1584,
+        "w": 220,
+        "h": 180,
+        "tipo": "uscita"
+      }
+    }
   },
   "Museo Demo QA": {
     "grid": {

@@ -157,12 +157,27 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
   const stanzeMap   = {};
   const oggettiList = [];
 
-  for (const [nome, info] of Object.entries(layout.grid)) {
-    const s  = new Stanza(nome);
-    s.row    = info.row;
-    s.col    = info.col;
-    s.tipo   = info.tipo || "normale";
-    stanzeMap[nome] = s;
+  const roomsObj = layout.rooms && typeof layout.rooms === "object" ? layout.rooms : null;
+  const gridObj  = layout.grid  && typeof layout.grid  === "object" ? layout.grid  : null;
+
+  if (roomsObj) {
+    for (const [nome, info] of Object.entries(roomsObj)) {
+      const s = new Stanza(nome);
+      s.x = info.x; s.y = info.y; s.w = info.w; s.h = info.h;
+      // Layout libero: evita fallback legacy su row/col (default 0 nel model).
+      s.row = undefined;
+      s.col = undefined;
+      s.tipo = info.tipo || "normale";
+      stanzeMap[nome] = s;
+    }
+  } else if (gridObj) {
+    for (const [nome, info] of Object.entries(gridObj)) {
+      const s  = new Stanza(nome);
+      s.row    = info.row;
+      s.col    = info.col;
+      s.tipo   = info.tipo || "normale";
+      stanzeMap[nome] = s;
+    }
   }
 
   for (const o of data.oggetti || []) {
@@ -172,6 +187,7 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
     const s   = stanzeMap[o.stanza];
     const obj = new Oggetto(o.nome, s, o.connessi || []);
     obj.visibile = o.visibile !== undefined ? o.visibile : true;
+    if (o.pos && typeof o.pos === "object") obj.posRel = o.pos;
     s.oggetti.push(obj);
     oggettiList.push(obj);
   }
@@ -189,12 +205,21 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
   const stanzeList = Object.values(stanzeMap);
   const corridoi   = buildLayout(stanzeList, layout.corridoi || []);
 
+  // dopo buildLayout: assegna posizione assoluta agli oggetti
   for (const o of oggettiList) {
-    if (specialTipi.includes(o.stanza.tipo)) {
-      const s = o.stanza;
-      o.pos   = [s.x + s.w / 2, s.y + s.h / 2];
+    const s = o.stanza;
+    if (o.posRel && typeof o.posRel.x === "number" && typeof o.posRel.y === "number") {
+      const x = s.x + s.w * Math.max(0, Math.min(1, o.posRel.x));
+      const y = s.y + s.h * Math.max(0, Math.min(1, o.posRel.y));
+      o.pos = [x, y];
+    } else {
+      // fallback: centro stanza
+      o.pos = [s.x + s.w / 2, s.y + s.h / 2];
     }
   }
+
+  // Non forzare i nodi speciali al centro stanza:
+  // se hanno posRel la usano, altrimenti mantengono il fallback gia' assegnato sopra.
 
   const w = Math.max(...stanzeList.map((s) => s.x + s.w)) + 200;
   const h = Math.max(...stanzeList.map((s) => s.y + s.h)) + 200;

@@ -125,6 +125,10 @@
         {
           "nome": "sarcofago",
           "stanza": "stanza 1",
+          "pos": {
+            "x": 0.8409090909090909,
+            "y": 0.2222222222222222
+          },
           "connessi": [
             "mummia"
           ],
@@ -154,6 +158,10 @@
         {
           "nome": "collana",
           "stanza": "stanza 2",
+          "pos": {
+            "x": 0.23636363636363636,
+            "y": 0.5333333333333333
+          },
           "connessi": [
             "mummia",
             "scettro"
@@ -184,6 +192,10 @@
         {
           "nome": "scettro",
           "stanza": "stanza 2",
+          "pos": {
+            "x": 0.8818181818181818,
+            "y": 0.14444444444444443
+          },
           "connessi": [
             "collana",
             "maschera"
@@ -214,6 +226,10 @@
         {
           "nome": "maschera",
           "stanza": "stanza 3",
+          "pos": {
+            "x": 0.1,
+            "y": 0.5111111111111111
+          },
           "connessi": [
             "scettro"
           ],
@@ -243,6 +259,10 @@
         {
           "nome": "mummia",
           "stanza": "stanza 1",
+          "pos": {
+            "x": 0.8409090909090909,
+            "y": 0.7944444444444444
+          },
           "connessi": [
             "sarcofago",
             "collana"
