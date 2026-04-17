@@ -982,13 +982,46 @@ function drawArrowText(layer: SVGGElement, link: Link) {
       ? dy > 0 ? 90 : -90
       : dx > 0 ? 0 : 180;
   const OFFSET = 35;
-  const len = Math.hypot(dx, dy) || 1;
-  const x = from.x - (dx / len) * OFFSET;
-  const y = from.y - (dy / len) * OFFSET;
+
+  // Dimensione freccia: resta uguale nei casi normali, ma se la stanza/mappa è enorme
+  // (viewBox molto grande → 40 unità SVG diventano pochi pixel) la rendiamo leggibile.
+  // Clamp anche rispetto allo spessore corridoio per non “invadere” altre stanze.
+  const svg = layer.ownerSVGElement;
+  const vbParts = (svg?.getAttribute("viewBox") ?? "0 0 800 600").split(" ").map(Number);
+  const vbW = vbParts[2] || 800;
+  const vbH = vbParts[3] || 600;
+  const svgRect = svg?.getBoundingClientRect();
+  const pxW = Math.max(1, svgRect?.width ?? 800);
+  const pxH = Math.max(1, svgRect?.height ?? 600);
+  const unitsPerPx = Math.max(vbW / pxW, vbH / pxH);
+
+  const cW = +corridor.rect.getAttribute("width")!;
+  const cH = +corridor.rect.getAttribute("height")!;
+  const thickness = corridor.orientation === "vertical" ? cW : cH;
+
+  const minPx = pxW <= 420 ? 32 : 28;
+  const maxPx = pxW <= 420 ? 50 : 46;
+  const minSizeUnits = minPx * unitsPerPx;
+  const maxSizeUnits = maxPx * unitsPerPx;
+  const maxFromCorridor = Math.max(minSizeUnits, thickness * 2.6);
+  const SIZE = clamp(Math.max(40, minSizeUnits), minSizeUnits, Math.min(maxSizeUnits, maxFromCorridor));
+  // Posizionamento “centrato sul corridoio”:
+  // invece di spostare la freccia lungo la diagonale verso il centro stanza,
+  // la teniamo sull'asse del corridoio (utile quando il corridoio è offset).
+  let x = from.x;
+  let y = from.y;
+  if (corridor.orientation === "vertical") {
+    const dir = dy >= 0 ? 1 : -1;
+    x = from.x;
+    y = from.y - dir * OFFSET;
+  } else {
+    const dir = dx >= 0 ? 1 : -1;
+    x = from.x - dir * OFFSET;
+    y = from.y;
+  }
 
   const g = document.createElementNS(ns, "g");
   const img = document.createElementNS(ns, "image");
-  const SIZE = 40;
   img.setAttribute("href", "./icons/arrow-right.png");
   img.setAttribute("width", `${SIZE}`);
   img.setAttribute("height", `${SIZE}`);
