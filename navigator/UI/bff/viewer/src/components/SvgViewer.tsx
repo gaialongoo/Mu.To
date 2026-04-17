@@ -132,6 +132,7 @@ export default function SvgViewer() {
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
   const [freeExplore, setFreeExplore] = useState(false);
   const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
+  const [svgLoadTick, setSvgLoadTick] = useState(0);
   const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
@@ -152,7 +153,12 @@ export default function SvgViewer() {
 
   useEffect(() => {
     if (!session) return;
-    loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
+    loadSvg(
+      computeSvgUrl(session),
+      session,
+      () => setExitConfirmOpen(true),
+      () => setSvgLoadTick(t => t + 1)
+    );
   }, [session]);
 
   useEffect(() => {
@@ -195,13 +201,21 @@ export default function SvgViewer() {
     const onPop = () => {
       const { stanza } = parseStanzaFromUrl(session);
       const isHome = normalize(stanza) === "home";
-      if (!freeExplore || isHome) {
-        loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
+      const stanzaChanged =
+        currentStanzaLabel != null &&
+        normalize(stanza) !== normalize(currentStanzaLabel);
+      if (!freeExplore || isHome || stanzaChanged) {
+        loadSvg(
+          computeSvgUrl(session),
+          session,
+          () => setExitConfirmOpen(true),
+          () => setSvgLoadTick(t => t + 1)
+        );
       }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [session, freeExplore]);
+  }, [session, freeExplore, currentStanzaLabel]);
 
   useEffect(() => {
     const sync = () => {
@@ -247,26 +261,8 @@ export default function SvgViewer() {
 
     // FREE MODE
     lockedViewBox.current = svg.getAttribute("viewBox");
-
-    if (!svg.getAttribute("data-full-viewbox")) {
-      try {
-        const bbox = svg.getBBox();
-        const pad = 80;
-        svg.setAttribute(
-          "data-full-viewbox",
-          `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`
-        );
-      } catch {
-        const vb = svg.getAttribute("viewBox")?.split(" ").map(Number) ?? [0, 0, 800, 600];
-        const pad = 200;
-        svg.setAttribute(
-          "data-full-viewbox",
-          `${vb[0] - pad} ${vb[1] - pad} ${vb[2] + pad * 2} ${vb[3] + pad * 2}`
-        );
-      }
-    }
-
-    svg.setAttribute("viewBox", svg.getAttribute("data-full-viewbox")!);
+    // In modalità libera manteniamo l'inquadratura attuale della stanza:
+    // evitiamo il salto automatico alla mappa intera (effetto dezoom).
     svg.style.cursor = "grab";
 
     const navLayer = svg.querySelector<SVGGElement>("#nav-layer");
@@ -427,7 +423,7 @@ export default function SvgViewer() {
       window.removeEventListener("touchmove", onTouchMove);
       svg.style.cursor = "";
     };
-  }, [freeExplore, session]);
+  }, [freeExplore, session, currentStanzaLabel, svgLoadTick]);
 
   const handleRoomConfirm = (label: string) => {
     setRoomConfirm(null);
@@ -685,7 +681,7 @@ export default function SvgViewer() {
           nome={focusedObject}
           session={session}
           onClose={closeObjectFocus}
-          showNav={!freeExplore}
+          showNav={true}
         />
       )}
     </>
@@ -727,7 +723,12 @@ function findRoomLabel(svg: SVGSVGElement, rect: SVGRectElement): string | null 
 
 /* ===================== SVG LOADER ===================== */
 
-function loadSvg(url: string, session: Session, onExitRequested: () => void) {
+function loadSvg(
+  url: string,
+  session: Session,
+  onExitRequested: () => void,
+  onLoaded?: () => void
+) {
   const host = document.getElementById("svg-host");
   if (!host) return;
   fetch(url)
@@ -748,6 +749,7 @@ function loadSvg(url: string, session: Session, onExitRequested: () => void) {
       renderNavigation(svg);
       bindObjectClicks(svg, session);
       mountExitInOutRoom(svg, onExitRequested);
+      onLoaded?.();
     });
 }
 
@@ -1534,6 +1536,7 @@ function ObjectOverlay({
           maxHeight: "88vh",
           display: "flex",
           flexDirection: "column",
+          minHeight: 0,
           overflow: "hidden",
           boxShadow: "0 12px 48px rgba(0,0,0,0.35)",
         }}
@@ -1615,7 +1618,7 @@ function ObjectOverlay({
         )}
 
         {/* ── Testo ── */}
-        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>
           <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{nome}</h2>
           {descrizione
             ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
@@ -1628,6 +1631,7 @@ function ObjectOverlay({
           <div style={{
             display: "flex", justifyContent: "space-between",
             padding: "12px 24px", borderTop: "1px solid #eee", flexShrink: 0,
+            background: "#fff", position: "sticky", bottom: 0, zIndex: 1,
           }}>
             <button
               onClick={handlePrev}
