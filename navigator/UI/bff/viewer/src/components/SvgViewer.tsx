@@ -97,6 +97,7 @@ type Link = {
   to: Point;
   label: string;
   corridor: Corridor;
+  fromRoom: Room;
 };
 
 type RectBox = { x: number; y: number; w: number; h: number };
@@ -153,6 +154,21 @@ export default function SvgViewer() {
     if (!session) return;
     loadSvg(computeSvgUrl(session), session, () => setExitConfirmOpen(true));
   }, [session]);
+
+  useEffect(() => {
+    if (!session || freeExplore) return;
+
+    const onResize = () => {
+      const host = document.getElementById("svg-host");
+      const svg = host?.querySelector<SVGSVGElement>("svg");
+      if (!svg) return;
+      fitSvgToViewport(svg);
+      renderNavigation(svg);
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [session, freeExplore]);
 
   // HOME: blocca zoom/pan e disabilita la modalità esplora.
   useEffect(() => {
@@ -547,7 +563,7 @@ export default function SvgViewer() {
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          overflow: "visible",
+          overflow: "hidden",
           touchAction: "none",
         }}
       />
@@ -721,6 +737,7 @@ function loadSvg(url: string, session: Session, onExitRequested: () => void) {
       const svg = host.querySelector<SVGSVGElement>("svg");
       if (!svg) return;
       svg.style.transform = "";
+      fitSvgToViewport(svg);
       svg.setAttribute("overflow", "visible");
       svg.style.overflow = "visible";
 
@@ -732,6 +749,15 @@ function loadSvg(url: string, session: Session, onExitRequested: () => void) {
       bindObjectClicks(svg, session);
       mountExitInOutRoom(svg, onExitRequested);
     });
+}
+
+function fitSvgToViewport(svg: SVGSVGElement) {
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  // Manteniamo le dimensioni native dell'SVG e limitiamo solo l'overflow
+  // per non perdere lo zoom sulla stanza corrente.
+  svg.style.maxWidth = "100%";
+  svg.style.maxHeight = "100%";
+  svg.style.display = "block";
 }
 
 function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
@@ -856,29 +882,37 @@ function extractCorridors(svg: SVGSVGElement): Corridor[] {
 /* ===================== NAV LOGIC ===================== */
 
 function buildNavigatorGraphCache(rooms: Room[], corridors: Corridor[]): NavigatorGraphCache {
-  const THRESH = 230;
+  // Considera collegati stanza↔corridoio solo se i rettangoli sono adiacenti/toccano.
+  // Questo evita frecce “spurie” in stanze molto grandi (dove il centro stanza è lontano).
+  const TOUCH_EPS = 8;
   const corridorsNearRoom: number[][] = Array.from({ length: rooms.length }, () => []);
   const roomsWithinCorridor: number[][] = Array.from({ length: corridors.length }, () => []);
 
   // Primo: per ogni room, quali corridor sono abbastanza vicine?
   for (let i = 0; i < rooms.length; i++) {
-    const rc = rooms[i].center;
+    const roomBox = rectBox(rooms[i].rect);
     for (let j = 0; j < corridors.length; j++) {
-      const cc = corridors[j].center;
-      if (distance(rc, cc) <= THRESH) corridorsNearRoom[i].push(j);
+      const corridorBox = rectBox(corridors[j].rect);
+      if (distanceRectToRect(corridorBox, roomBox) <= TOUCH_EPS) corridorsNearRoom[i].push(j);
     }
   }
 
   // Secondo: per ogni corridor, quali room sono abbastanza vicine?
   for (let j = 0; j < corridors.length; j++) {
-    const cc = corridors[j].center;
+    const corridorBox = rectBox(corridors[j].rect);
     for (let i = 0; i < rooms.length; i++) {
-      const rc = rooms[i].center;
-      if (distance(rc, cc) < THRESH) roomsWithinCorridor[j].push(i);
+      const roomBox = rectBox(rooms[i].rect);
+      if (distanceRectToRect(corridorBox, roomBox) <= TOUCH_EPS) roomsWithinCorridor[j].push(i);
     }
   }
 
   return { corridorsNearRoom, roomsWithinCorridor };
+}
+
+function distanceRectToRect(a: RectBox, b: RectBox): number {
+  const dx = a.x + a.w < b.x ? (b.x - (a.x + a.w)) : (b.x + b.w < a.x ? (a.x - (b.x + b.w)) : 0);
+  const dy = a.y + a.h < b.y ? (b.y - (a.y + a.h)) : (b.y + b.h < a.y ? (a.y - (b.y + b.h)) : 0);
+  return Math.hypot(dx, dy);
 }
 
 function computeNavigatorZoomProfile(
@@ -963,7 +997,7 @@ function computeNavigatorLinks(
     for (const toIdx of toRoomIndicesByCorridor[corridorIdx]) {
       if (toIdx === fromIdx) continue;
       const toRoom = rooms[toIdx];
-      links.push({ from: fromPoint, to: toRoom.center, label: toRoom.label, corridor });
+      links.push({ from: fromPoint, to: toRoom.center, label: toRoom.label, corridor, fromRoom: from });
     }
   }
 
@@ -974,14 +1008,13 @@ function computeNavigatorLinks(
 
 function drawArrowText(layer: SVGGElement, link: Link) {
   const ns = "http://www.w3.org/2000/svg";
-  const { from, to, corridor } = link;
+  const { from, to, corridor, fromRoom } = link;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const rotation =
     corridor.orientation === "vertical"
       ? dy > 0 ? 90 : -90
       : dx > 0 ? 0 : 180;
-  const OFFSET = 35;
 
   // Dimensione freccia: resta uguale nei casi normali, ma se la stanza/mappa è enorme
   // (viewBox molto grande → 40 unità SVG diventano pochi pixel) la rendiamo leggibile.
@@ -1005,19 +1038,25 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   const maxSizeUnits = maxPx * unitsPerPx;
   const maxFromCorridor = Math.max(minSizeUnits, thickness * 2.6);
   const SIZE = clamp(Math.max(40, minSizeUnits), minSizeUnits, Math.min(maxSizeUnits, maxFromCorridor));
-  // Posizionamento “centrato sul corridoio”:
-  // invece di spostare la freccia lungo la diagonale verso il centro stanza,
-  // la teniamo sull'asse del corridoio (utile quando il corridoio è offset).
-  let x = from.x;
-  let y = from.y;
+  // Posizione: la freccia deve stare vicino alla stanza corrente (fromRoom) ma
+  // *sempre dentro il corridoio* (mai dentro la stanza), indipendentemente
+  // dalla direzione verso la stanza target.
+  const corridorBox = rectBox(corridor.rect);
+  const roomBox = rectBox(fromRoom.rect);
+  const door = corridorDoorPoint(roomBox, corridorBox, corridor.orientation);
+
+  const attachThickness = corridor.orientation === "vertical" ? corridorBox.w : corridorBox.h;
+  const inset = Math.max(6, attachThickness * 0.55);
+  const attachDir = corridorAttachDir(roomBox, corridorBox, corridor.orientation); // verso “dentro corridoio”
+
+  let x = door.x;
+  let y = door.y;
   if (corridor.orientation === "vertical") {
-    const dir = dy >= 0 ? 1 : -1;
-    x = from.x;
-    y = from.y - dir * OFFSET;
+    x = door.x;
+    y = door.y + attachDir * inset;
   } else {
-    const dir = dx >= 0 ? 1 : -1;
-    x = from.x - dir * OFFSET;
-    y = from.y;
+    x = door.x + attachDir * inset;
+    y = door.y;
   }
 
   const g = document.createElementNS(ns, "g");
@@ -1035,6 +1074,36 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   });
   g.appendChild(img);
   layer.appendChild(g);
+}
+
+function corridorDoorPoint(room: RectBox, corridor: RectBox, orientation: "vertical" | "horizontal"): Point {
+  const overlapX0 = Math.max(room.x, corridor.x);
+  const overlapX1 = Math.min(room.x + room.w, corridor.x + corridor.w);
+  const overlapY0 = Math.max(room.y, corridor.y);
+  const overlapY1 = Math.min(room.y + room.h, corridor.y + corridor.h);
+  const cx = overlapX1 > overlapX0 ? (overlapX0 + overlapX1) / 2 : corridor.x + corridor.w / 2;
+  const cy = overlapY1 > overlapY0 ? (overlapY0 + overlapY1) / 2 : corridor.y + corridor.h / 2;
+
+  if (orientation === "vertical") {
+    // Se il corridoio è sotto la stanza, la "porta" è sul top del corridoio; se sopra, sul bottom.
+    const corridorIsBelow = corridor.y >= room.y + room.h;
+    const y = corridorIsBelow ? corridor.y : corridor.y + corridor.h;
+    return { x: cx, y };
+  }
+
+  // Horizontal: se corridoio è a destra della stanza → porta a sx del corridoio; se a sinistra → a dx.
+  const corridorIsRight = corridor.x >= room.x + room.w;
+  const x = corridorIsRight ? corridor.x : corridor.x + corridor.w;
+  return { x, y: cy };
+}
+
+function corridorAttachDir(room: RectBox, corridor: RectBox, orientation: "vertical" | "horizontal"): 1 | -1 {
+  if (orientation === "vertical") {
+    // corridoio sotto stanza → entra verso +Y, sopra → entra verso -Y
+    return corridor.y >= room.y + room.h ? 1 : -1;
+  }
+  // corridoio a destra stanza → entra verso +X, a sinistra → entra verso -X
+  return corridor.x >= room.x + room.w ? 1 : -1;
 }
 
 /* ===================== OBJECT IMAGE REPLACEMENT ===================== */
@@ -1241,11 +1310,14 @@ function zoomToRect(
   const svgW = svgRect.width || svg.clientWidth || fallbackW;
   const svgH = svgRect.height || svg.clientHeight || fallbackH;
   const containerAspect = svgW / svgH;
+  const isSmallMobile = svgW <= 420;
+  const isMobile = svgW <= 700;
 
   // Padding dinamico: adatta lo zoom alla scala complessiva del museo.
   const mapArea = Math.max(1, fallbackW * fallbackH);
   const roomArea = Math.max(1, rectW * rectH);
   const areaRatio = Math.sqrt(mapArea / roomArea);
+  const roomCoverage = roomArea / mapArea;
   const basePadFactor = clamp(0.75 + ((areaRatio - 5) / 2.5) * 0.75, 0.75, 1.5);
 
   // HOME deve restare identica al comportamento originale.
@@ -1262,18 +1334,25 @@ function zoomToRect(
     return;
   }
 
-  const isSmallMobile = svgW <= 420;
-  const isMobile = svgW <= 700;
+  // Non-HOME: focus forte sulla stanza singola, soprattutto su mobile.
+  // Usiamo un padding base molto più stretto rispetto al passato.
+  const targetPad = isSmallMobile ? 0.05 : isMobile ? 0.08 : 0.16;
+  const padFactor = clamp(Math.min(basePadFactor, targetPad), 0.04, 0.24);
 
-  // Zoom costante per il museo: aggiunge la riserva massima necessaria per
-  // ospitare i navigator laterali in qualunque stanza non-home.
-  const mobileBoost = isSmallMobile ? 1.18 : isMobile ? 1.1 : 1;
-  const padFactor = clamp(basePadFactor * mobileBoost, 0.75, 1.7);
+  // Le stanze molto grandi non devono "ereditare" margini enormi dai navigator:
+  // riduciamo/cappiamo gli extra in base alla copertura della stanza.
+  const isLargeRoom = roomCoverage >= 0.1;
+  const extraScale = isLargeRoom ? 0.25 : roomCoverage >= 0.06 ? 0.5 : 1;
+  const extraCap = isSmallMobile ? 0.16 : isMobile ? 0.2 : 0.24;
+  const extraLeft = clamp(zoomProfile.extraLeftRatio * extraScale, 0, extraCap);
+  const extraRight = clamp(zoomProfile.extraRightRatio * extraScale, 0, extraCap);
+  const extraTop = clamp(zoomProfile.extraTopRatio * extraScale, 0, extraCap);
+  const extraBottom = clamp(zoomProfile.extraBottomRatio * extraScale, 0, extraCap);
 
-  const padLeft = rectW * (padFactor + zoomProfile.extraLeftRatio);
-  const padRight = rectW * (padFactor + zoomProfile.extraRightRatio);
-  const padTop = rectH * (padFactor + zoomProfile.extraTopRatio);
-  const padBottom = rectH * (padFactor + zoomProfile.extraBottomRatio + (isMobile ? 0.04 : 0));
+  const padLeft = rectW * (padFactor + extraLeft);
+  const padRight = rectW * (padFactor + extraRight);
+  const padTop = rectH * (padFactor + extraTop);
+  const padBottom = rectH * (padFactor + extraBottom + (isMobile ? 0.01 : 0));
   let vbW = rectW + padLeft + padRight;
   let vbH = rectH + padTop + padBottom;
 
@@ -1288,10 +1367,6 @@ function zoomToRect(
   const cy = contentMinY + contentH / 2;
 
   svg.setAttribute("viewBox", `${cx - vbW / 2} ${cy - vbH / 2} ${vbW} ${vbH}`);
-}
-
-function distance(a: Point, b: Point) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function normalize(s: string) {
