@@ -199,14 +199,26 @@ function useLayout(stanze, oggetti, corridoiCfg = []) {
       const pDoorB = doorPoint(roomB, link.bDoor, bSide);
 
       if (typeof link.x === "number" && typeof link.y === "number" && typeof link.w === "number" && typeof link.h === "number") {
-        list.push({ x: link.x, y: link.y, w: link.w, h: link.h, a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+        list.push({
+          x: link.x, y: link.y, w: link.w, h: link.h,
+          a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB,
+          aDoor: link.aDoor, bDoor: link.bDoor,
+        });
       } else {
         const dx = pDoorB[0] - pDoorA[0];
         const dy = pDoorB[1] - pDoorA[1];
         if (Math.abs(dx) >= Math.abs(dy)) {
-          list.push({ x: Math.min(pDoorA[0], pDoorB[0]), y: pDoorA[1] - 20, w: Math.abs(dx), h: 40, a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+          list.push({
+            x: Math.min(pDoorA[0], pDoorB[0]), y: pDoorA[1] - 20, w: Math.abs(dx), h: 40,
+            a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB,
+            aDoor: link.aDoor, bDoor: link.bDoor,
+          });
         } else {
-          list.push({ x: pDoorA[0] - 20, y: Math.min(pDoorA[1], pDoorB[1]), w: 40, h: Math.abs(dy), a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB });
+          list.push({
+            x: pDoorA[0] - 20, y: Math.min(pDoorA[1], pDoorB[1]), w: 40, h: Math.abs(dy),
+            a: a.nome, b: b.nome, pA: pDoorA, pB: pDoorB,
+            aDoor: link.aDoor, bDoor: link.bDoor,
+          });
         }
       }
     }
@@ -1394,13 +1406,24 @@ export default function MuseoEditor() {
         if (corridoioKey(c.a, c.b) !== key) return c;
         const isRoomA = c.a === roomName;
         const doorKey = isRoomA ? "aDoor" : "bDoor";
-        return {
+        const updated = {
           ...c,
           [doorKey]: {
             side: patch.side ?? c?.[doorKey]?.side ?? "E",
             offset: clamp01(patch.offset ?? c?.[doorKey]?.offset ?? 0.5),
           },
         };
+        const autoGeom = computeAutoCorridoioGeom(m.stanze, updated);
+        const thickness = Math.max(
+          10,
+          Math.min(120, Math.round(Math.min(c.w || 40, c.h || 40)))
+        );
+        if (autoGeom.w >= autoGeom.h) {
+          const yMid = autoGeom.y + autoGeom.h / 2;
+          return { ...updated, x: autoGeom.x, y: yMid - thickness / 2, w: autoGeom.w, h: thickness };
+        }
+        const xMid = autoGeom.x + autoGeom.w / 2;
+        return { ...updated, x: xMid - thickness / 2, y: autoGeom.y, w: thickness, h: autoGeom.h };
       });
       return { ...m, corridoi: normalizeCorridoi(m.stanze, corridoi) };
     });

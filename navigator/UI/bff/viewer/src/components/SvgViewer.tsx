@@ -130,8 +130,9 @@ export default function SvgViewer() {
   }, []);
 
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
-  const [freeExplore, setFreeExplore] = useState(false);
+  const [freeExplore, setFreeExplore] = useState(true);
   const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
+  const [currentStanzaParam, setCurrentStanzaParam] = useState<string | null>(null);
   const [svgLoadTick, setSvgLoadTick] = useState(0);
   const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
@@ -180,8 +181,10 @@ export default function SvgViewer() {
   useEffect(() => {
     if (!session) return;
     const sync = () => {
+      const rawStanzaParam = new URLSearchParams(window.location.search).get("stanza");
       const { stanza } = parseStanzaFromUrl(session);
       setCurrentStanzaLabel(stanza);
+      setCurrentStanzaParam(rawStanzaParam);
     };
     sync();
     window.addEventListener("popstate", sync);
@@ -199,12 +202,16 @@ export default function SvgViewer() {
     if (!session) return;
     ensureDefaultStanza(session);
     const onPop = () => {
+      const rawStanzaParam = new URLSearchParams(window.location.search).get("stanza");
       const { stanza } = parseStanzaFromUrl(session);
       const isHome = normalize(stanza) === "home";
       const stanzaChanged =
         currentStanzaLabel != null &&
         normalize(stanza) !== normalize(currentStanzaLabel);
-      if (!freeExplore || isHome || stanzaChanged) {
+      const stanzaParamChanged =
+        currentStanzaParam != null &&
+        (rawStanzaParam ?? "") !== currentStanzaParam;
+      if (!freeExplore || isHome || stanzaChanged || stanzaParamChanged) {
         loadSvg(
           computeSvgUrl(session),
           session,
@@ -215,7 +222,7 @@ export default function SvgViewer() {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [session, freeExplore, currentStanzaLabel]);
+  }, [session, freeExplore, currentStanzaLabel, currentStanzaParam]);
 
   useEffect(() => {
     const sync = () => {
@@ -273,22 +280,12 @@ export default function SvgViewer() {
     }
 
     const stanzaRects = Array.from(svg.querySelectorAll<SVGRectElement>("rect.stanza"));
-    const stanzaHandlers = new Map<SVGRectElement, (e: Event) => void>();
-
     for (const rect of stanzaRects) {
-      const label = findRoomLabel(svg, rect);
-      if (!label) continue;
-      rect.style.cursor = "pointer";
+      rect.style.cursor = "grab";
       if (!rect.getAttribute("fill") || rect.getAttribute("fill") === "none") {
         rect.setAttribute("fill", "transparent");
       }
       rect.style.pointerEvents = "all";
-      const handler = (e: Event) => {
-        e.stopPropagation();
-        setRoomConfirmRef.current(label);
-      };
-      rect.addEventListener("click", handler);
-      stanzaHandlers.set(rect, handler);
     }
 
     let dragging = false;
@@ -304,8 +301,16 @@ export default function SvgViewer() {
       return { x: v[0], y: v[1], w: v[2], h: v[3] };
     };
 
+    const isInteractiveTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof Element)) return false;
+      return !!target.closest(
+        "circle.oggetto, image[data-nome], g.exit-room-cta, .exit-room-cta, text.exit-room-label"
+      );
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (isPinching) return;
+      if (isInteractiveTarget(e.target)) return;
       dragging = true;
       didDrag = false;
       startX = e.clientX;
@@ -317,7 +322,7 @@ export default function SvgViewer() {
       if (!dragging || isPinching) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      if (Math.hypot(dx, dy) > 5) {
+      if (Math.hypot(dx, dy) > 9) {
         didDrag = true;
         svg.style.cursor = "grabbing";
       }
@@ -336,9 +341,14 @@ export default function SvgViewer() {
       dragging = false;
       svg.style.cursor = "grab";
       if (didDrag) {
+        const consumeNonInteractiveClick = (e: MouseEvent) => {
+          if (isInteractiveTarget(e.target)) return;
+          e.stopPropagation();
+          e.preventDefault();
+        };
         window.addEventListener(
           "click",
-          (e) => { e.stopPropagation(); e.preventDefault(); },
+          consumeNonInteractiveClick,
           { capture: true, once: true }
         );
       }
@@ -408,8 +418,7 @@ export default function SvgViewer() {
     window.addEventListener("touchmove", onTouchMove, { passive: false });
 
     return () => {
-      for (const [rect, handler] of stanzaHandlers) {
-        rect.removeEventListener("click", handler);
+      for (const rect of stanzaRects) {
         rect.style.cursor = "";
       }
       svg.removeEventListener("pointerdown", onPointerDown);
@@ -435,7 +444,6 @@ export default function SvgViewer() {
     url.searchParams.set("stanza", value);
     window.history.pushState({}, "", url);
     lockedViewBox.current = null;
-    setFreeExplore(false);
     setTimeout(() => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     }, 0);
@@ -492,8 +500,8 @@ export default function SvgViewer() {
           normalize(currentStanzaLabel ?? "") === "home"
             ? "Zoom disabilitato in HOME"
             : freeExplore
-              ? "Torna alla stanza"
-              : "Esplora mappa"
+              ? "Blocca vista"
+              : "Attiva modalità libera"
         }
         style={{
           position: "fixed",
@@ -527,8 +535,8 @@ export default function SvgViewer() {
         <div
           style={{
             position: "fixed",
-            bottom: 72,
-            right: 16,
+            top: 16,
+            left: 16,
             zIndex: 1000,
             background: "rgba(15,110,86,0.88)",
             backdropFilter: "blur(6px)",
@@ -546,8 +554,7 @@ export default function SvgViewer() {
           }}
         >
           Trascina per spostarti<br />
-          Pizzica per zoomare<br />
-          <span style={{ opacity: 0.8 }}>Tocca una stanza per andarci</span>
+          Pizzica per zoomare
         </div>
       )}
 
