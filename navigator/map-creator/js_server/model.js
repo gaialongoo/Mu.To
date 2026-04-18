@@ -4,6 +4,8 @@ class Stanza {
   constructor(nome) {
     this.nome = nome;
     this.tipo = "normale";
+    this.bgImage = null;
+    this.bgTipo = "preview";
     this.oggetti = [];
 
     this.row = 0;

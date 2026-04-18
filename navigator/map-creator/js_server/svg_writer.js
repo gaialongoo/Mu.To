@@ -10,6 +10,19 @@ function findObject(oggetti, nome) {
   return oggetti.find((o) => o.nome === nome) || null;
 }
 
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function roomPatternId(nome, v = 0) {
+  const safeName = String(nome || "stanza").replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `room-bg-${safeName}-${v}`;
+}
+
 // ---------- SVG ----------
 
 function svgHeader(title, w, h) {
@@ -19,15 +32,14 @@ function svgHeader(title, w, h) {
     <style>
       /* ===== STANZE ===== */
       .stanza {
-        fill: #fff;
         stroke: #2c3e50;
         stroke-width: 3;
       }
 
-      .stanza.ingresso  { fill: #a9dfbf; stroke: #2ecc71; }
-      .stanza.uscita    { fill: #f5b7b1; stroke: #e74c3c; }
-      .stanza.bagno     { fill: #aed6f1; stroke: #3498db; }
-      .stanza.servizio  { fill: #fad7a0; stroke: #f39c12; }
+      .stanza.ingresso  { stroke: #2ecc71; }
+      .stanza.uscita    { stroke: #e74c3c; }
+      .stanza.bagno     { stroke: #3498db; }
+      .stanza.servizio  { stroke: #f39c12; }
 
       .stanza-label {
         font: bold 14px Arial;
@@ -250,6 +262,20 @@ function inferLegacySide(fromRoom, toRoom) {
 // ---------- DRAW ----------
 
 function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null) {
+  const roomsWithBg = stanze.filter((s) => typeof s.bgImage === "string" && s.bgImage.trim());
+  if (roomsWithBg.length > 0) {
+    svg += "\n<defs>";
+    for (const s of roomsWithBg) {
+      const v = s.bgImage ? s.bgImage.slice(-10).replace(/[^a-zA-Z0-9]/g, "") : "0";
+      const pid = roomPatternId(s.nome, v);
+      svg += `\n<pattern id="${pid}" patternUnits="userSpaceOnUse" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}">`;
+      svg += `\n<rect x="0" y="0" width="${s.w}" height="${s.h}" fill="#fff"/>`;
+      svg += `\n<image href="${escapeXml(s.bgImage)}" x="0" y="0" width="${s.w}" height="${s.h}" preserveAspectRatio="none"/>`;
+      svg += `\n</pattern>`;
+    }
+    svg += "\n</defs>";
+  }
+
   // ---------- CORRIDOI ----------
   for (const c of corridoi) {
     svg += `\n<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" class="corridoio"/>`;
@@ -260,7 +286,11 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
   // la stanza resta visivamente prioritaria.
   for (const s of stanze) {
     const cls = s.tipo !== "normale" ? `stanza ${s.tipo}` : "stanza";
-    svg += `\n<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="8" class="${cls}"/>`;
+    const v = s.bgImage ? s.bgImage.slice(-10).replace(/[^a-zA-Z0-9]/g, "") : "0";
+    const roomFill = typeof s.bgImage === "string" && s.bgImage.trim()
+      ? `url(#${roomPatternId(s.nome, v)})`
+      : "#fff";
+    svg += `\n<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="8" class="${cls}" fill="${roomFill}"/>`;
     svg += `\n<text x="${s.x + s.w / 2}" y="${s.y + 16}" class="stanza-label" text-anchor="middle">${s.nome}</text>`;
   }
 

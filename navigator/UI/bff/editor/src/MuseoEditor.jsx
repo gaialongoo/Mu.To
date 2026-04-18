@@ -63,6 +63,47 @@ async function apiListImages(museo, oggetto) {
   return res.json();
 }
 
+async function apiUploadRoomImage(museo, stanza, tipo, file) {
+  const fd = new FormData();
+  fd.append("immagine", file, file.name);
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${encodeURIComponent(tipo)}`,
+    {
+      method: "POST",
+      body: fd,
+      headers: { "X-API-Key": API_KEY },
+    }
+  );
+  const errText = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`Upload ${res.status}: ${errText}`);
+  return JSON.parse(errText);
+}
+
+async function apiDeleteRoomImage(museo, stanza, tipo) {
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${tipo}`,
+    {
+      method: "DELETE",
+      headers: { "X-API-Key": API_KEY },
+    }
+  );
+  if (!res.ok) throw new Error(`Delete ${res.status}`);
+}
+
+async function apiListRoomImages(museo, stanza) {
+  const res = await fetch(
+    `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini`,
+    { headers: { "X-API-Key": API_KEY } }
+  );
+  if (!res.ok) throw new Error(`List ${res.status}`);
+  return res.json();
+}
+
+function roomBackgroundUrl(museo, stanza, tipo = "preview", v = 0) {
+  const baseUrl = `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${encodeURIComponent(tipo)}`;
+  return v > 0 ? `${baseUrl}?v=${v}` : baseUrl;
+}
+
 // ─── COSTANTI LAYOUT ───────────────────────────────────────────────────────
 const DEFAULT_ROOM_W = 220, DEFAULT_ROOM_H = 180;
 const START_X = 100, START_Y = 120;
@@ -71,6 +112,11 @@ const GAP_X = 120, GAP_Y = 140;
 function clamp01(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return 0.5;
   return Math.max(0, Math.min(1, n));
+}
+
+function roomPatternId(nome, v = 0) {
+  const safeName = String(nome || "stanza").replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `room-bg-${safeName}-${v}`;
 }
 
 function inferSide(a, b) {
@@ -91,10 +137,10 @@ function doorPoint(room, doorSpec, fallbackSide) {
 
 const TIPO_COLORS = {
   normale:  { fill: "#ffffff", stroke: "#2c3e50" },
-  ingresso: { fill: "#a9dfbf", stroke: "#2ecc71" },
-  uscita:   { fill: "#f5b7b1", stroke: "#e74c3c" },
-  bagno:    { fill: "#aed6f1", stroke: "#3498db" },
-  servizio: { fill: "#fad7a0", stroke: "#f39c12" },
+  ingresso: { fill: "#ffffff", stroke: "#2ecc71" },
+  uscita:   { fill: "#ffffff", stroke: "#e74c3c" },
+  bagno:    { fill: "#ffffff", stroke: "#3498db" },
+  servizio: { fill: "#ffffff", stroke: "#f39c12" },
 };
 
 const OBJ_FILL        = "#3498db";
@@ -612,6 +658,165 @@ function ImmaginiCard({ nomeMuseo, nomeOggetto, showToast, onPreviewUpdated }) {
   );
 }
 
+function StanzaImmaginiCard({ nomeMuseo, nomeStanza, selectedBgTipo = "preview", onBgTipoChange, showToast }) {
+  const isMobile = window.innerWidth <= 768;
+  const [immagini, setImmagini] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fileInputRef = useRef();
+
+  const reload = useCallback(async () => {
+    if (!nomeMuseo || !nomeStanza) return;
+    setLoading(true);
+    try {
+      const data = await apiListRoomImages(nomeMuseo, nomeStanza);
+      setImmagini(data.immagini ?? []);
+    } catch {
+      setImmagini([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [nomeMuseo, nomeStanza]);
+
+  useEffect(() => { reload(); }, [reload, refreshKey]);
+  useEffect(() => {
+    setPreviewSrc(null);
+    setSelectedFile(null);
+  }, [nomeStanza]);
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      await apiUploadRoomImage(nomeMuseo, nomeStanza, "preview", file);
+      showToast(`✓ Sfondo caricato`);
+      await reload();
+      const ts = Date.now();
+      setRefreshKey(ts);
+      // Forza "preview" come sfondo
+      onBgTipoChange("preview", ts);
+      setPreviewSrc(null);
+      setSelectedFile(null);
+    } catch (err) {
+      showToast(`✗ ${err.message}`, false);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiDeleteRoomImage(nomeMuseo, nomeStanza, "preview");
+      showToast(`✓ Sfondo eliminato`);
+      await reload();
+      setRefreshKey((k) => k + 1);
+      onBgTipoChange("preview");
+    } catch (err) {
+      showToast(`✗ ${err.message}`, false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const onFileSelected = (file) => {
+    if (!file) return;
+    setSelectedFile(file);
+    setPreviewSrc(URL.createObjectURL(file));
+  };
+
+  const currentBg = immagini.find(i => i.tipo === "preview");
+  const imgUrl = (url) => `/api${url}`;
+  const formatSize = (b) => b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`;
+
+  return (
+    <Card title="SFONDO STANZA" color="#27ae60">
+      {loading && <div style={{fontSize:11,color:THEME.textDim,marginBottom:8}}>⏳ Caricamento...</div>}
+      {!loading && !currentBg && !previewSrc && (
+        <div style={{fontSize:11,color:THEME.textFaint,fontStyle:"italic",marginBottom:10}}>
+          Nessun background caricato
+        </div>
+      )}
+
+      {!previewSrc && currentBg && (
+        <div style={{border:`1px solid ${THEME.border}`,borderRadius:6,marginBottom:8,overflow:"hidden",background:THEME.surface}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px"}}>
+            <span style={{fontSize:12,fontWeight:"bold",color:"#27ae60",flex:1}}>Background</span>
+            <span style={{fontSize:10,color:THEME.textDim}}>{formatSize(currentBg.size)}</span>
+            <button
+              title="Sostituisci"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || deleting}
+              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #27ae60",background:"transparent",color:"#27ae60",fontSize:11,cursor:"pointer"}}
+            >
+              {uploading ? "⏳" : "Cambia"}
+            </button>
+            <button
+              title="Elimina"
+              onClick={handleDelete}
+              disabled={deleting || uploading}
+              style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${THEME.danger}`,background:"rgba(224,90,74,0.12)",color:THEME.danger,fontSize:11,cursor:"pointer"}}
+            >
+              {deleting ? "⏳" : "Elimina"}
+            </button>
+          </div>
+          <img
+            src={imgUrl(currentBg.url)}
+            alt="background"
+            style={{width:"100%",maxHeight:100,objectFit:"cover",display:"block",borderTop:`1px solid ${THEME.border}`}}
+          />
+        </div>
+      )}
+
+      <input
+        type="file"
+        accept="image/*"
+        style={{display:"none"}}
+        ref={fileInputRef}
+        onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFileSelected(f); }}
+      />
+
+      {previewSrc && (
+        <div style={{marginBottom:8,borderRadius:6,overflow:"hidden",border:`1px solid ${THEME.border}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px"}}>
+            <span style={{fontSize:12,fontWeight:"bold",color:"#27ae60",flex:1}}>Nuovo Background</span>
+            <button onClick={() => { setPreviewSrc(null); setSelectedFile(null); }} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${THEME.border}`,background:"transparent",color:THEME.textDim,fontSize:11,cursor:"pointer"}}>
+              Annulla
+            </button>
+          </div>
+          <img src={previewSrc} alt="anteprima" style={{width:"100%",maxHeight:120,objectFit:"cover",display:"block"}} />
+        </div>
+      )}
+
+      {(!currentBg || previewSrc) && (
+        <div style={{display:"flex",gap:6,flexDirection:isMobile?"column":"row"}}>
+          {!previewSrc && (
+            <button onClick={() => fileInputRef.current?.click()}
+              style={{flex:1,padding:"7px",borderRadius:5,border:"1px dashed #27ae60",background:"transparent",color:"#27ae60",fontSize:11,cursor:"pointer"}}>
+              📂 {currentBg ? "Cambia file" : "Scegli file sfondo"}
+            </button>
+          )}
+          {previewSrc && (
+            <button
+              disabled={!selectedFile || uploading}
+              onClick={() => { if (selectedFile) handleUpload(selectedFile); }}
+              style={{flex:1,padding:"7px",borderRadius:5,border:"none",fontSize:11,cursor:"pointer",fontWeight:"bold",
+                background:(!selectedFile || uploading) ? "#b9dfc8" : "#27ae60",color:"white"}}
+            >
+              {uploading ? "⏳ Upload..." : "↑ Carica Sfondo"}
+            </button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── PERCORSO EDITOR PANEL ────────────────────────────────────────────────
 function PercorsoEditor({ museo, percorso, oggettiEdit, onOggettiChange, onNomeChange, nomeEdit, onSave, onCancel, saving }) {
   const isMobile = window.innerWidth <= 768;
@@ -803,7 +1008,16 @@ export default function MuseoEditor() {
       ]);
       if (!data) return;
       const stanze = layout?.rooms
-        ? Object.entries(layout.rooms).map(([n,v])=>({ nome:n, x:v.x, y:v.y, w:v.w, h:v.h, tipo:v.tipo??"normale" }))
+        ? Object.entries(layout.rooms).map(([n,v])=>({
+            nome:n,
+            x:v.x,
+            y:v.y,
+            w:v.w,
+            h:v.h,
+            tipo:v.tipo??"normale",
+            bgImage: v.bgImage ?? null,
+            bgTipo: v.bgTipo ?? "preview",
+          }))
         : layout?.grid
           ? Object.entries(layout.grid).map(([n,v])=>({
               nome:n,
@@ -811,7 +1025,9 @@ export default function MuseoEditor() {
               y: START_Y + (v.row ?? 0) * (DEFAULT_ROOM_H + GAP_Y),
               w: DEFAULT_ROOM_W,
               h: DEFAULT_ROOM_H,
-              tipo:v.tipo??"normale"
+              tipo:v.tipo??"normale",
+              bgImage: null,
+              bgTipo: "preview",
             }))
           : [];
       setMuseo({
@@ -846,7 +1062,7 @@ export default function MuseoEditor() {
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
         { method:"PUT", body:JSON.stringify({
-            rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+            rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
             corridoi
           })
         });
@@ -872,7 +1088,7 @@ export default function MuseoEditor() {
       await apiFetch(`/musei/${encodeURIComponent(vecchio)}`, { method:"PUT", body:JSON.stringify({ nome:nuovoNomeMuseo }) });
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({
-        rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+        rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
         corridoi
       }) });
       setMuseList(l => l.map(n => n===vecchio ? nuovoNomeMuseo : n));
@@ -956,7 +1172,15 @@ export default function MuseoEditor() {
 
   const updStanza = useCallback(async (vecchio, patch) => {
     setMuseo(m => {
-      const stanze = m.stanze.map(s=>s.nome===vecchio?{...s,...patch}:s);
+      const stanze = m.stanze.map((s) => {
+        if (s.nome !== vecchio) return s;
+        const next = { ...s, ...patch };
+        if (patch.nome && s.bgImage && s.bgImage.includes("/stanze/")) {
+          const tipo = next.bgTipo || "preview";
+          next.bgImage = roomBackgroundUrl(m.nome, patch.nome, tipo);
+        }
+        return next;
+      });
       const corridoiBase = m.corridoi || [];
       const corridoi = patch.nome
         ? corridoiBase.map(c => ({
@@ -983,7 +1207,7 @@ export default function MuseoEditor() {
           }))
         );
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({
-          rooms: Object.fromEntries(nuove.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+          rooms: Object.fromEntries(nuove.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
           corridoi
         })});
         await Promise.all(museo.oggetti.filter(o=>o.stanza===vecchio).map(o=>
@@ -1044,7 +1268,7 @@ export default function MuseoEditor() {
         const stanzeAgg = museo.stanze.filter(s=>s.nome!==selected.nome);
         const corridoiAgg = normalizeCorridoi(stanzeAgg, museo.corridoi.filter(c => c.a !== selected.nome && c.b !== selected.nome));
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({
-          rooms: Object.fromEntries(stanzeAgg.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+          rooms: Object.fromEntries(stanzeAgg.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
           corridoi: corridoiAgg
         }) });
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
@@ -1161,11 +1385,11 @@ export default function MuseoEditor() {
     const tipo = ["normale", "ingresso", "uscita", "bagno", "servizio"].includes(tipoRaw.trim())
       ? tipoRaw.trim()
       : "normale";
-    const nuova = { nome:n, x: centerX - w / 2, y: centerY - h / 2, w, h, tipo };
+    const nuova = { nome:n, x: centerX - w / 2, y: centerY - h / 2, w, h, tipo, bgImage: null, bgTipo: "preview" };
     setMuseo(m=>({...m,stanze:[...m.stanze,nuova]}));
     setSelected({type:"stanza",nome:n}); setMode("select");
     try {
-      const rooms = Object.fromEntries([...museo.stanze, nuova].map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}]));
+      const rooms = Object.fromEntries([...museo.stanze, nuova].map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}]));
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({rooms, corridoi: normalizeCorridoi([...museo.stanze,nuova], museo.corridoi || [])})});
       showToast(`✓ Stanza "${n}" creata`);
     } catch(err){showToast(`⚠ Stanza solo locale (${err.message})`,false);}
@@ -1344,7 +1568,7 @@ export default function MuseoEditor() {
   // ─── EXPORT ───────────────────────────────────────────────────────────
   const exportData = useMemo(() => ({
     layout: {
-      rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo}])),
+      rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
       corridoi: normalizeCorridoi(museo.stanze, museo.corridoi),
     },
     museo:  { nome: museo.nome, oggetti: museo.oggetti, percorsi: museo.percorsi },
@@ -1621,6 +1845,34 @@ export default function MuseoEditor() {
             <marker id="arrow-orange-dim" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
               <path d="M0,0 L0,6 L8,3 z" fill="#f0a060"/>
             </marker>
+            {museo.stanze
+              .filter((s) => typeof s.bgImage === "string" && s.bgImage.trim())
+              .map((s) => {
+                const p = roomPos[s.nome];
+                if (!p) return null;
+                const v = s.bgImage ? (s.bgImage.split("v=")[1] || "0") : "0";
+                return (
+                  <pattern
+                    key={`pattern-${s.nome}-${v}`}
+                    id={roomPatternId(s.nome, v)}
+                    patternUnits="userSpaceOnUse"
+                    x={p.x}
+                    y={p.y}
+                    width={p.w}
+                    height={p.h}
+                  >
+                    <rect x={0} y={0} width={p.w} height={p.h} fill="#fff" />
+                    <image
+                      href={s.bgImage}
+                      x={0}
+                      y={0}
+                      width={p.w}
+                      height={p.h}
+                      preserveAspectRatio="none"
+                    />
+                  </pattern>
+                );
+              })}
             {museo.oggetti.filter(o=>objPreviews[o.nome]&&objPos[o.nome]).map(o=>{
               const [x,y] = objPos[o.nome];
               return (
@@ -1672,11 +1924,15 @@ export default function MuseoEditor() {
             const tc=TIPO_COLORS[s.tipo]||TIPO_COLORS.normale;
             const sel=!percorsoEdit&&selected?.type==="stanza"&&selected?.nome===s.nome;
             const inPercorso=percorsoAttivoOggetti.some(on=>museo.oggetti.find(o=>o.nome===on)?.stanza===s.nome);
+            const v = s.bgImage ? (s.bgImage.split("v=")[1] || "0") : "0";
+            const roomFill = typeof s.bgImage === "string" && s.bgImage.trim()
+              ? `url(#${roomPatternId(s.nome, v)})`
+              : tc.fill;
             return (
               <g key={s.nome} style={{cursor:"pointer"}} onClick={e=>onRoomClick(e,s.nome)}>
                 <rect
                   x={p.x} y={p.y} width={p.w} height={p.h} rx={8}
-                  fill={tc.fill} stroke={sel?"#f39c12":inPercorso?"#e67e22":tc.stroke} strokeWidth={sel?4:inPercorso?3:3}
+                  fill={roomFill} stroke={sel?"#f39c12":inPercorso?"#e67e22":tc.stroke} strokeWidth={sel?4:inPercorso?3:3}
                   style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":inPercorso?"drop-shadow(0 0 6px #e67e2266)":undefined}}
                   onPointerDown={(e)=>{ e.stopPropagation(); startDragRoom(e, s.nome, "move"); }}
                 />
@@ -1857,6 +2113,7 @@ export default function MuseoEditor() {
               <select value={selItem.tipo} onChange={e=>updStanza(selItem.nome,{tipo:e.target.value})} style={INP}>
                 {["normale","ingresso","uscita","bagno","servizio"].map(t=><option key={t}>{t}</option>)}
               </select>
+
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
                 <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
                   <FLabel>X</FLabel>
@@ -1954,6 +2211,18 @@ export default function MuseoEditor() {
               )}
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:6}}>✕ Elimina stanza</button>
             </Card>
+          )}
+          {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="stanza" && (
+            <StanzaImmaginiCard
+              nomeMuseo={museo.nome}
+              nomeStanza={selItem.nome}
+              selectedBgTipo={selItem.bgTipo || "preview"}
+              onBgTipoChange={(tipo, ts = 0) => updStanza(selItem.nome, {
+                bgTipo: tipo,
+                bgImage: roomBackgroundUrl(museo.nome, selItem.nome, tipo, ts),
+              })}
+              showToast={showToast}
+            />
           )}
 
           {rightPanelTab === "details" && !percorsoEdit && selItem && selected.type==="corridoio" && (

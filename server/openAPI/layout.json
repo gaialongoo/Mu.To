@@ -117,14 +117,14 @@
       {
         "a": "stanza 3",
         "b": "SHOP",
+        "x": 675,
+        "y": 1200.5,
+        "w": 188,
+        "h": 52,
         "aDoor": {
           "side": "E",
           "offset": 0.5
         }
-      },
-      {
-        "a": "stanza 3",
-        "b": "OUT"
       },
       {
         "a": "WC",
@@ -157,6 +157,10 @@
       {
         "a": "stanza 2",
         "b": "stanza 3",
+        "x": 525,
+        "y": 919,
+        "w": 76,
+        "h": 156,
         "aDoor": {
           "side": "S",
           "offset": 0.5
@@ -193,6 +197,18 @@
           "side": "N",
           "offset": 0.5
         }
+      },
+      {
+        "a": "SHOP",
+        "b": "OUT",
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
       }
     ],
     "rooms": {
@@ -201,56 +217,72 @@
         "y": 203,
         "w": 172,
         "h": 159,
-        "tipo": "ingresso"
+        "tipo": "ingresso",
+        "bgImage": null,
+        "bgTipo": "preview"
       },
       "stanza 1": {
         "x": 449,
         "y": 446,
         "w": 220,
         "h": 180,
-        "tipo": "normale"
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
       },
       "stanza 2": {
         "x": 445,
         "y": 739,
         "w": 220,
         "h": 180,
-        "tipo": "normale"
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
       },
       "stanza 4": {
-        "x": 85,
-        "y": 737,
-        "w": 220,
-        "h": 180,
-        "tipo": "servizio"
+        "x": -43,
+        "y": 716,
+        "w": 355,
+        "h": 239,
+        "tipo": "normale",
+        "bgImage": "/api/musei/Museo%20di%20Torino/stanze/stanza%204/immagini/preview?v=1776521580934",
+        "bgTipo": "preview"
       },
       "stanza 3": {
-        "x": 206,
-        "y": 1063,
+        "x": 241,
+        "y": 1073,
         "w": 432,
         "h": 303,
-        "tipo": "normale"
+        "tipo": "normale",
+        "bgImage": "/api/musei/Museo%20di%20Torino/stanze/stanza%203/immagini/preview?v=1776522286540",
+        "bgTipo": "preview"
       },
       "WC": {
         "x": 780,
         "y": 760,
         "w": 220,
         "h": 180,
-        "tipo": "bagno"
+        "tipo": "bagno",
+        "bgImage": null,
+        "bgTipo": "preview"
       },
       "SHOP": {
         "x": 864,
         "y": 1134,
         "w": 220,
         "h": 180,
-        "tipo": "servizio"
+        "tipo": "servizio",
+        "bgImage": null,
+        "bgTipo": "preview"
       },
       "OUT": {
-        "x": 313,
-        "y": 1487,
+        "x": 1200,
+        "y": 1141,
         "w": 220,
         "h": 180,
-        "tipo": "uscita"
+        "tipo": "uscita",
+        "bgImage": null,
+        "bgTipo": "preview"
       }
     }
   },

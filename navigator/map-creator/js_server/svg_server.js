@@ -113,8 +113,10 @@ async function getLayoutForMuseo(nomeMuseo) {
 
   const doc = await r.json();
 
-  if (!doc.grid || typeof doc.grid !== "object") {
-    const err = new Error(`Layout di '${nomeMuseo}' non contiene una grid valida`);
+  const hasRooms = doc.rooms && typeof doc.rooms === "object";
+  const hasGrid  = doc.grid  && typeof doc.grid  === "object";
+  if (!hasRooms && !hasGrid) {
+    const err = new Error(`Layout di '${nomeMuseo}' non contiene né 'rooms' né 'grid' validi`);
     err.code = "INVALID";
     throw err;
   }
@@ -150,6 +152,41 @@ async function getDatiMuseo(nomeMuseo) {
 }
 
 // ============================================================
+// FETCH SFONDI STANZE DA API
+// ============================================================
+
+/**
+ * Per ogni stanza nel layout che non ha già un bgImage stringa,
+ * prova a scaricare l'immagine "preview" dal server API e la
+ * converte in data-URL base64 così l'SVG è self-contained.
+ */
+async function fetchRoomBgImages(nomeMuseo, layoutDoc) {
+  const roomsObj = layoutDoc.rooms && typeof layoutDoc.rooms === "object" ? layoutDoc.rooms : null;
+  if (!roomsObj) return; // layout legacy (grid) — nessun background
+
+  const headers = { "X-API-KEY": API_KEY, Accept: "*/*" };
+
+  await Promise.all(
+    Object.entries(roomsObj).map(async ([nomeStanza, info]) => {
+      // Se non abbiamo già un data-URL embedded, prova a scaricare l'immagine
+      if (typeof info.bgImage === "string" && info.bgImage.startsWith("data:")) return;
+
+      const url = `${JSON_SERVER}/musei/${encodeURIComponent(nomeMuseo)}/stanze/${encodeURIComponent(nomeStanza)}/immagini/preview`;
+      try {
+        const r = await fetch(url, { headers, agent: httpsAgent, timeout: REQUEST_TIMEOUT });
+        if (!r.ok) return; // nessuna immagine per questa stanza
+        const contentType = r.headers.get("content-type") || "image/webp";
+        const buffer = await r.buffer();
+        info.bgImage = `data:${contentType};base64,${buffer.toString("base64")}`;
+        log(`🖼  Background stanza '${nomeStanza}' caricato (${buffer.length} B)`);
+      } catch {
+        // silenzioso: stanza senza sfondo
+      }
+    })
+  );
+}
+
+// ============================================================
 // SVG GENERATOR
 // ============================================================
 
@@ -168,6 +205,8 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
       s.row = undefined;
       s.col = undefined;
       s.tipo = info.tipo || "normale";
+      s.bgImage = typeof info.bgImage === "string" ? info.bgImage : null;
+      s.bgTipo = info.bgTipo || "preview";
       stanzeMap[nome] = s;
     }
   } else if (gridObj) {
@@ -277,7 +316,15 @@ app.get("/:nomeMuseo/:edgeMode?/:f1?/:f2?", async (req, res) => {
     return jsonError(res, status, "Errore recupero dati museo", e.message);
   }
 
-  // 3. Genera SVG
+  // 3. Carica sfondi stanze da API (se presenti)
+  try {
+    await fetchRoomBgImages(nomeMuseo, layoutMuseo);
+  } catch (e) {
+    log(`Avviso: errore fetch sfondi stanze: ${e.message}`, "WARN");
+    // non fatale: continua senza sfondi
+  }
+
+  // 4. Genera SVG
   let svg;
   try {
     svg = generaSvg(data, layoutMuseo, edgeMode, edgeFocus);

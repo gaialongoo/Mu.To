@@ -135,6 +135,16 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") return next();
+  
+  // Esenta i GET delle immagini (stanze e oggetti) dall'API Key
+  // per permettere al browser di caricarle via <img> / <image>
+  const isImageGet = req.method === "GET" && (
+    req.url.includes("/immagini/") || 
+    req.url.includes("/preview")
+  );
+  
+  if (isImageGet) return next();
+
   const apiKey = req.header("X-API-Key");
   if (!apiKey) return res.status(401).json({ error: "API key mancante" });
   if (!VALID_API_KEYS.includes(apiKey)) return res.status(403).json({ error: "API key non valida" });
@@ -609,6 +619,20 @@ async function startServer(cliOptions) {
     return `${museo}_${oggetto}_${tipo}`;
   }
 
+  function stanzaImgDocId(museo, stanza, tipo) {
+    return `${museo}_${stanza}_${tipo}`;
+  }
+
+  function stanzaExistsInLayout(nomeMuseo, stanzaNome) {
+    const layout = layoutStore?.[nomeMuseo];
+    if (!layout) return false;
+    const rooms = layout.rooms && typeof layout.rooms === "object" ? layout.rooms : null;
+    if (rooms) return Object.prototype.hasOwnProperty.call(rooms, stanzaNome);
+    const grid = layout.grid && typeof layout.grid === "object" ? layout.grid : null;
+    if (grid) return Object.prototype.hasOwnProperty.call(grid, stanzaNome);
+    return false;
+  }
+
   // ==========================================================
   // POST /musei/:nome_museo/oggetti/:oggetto/immagini/:tipo
   // Upload o sostituzione immagine
@@ -784,6 +808,165 @@ async function startServer(cliOptions) {
       await client.close();
     }
 });
+
+  // ==========================================================
+  // STANZE IMMAGINI (stesso schema degli oggetti)
+  // ==========================================================
+
+  app.post(
+    "/musei/:nome_museo/stanze/:stanza/immagini/:tipo",
+    imgUpload.single("immagine"),
+    async (req, res) => {
+      const { nome_museo, stanza, tipo } = req.params;
+      const museo = sistema.get_museo(nome_museo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      if (!stanzaExistsInLayout(nome_museo, stanza)) {
+        return res.status(404).json({ error: "Stanza non trovata nel layout" });
+      }
+      if (!req.file) return res.status(400).json({ error: "Nessun file ricevuto (campo: 'immagine')" });
+      if (tipo !== "preview" && !/^\d+$/.test(tipo)) {
+        return res.status(400).json({ error: "Tipo non valido: usa 'preview' o un numero (1, 2, 3…)" });
+      }
+
+      const client = new MongoClient(MONGO_URI);
+      try {
+        await client.connect();
+        const col = client.db("musei").collection("stanze_immagini");
+
+        let buffer = req.file.buffer;
+        let mimeType = req.file.mimetype;
+        let size = req.file.size;
+
+        if (mimeType !== "image/webp" && !mimeType.startsWith("image/svg")) {
+          try {
+            buffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
+            mimeType = "image/webp";
+            size = buffer.length;
+          } catch (e) {
+            console.error("Errore conversione in webp durante upload stanza:", e);
+          }
+        }
+
+        await col.replaceOne(
+          { _id: stanzaImgDocId(nome_museo, stanza, tipo) },
+          {
+            _id: stanzaImgDocId(nome_museo, stanza, tipo),
+            museo: nome_museo,
+            stanza,
+            tipo,
+            mimeType,
+            data: buffer,
+            size,
+            updatedAt: new Date(),
+          },
+          { upsert: true }
+        );
+
+        res.status(201).json({ id: stanzaImgDocId(nome_museo, stanza, tipo) });
+      } catch (err) {
+        console.error("Errore immagine stanza POST:", err.message);
+        res.status(500).json({ error: "Errore salvataggio immagine stanza" });
+      } finally {
+        await client.close();
+      }
+    }
+  );
+
+  app.get("/musei/:nome_museo/stanze/:stanza/immagini", async (req, res) => {
+    const { nome_museo, stanza } = req.params;
+    const museo = sistema.get_museo(nome_museo);
+    if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+    if (!stanzaExistsInLayout(nome_museo, stanza)) {
+      return res.status(404).json({ error: "Stanza non trovata nel layout" });
+    }
+
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("stanze_immagini");
+      const docs = await col
+        .find({ museo: nome_museo, stanza }, { projection: { tipo: 1, size: 1, updatedAt: 1 } })
+        .toArray();
+
+      docs.sort((a, b) => {
+        if (a.tipo === "preview") return -1;
+        if (b.tipo === "preview") return 1;
+        return parseInt(a.tipo) - parseInt(b.tipo);
+      });
+
+      res.json({
+        stanza,
+        immagini: docs.map((d) => ({
+          tipo: d.tipo,
+          url: `/musei/${encodeURIComponent(nome_museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${d.tipo}`,
+          size: d.size,
+          updatedAt: d.updatedAt,
+        })),
+      });
+    } catch (err) {
+      console.error("Errore immagini stanza GET list:", err.message);
+      res.status(500).json({ error: "Errore recupero lista immagini stanza" });
+    } finally {
+      await client.close();
+    }
+  });
+
+  app.get("/musei/:nome_museo/stanze/:stanza/immagini/:tipo", async (req, res) => {
+    const { nome_museo, stanza, tipo } = req.params;
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("stanze_immagini");
+      const doc = await col.findOne({ _id: stanzaImgDocId(nome_museo, stanza, tipo) });
+      if (!doc) return res.status(404).json({ error: "Immagine stanza non trovata" });
+
+      let data = doc.data.buffer ?? doc.data;
+      let mimeType = doc.mimeType;
+      if (mimeType !== "image/webp" && !mimeType.startsWith("image/svg")) {
+        try {
+          data = await sharp(data).webp({ quality: 80 }).toBuffer();
+          mimeType = "image/webp";
+          await col.updateOne(
+            { _id: doc._id },
+            { $set: { data, mimeType, size: data.length } }
+          );
+        } catch (e) {
+          console.error("Errore conversione lazy API image stanza a webp:", e);
+        }
+      }
+
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(data);
+    } catch (err) {
+      console.error("Errore immagine stanza GET:", err.message);
+      res.status(500).json({ error: "Errore recupero immagine stanza" });
+    } finally {
+      await client.close();
+    }
+  });
+
+  app.delete("/musei/:nome_museo/stanze/:stanza/immagini/:tipo", async (req, res) => {
+    const { nome_museo, stanza, tipo } = req.params;
+    const museo = sistema.get_museo(nome_museo);
+    if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const col = client.db("musei").collection("stanze_immagini");
+      const result = await col.deleteOne({ _id: stanzaImgDocId(nome_museo, stanza, tipo) });
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ error: "Immagine stanza non trovata" });
+      }
+      res.json({ message: `Immagine '${tipo}' eliminata da stanza '${stanza}'` });
+    } catch (err) {
+      console.error("Errore immagine stanza DELETE:", err.message);
+      res.status(500).json({ error: "Errore eliminazione immagine stanza" });
+    } finally {
+      await client.close();
+    }
+  });
 }
 
 // ============================================================
