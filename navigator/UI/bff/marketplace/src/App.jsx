@@ -3,8 +3,6 @@ import { api, enc, setApiKey, clearApiKey } from "./api";
 import Toast from "./components/Toast";
 import ApiKeyModal from "./components/ApiKeyModal";
 import ItemCard from "./components/ItemCard";
-import ItemForm from "./components/ItemForm";
-import VisitForm from "./components/VisitForm";
 
 const PAGE_SIZE = 9;
 
@@ -78,7 +76,7 @@ function Pagination({ total, current, onChange }) {
 }
 
 // ─── Visit card ──────────────────────────────────────────────────────────────
-function VisitCard({ percorso, onDelete, delay }) {
+function VisitCard({ percorso, onView, delay }) {
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
@@ -86,7 +84,6 @@ function VisitCard({ percorso, onDelete, delay }) {
       animation: `fadeUp 0.4s ease ${delay}s backwards`,
     }}>
       <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-      <div style={{ height: 155, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, background: "linear-gradient(135deg, #1a1a1a, #202020)" }}>🗺️</div>
       <div style={{ padding: "20px 22px 14px" }}>
         <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{percorso.nome}</div>
         <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)", marginBottom: 14 }}>{(percorso.oggetti || []).length} opere</div>
@@ -98,32 +95,54 @@ function VisitCard({ percorso, onDelete, delay }) {
         </div>
       </div>
       <div style={{ padding: "10px 22px 18px" }}>
-        <DangerBtn onClick={() => onDelete(percorso.nome)}>Elimina</DangerBtn>
+        <button
+          onClick={() => onView?.(percorso)}
+          style={{
+            width: "100%",
+            padding: "8px 10px",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            cursor: "pointer",
+            fontFamily: "var(--font-head)",
+            fontSize: 9,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--gold)",
+            transition: "all 0.2s",
+          }}
+        >
+          Visualizza
+        </button>
       </div>
     </div>
   );
 }
 
-function DangerBtn({ onClick, children }) {
-  const [h, setH] = useState(false);
-  return (
-    <button onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
-      width: "100%", padding: "8px 10px", background: "transparent",
-      border: `1px solid ${h ? "rgba(200,70,60,0.4)" : "var(--border)"}`,
-      borderRadius: "var(--radius)", cursor: "pointer",
-      fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em",
-      textTransform: "uppercase", color: h ? "#e05a4a" : "var(--text-dim)",
-      transition: "all 0.2s",
-    }}>{children}</button>
-  );
-}
-
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
+  const DESCRIPTION_LEVELS = ["Bambino", "Studente", "Esperto", "Avanzato"];
+  const DESCRIPTION_LENGTHS = ["Breve", "Medio", "Lungo"];
+  const LEVEL_KEY_TO_INDEX = {
+    bambino: 0,
+    studente: 1,
+    esperto: 2,
+    avanzato: 3,
+  };
+  const DURATION_KEY_TO_INDEX = {
+    corto: 0,
+    medio: 1,
+    lungo: 2,
+  };
   const [viewportW, setViewportW] = useState(() => window.innerWidth);
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedItemImages, setSelectedItemImages] = useState([]);
+  const [selectedPath, setSelectedPath] = useState(null);
+  const [showAllDescriptions, setShowAllDescriptions] = useState(false);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
   const [profileForm, setProfileForm] = useState({
     nome: "",
     cognome: "",
@@ -156,7 +175,6 @@ export default function App() {
   const [percorsiLoaded, setPercorsiLoaded] = useState(false);
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingVisits,setLoadingVisits]= useState(false);
-  const [editingObj,   setEditingObj]   = useState(null); // oggetto in modifica
   const [stanze,       setStanze]       = useState([]);
   const [search,       setSearch]       = useState("");
   const [stanzaFilter, setStanzaFilter] = useState("");
@@ -242,10 +260,9 @@ export default function App() {
   const pagedVisits = percorsi.slice((visitPage - 1) * PAGE_SIZE, visitPage * PAGE_SIZE);
 
   // ── Navigation switching ───────────────────────────────────────────────────
-  const currentSection = activeTab === "visits" || activeTab === "create-visit" ? "visits" : "items";
+  const currentSection = activeTab === "visits" ? "visits" : "items";
   const switchSection = (section) => {
     if (section === "visits" && !percorsiLoaded) loadPercorsi();
-    if (section === "items") setEditingObj(null);
     setActiveTab(section);
   };
 
@@ -285,6 +302,13 @@ export default function App() {
 
   const openProfile = () => setProfileOpen(true);
   const closeProfile = () => setProfileOpen(false);
+  const closeItemModal = () => {
+    setSelectedItem(null);
+    setSelectedItemImages([]);
+    setShowAllDescriptions(false);
+    setSelectedGalleryIndex(0);
+  };
+  const closePathModal = () => setSelectedPath(null);
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -330,30 +354,43 @@ export default function App() {
     }
   };
 
-  // ── CRUD ───────────────────────────────────────────────────────────────────
-  const handleDeleteOggetto = async (nome) => {
-    if (!confirm(`Eliminare "${nome}"?`)) return;
+  const openItemDetails = async (oggetto) => {
+    setSelectedItem(oggetto);
+    setSelectedItemImages([]);
+    setShowAllDescriptions(false);
+    setSelectedGalleryIndex(0);
     try {
-      await api(`/musei/${enc(MUSEO)}/oggetti/${enc(nome)}`, { method: "DELETE" });
-      showToast(`"${nome}" eliminato`);
-      await loadMuseo();
-    } catch (e) { showToast("Errore: " + e.message, "error"); }
+      const data = await api(`/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}/immagini`);
+      setSelectedItemImages(data.immagini || []);
+    } catch {
+      setSelectedItemImages([]);
+    }
   };
 
-  const handleEditOggetto = (nome) => {
-    const o = allOggetti.find((x) => x.nome === nome);
-    if (!o) return;
-    setEditingObj(o);
-    setActiveTab("create-item");
+  const openPathDetails = (percorso) => {
+    setSelectedPath(percorso);
   };
 
-  const handleDeletePercorso = async (nome) => {
-    if (!confirm(`Eliminare il percorso "${nome}"?`)) return;
-    try {
-      await api(`/musei/${enc(MUSEO)}/percorsi/${enc(nome)}`, { method: "DELETE" });
-      showToast(`Percorso "${nome}" eliminato`);
-      await loadPercorsi();
-    } catch (e) { showToast("Errore: " + e.message, "error"); }
+  const getPreferredDescription = (oggetto) => {
+    const descrizioni = Array.isArray(oggetto?.descrizioni) ? oggetto.descrizioni : [];
+    if (descrizioni.length === 0) return null;
+
+    const preferredLevelIndex = LEVEL_KEY_TO_INDEX[currentUser?.livello] ?? 1;
+    const preferredDurationIndex = DURATION_KEY_TO_INDEX[currentUser?.durata] ?? 1;
+
+    const levelIndex = descrizioni[preferredLevelIndex]
+      ? preferredLevelIndex
+      : Math.min(preferredLevelIndex, descrizioni.length - 1);
+    const durationGroup = Array.isArray(descrizioni[levelIndex]) ? descrizioni[levelIndex] : [];
+    const durationIndex = durationGroup[preferredDurationIndex]
+      ? preferredDurationIndex
+      : Math.min(preferredDurationIndex, Math.max(durationGroup.length - 1, 0));
+
+    return {
+      levelLabel: DESCRIPTION_LEVELS[levelIndex] || `Livello ${levelIndex + 1}`,
+      durationLabel: DESCRIPTION_LENGTHS[durationIndex] || `Variante ${durationIndex + 1}`,
+      text: durationGroup[durationIndex] || null,
+    };
   };
 
   // ── No museo ───────────────────────────────────────────────────────────────
@@ -434,22 +471,6 @@ export default function App() {
               }}>{t.label}</button>
             ))}
           </div>
-
-          {currentSection === "items" ? (
-            <button
-              onClick={() => { setEditingObj(null); setActiveTab("create-item"); }}
-              style={{ padding: "11px 18px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
-            >
-              + Nuovo Oggetto
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveTab("create-visit")}
-              style={{ padding: "11px 18px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}
-            >
-              + Nuovo Percorso
-            </button>
-          )}
         </nav>
 
         {/* ── Filters (only on items tab) ── */}
@@ -478,7 +499,7 @@ export default function App() {
                 : pagedItems.length === 0
                   ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>Nessun oggetto trovato</p></div>
                   : pagedItems.map((o, i) => (
-                    <ItemCard key={o.nome} oggetto={o} museo={MUSEO} onEdit={handleEditOggetto} onDelete={handleDeleteOggetto} delay={i * 0.05} />
+                    <ItemCard key={o.nome} oggetto={o} museo={MUSEO} onView={openItemDetails} delay={i * 0.05} />
                   ))
               }
             </div>
@@ -495,34 +516,12 @@ export default function App() {
                 : pagedVisits.length === 0
                   ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>Nessun percorso creato</p></div>
                   : pagedVisits.map((p, i) => (
-                    <VisitCard key={p.nome} percorso={p} onDelete={handleDeletePercorso} delay={i * 0.06} />
+                    <VisitCard key={p.nome} percorso={p} onView={openPathDetails} delay={i * 0.06} />
                   ))
               }
             </div>
             <Pagination total={percorsi.length} current={visitPage} onChange={setVisitPage} />
           </>
-        )}
-
-        {/* ── Tab: Nuovo Oggetto ── */}
-        {activeTab === "create-item" && (
-          <ItemForm
-            museo={MUSEO}
-            oggetto={editingObj}
-            toast={showToast}
-            onSaved={async () => { await loadMuseo(); setActiveTab("items"); setEditingObj(null); }}
-            onCancel={() => { setActiveTab("items"); setEditingObj(null); }}
-          />
-        )}
-
-        {/* ── Tab: Nuovo Percorso ── */}
-        {activeTab === "create-visit" && (
-          <VisitForm
-            museo={MUSEO}
-            allOggetti={allOggetti}
-            toast={showToast}
-            onSaved={async () => { await loadPercorsi(); setActiveTab("visits"); }}
-            onCancel={() => setActiveTab("visits")}
-          />
         )}
 
       </div>
@@ -595,6 +594,186 @@ export default function App() {
                 <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Salva profilo</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedItem && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) closeItemModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ width: isMobile ? "min(760px, 100%)" : "min(980px, 96vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
+            <button onClick={closeItemModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Oggetto</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedItem.nome}</h3>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ display: "grid", gap: 14 }}>
+                <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Dettagli</p>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px, 1fr) minmax(0, 2fr)", gap: 12 }}>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Stanza:</strong> {selectedItem.stanza || "N/D"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>Connessi:</strong> {(selectedItem.connessi || []).join(", ") || "Nessuno"}</p>
+                  </div>
+                </div>
+                <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Descrizioni</p>
+                  {(() => {
+                    const preferred = getPreferredDescription(selectedItem);
+                    return (
+                      <>
+                        {preferred?.text ? (
+                          <div style={{ display: "grid", gap: 10 }}>
+                            <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}>{preferred.text}</p>
+                          </div>
+                        ) : (
+                          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>Nessuna descrizione disponibile.</p>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setShowAllDescriptions((prev) => !prev)}
+                          style={{
+                            marginTop: 12,
+                            padding: "8px 12px",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius)",
+                            cursor: "pointer",
+                            fontFamily: "var(--font-head)",
+                            fontSize: 10,
+                            letterSpacing: "0.12em",
+                            textTransform: "uppercase",
+                            color: "var(--gold)",
+                          }}
+                        >
+                          {showAllDescriptions ? "Nascondi tutte" : "Vedi tutte"}
+                        </button>
+
+                        {showAllDescriptions && (
+                          <div style={{ marginTop: 12 }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>Livello \\ Lunghezza</th>
+                                  {DESCRIPTION_LENGTHS.map((len) => (
+                                    <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
+                                      {len}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {DESCRIPTION_LEVELS.map((lvlLabel, lvlIndex) => {
+                                  const group = Array.isArray(selectedItem.descrizioni?.[lvlIndex]) ? selectedItem.descrizioni[lvlIndex] : [];
+                                  return (
+                                    <tr key={lvlLabel}>
+                                      <td style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text)", fontSize: 13, verticalAlign: "top", whiteSpace: isMobile ? "normal" : "nowrap", overflowWrap: "anywhere" }}>
+                                        {lvlLabel}
+                                      </td>
+                                      {DESCRIPTION_LENGTHS.map((lenLabel, lenIndex) => (
+                                        <td key={`${lvlLabel}-${lenLabel}`} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text-dim)", fontSize: isMobile ? 12 : 14, lineHeight: 1.55, verticalAlign: "top", overflowWrap: "anywhere" }}>
+                                          {group?.[lenIndex] || "—"}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {(() => {
+                const galleryImages = selectedItemImages.filter((img) => img.tipo !== "preview");
+                const safeIndex = Math.min(selectedGalleryIndex, Math.max(galleryImages.length - 1, 0));
+                const activeImage = galleryImages[safeIndex] || null;
+                return (
+                  <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                    <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Galleria immagini</p>
+                    {galleryImages.length === 0 ? (
+                      <p style={{ color: "var(--text-dim)", fontSize: 14 }}>Nessuna immagine extra disponibile.</p>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        <img
+                          src={activeImage.url.startsWith("/api") ? activeImage.url : `/api${activeImage.url}`}
+                          alt={`${selectedItem.nome} ${activeImage.tipo}`}
+                          style={{ width: "100%", height: isMobile ? 220 : 260, objectFit: "cover", borderRadius: 12, background: "#111" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))}
+                            style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
+                          >
+                            ‹
+                          </button>
+                          <div style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1, paddingBottom: 2 }}>
+                            {galleryImages.map((img, index) => (
+                              <button
+                                key={img.tipo}
+                                type="button"
+                                onClick={() => setSelectedGalleryIndex(index)}
+                                style={{
+                                  border: index === safeIndex ? "1px solid var(--gold)" : "1px solid var(--border)",
+                                  padding: 0,
+                                  borderRadius: 12,
+                                  overflow: "hidden",
+                                  background: "transparent",
+                                  cursor: "pointer",
+                                  minWidth: isMobile ? 84 : 72,
+                                }}
+                              >
+                                <img
+                                  src={img.url.startsWith("/api") ? img.url : `/api${img.url}`}
+                                  alt={`${selectedItem.nome} thumb ${img.tipo}`}
+                                  style={{ width: isMobile ? 84 : 72, height: isMobile ? 60 : 52, objectFit: "cover", display: "block" }}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))}
+                            style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
+                          >
+                            ›
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedPath && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) closePathModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ width: isMobile ? "min(720px, 100%)" : "min(900px, 92vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
+            <button onClick={closePathModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Percorso</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedPath.nome}</h3>
+            <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10, fontFamily: "var(--font-head)" }}>Opere del percorso in ordine</p>
+              <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10 }}>
+                {(selectedPath.oggetti || []).map((name) => {
+                  const oggetto = allOggetti.find((item) => item.nome === name);
+                  return (
+                    <li key={name} style={{ color: "var(--text)", lineHeight: 1.6 }}>
+                      <span style={{ fontFamily: "var(--font-head)", letterSpacing: "0.06em" }}>{name}</span>
+                      {oggetto?.stanza ? (
+                        <span style={{ color: "var(--text-dim)" }}>{` — stanza ${oggetto.stanza}`}</span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           </div>
         </div>
       )}

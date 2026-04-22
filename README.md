@@ -152,6 +152,39 @@ Spec completa: `server/openAPI/extra/musei_api.yaml`
 
 ---
 
+## Codici accesso professore
+
+Per creare un account **professore**, in fase di registrazione l'utente puo inserire un **Codice accesso professore**.
+
+- **Codici multipli**: sono supportati piu codici contemporaneamente.
+- **Nessun codice in chiaro**: i codici sono salvati su MongoDB **solo come hash (SHA-256)**.
+- **Controllo**:
+  - se il campo e vuoto -> l'utente viene creato come `utente`
+  - se il campo e pieno -> il server calcola `sha256(codice)` e verifica che esista in `utenti.professor_codes` con `enabled: true`
+    - se esiste -> ruolo `professore`
+    - se non esiste -> errore `codice professore non valido`
+
+### Generare codici professore (script)
+
+Lo script genera codici (stampa a schermo quelli in chiaro) e salva su MongoDB soltanto gli hash.
+
+```bash
+cd server/openAPI
+npm run gen:prof-codes
+```
+
+Opzioni:
+
+```bash
+node scripts/generate_professor_codes.js --count 10 --length 12 --prefix PROF
+```
+
+Note:
+- Salva i codici stampati: **non vengono recuperati** dal DB (perche nel DB c'e solo l'hash).
+- Collection: `utenti.professor_codes`.
+
+---
+
 ## Troubleshooting rapido
 
 - **401 / 403 API key**: verifica `X-API-Key` e `API_KEY` nel `.env`

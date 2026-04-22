@@ -1,7 +1,7 @@
 import React from "react";
 import { previewUrl } from "../api";
 
-export default function ItemCard({ oggetto, museo, onEdit, onDelete, delay = 0 }) {
+export default function ItemCard({ oggetto, museo, onView, delay = 0 }) {
   const nD = Array.isArray(oggetto.descrizioni) ? oggetto.descrizioni.length : 0;
   const nC = Array.isArray(oggetto.connessi) ? oggetto.connessi.length : 0;
 
@@ -100,36 +100,27 @@ export default function ItemCard({ oggetto, museo, onEdit, onDelete, delay = 0 }
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8, padding: "10px 22px 18px" }}>
-        <CardBtn onClick={() => onEdit(oggetto.nome)}>Modifica</CardBtn>
-        <CardBtn danger onClick={() => onDelete(oggetto.nome)}>Elimina</CardBtn>
+      <div style={{ padding: "10px 22px 18px" }}>
+        <button
+          onClick={() => onView?.(oggetto)}
+          style={{
+            width: "100%",
+            padding: "8px 10px",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            cursor: "pointer",
+            fontFamily: "var(--font-head)",
+            fontSize: 9,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--gold)",
+            transition: "all 0.2s",
+          }}
+        >
+          Visualizza
+        </button>
       </div>
     </div>
-  );
-}
-
-function CardBtn({ children, onClick, danger }) {
-  const [hov, setHov] = React.useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        flex: 1,
-        padding: "8px 10px",
-        background: "transparent",
-        border: `1px solid ${hov ? (danger ? "rgba(200,70,60,0.4)" : "rgba(92,191,128,0.3)") : "var(--border)"}`,
-        borderRadius: "var(--radius)",
-        cursor: "pointer",
-        fontFamily: "var(--font-head)",
-        fontSize: 9,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color: hov ? (danger ? "#e05a4a" : "var(--gold)") : "var(--text-dim)",
-        transition: "all 0.2s",
-      }}
-    >{children}</button>
   );
 }

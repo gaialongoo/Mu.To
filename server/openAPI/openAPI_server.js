@@ -35,9 +35,9 @@ const LAYOUT_COLLECTION = "musei_layout";
 const USERS_DB_NAME = "utenti";
 const USERS_COLLECTION = "users";
 const SESSIONS_COLLECTION = "sessions";
+const PROFESSOR_CODES_COLLECTION = "professor_codes";
 const SESSION_COOKIE_NAME = "muto_auth";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const PROFESSOR_CODE = process.env.PROFESSOR_CODE || "";
 
 const ALLOWED_INTERESTS = [
   "storia",
@@ -95,6 +95,20 @@ function verifyPassword(password, encoded) {
   const b = Buffer.from(storedHash, "hex");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+function hashProfessorCode(code) {
+  return crypto.createHash("sha256").update(String(code || "").trim()).digest("hex");
+}
+
+async function isValidProfessorCode(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return false;
+  const hash = hashProfessorCode(raw);
+  return withUsersDb(async (db) => {
+    const doc = await db.collection(PROFESSOR_CODES_COLLECTION).findOne({ hash, enabled: true });
+    return !!doc;
+  });
 }
 
 function normalizeUserInput(body = {}) {
@@ -160,6 +174,8 @@ async function ensureUserIndexes() {
     await db.collection(USERS_COLLECTION).createIndex({ email: 1 }, { unique: true });
     await db.collection(SESSIONS_COLLECTION).createIndex({ token: 1 }, { unique: true });
     await db.collection(SESSIONS_COLLECTION).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection(PROFESSOR_CODES_COLLECTION).createIndex({ hash: 1 }, { unique: true });
+    await db.collection(PROFESSOR_CODES_COLLECTION).createIndex({ enabled: 1 });
   });
 }
 
@@ -330,7 +346,6 @@ async function startServer(cliOptions) {
     try {
       const input = normalizeUserInput(req.body);
       const codiceRuolo = String(req.body?.codiceRuolo || "");
-      const roleRequested = String(req.body?.ruolo || "").trim().toLowerCase();
 
       if (!input.nome || !input.cognome || !input.email || !input.password) {
         return res.status(400).json({ error: "nome, cognome, email e password sono obbligatori" });
@@ -353,13 +368,11 @@ async function startServer(cliOptions) {
       if (input.durata && !ALLOWED_DURATIONS.includes(input.durata)) {
         return res.status(400).json({ error: "durata non valida" });
       }
-      if (roleRequested === "admin") {
-        return res.status(403).json({ error: "creazione admin non consentita via API" });
-      }
 
       let ruolo = "utente";
       if (codiceRuolo) {
-        if (!PROFESSOR_CODE || codiceRuolo !== PROFESSOR_CODE) {
+        const ok = await isValidProfessorCode(codiceRuolo);
+        if (!ok) {
           return res.status(403).json({ error: "codice professore non valido" });
         }
         ruolo = "professore";
