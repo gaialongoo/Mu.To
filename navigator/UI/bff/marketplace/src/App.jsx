@@ -121,6 +121,19 @@ function DangerBtn({ onClick, children }) {
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
   const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    nome: "",
+    cognome: "",
+    email: "",
+    eta: "",
+    ruolo: "",
+    livello: "",
+    durata: "",
+    interessi: [],
+  });
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);
     window.addEventListener("resize", onResize);
@@ -151,6 +164,41 @@ export default function App() {
   const [appliedStanza, setAppliedStanza] = useState("");
   const [itemPage,     setItemPage]     = useState(1);
   const [visitPage,    setVisitPage]    = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function ensureAuth() {
+      try {
+        const res = await fetch("/api/users/me", { credentials: "include" });
+        if (!res.ok) {
+          window.location.replace("/");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) {
+          const user = data.user || null;
+          setCurrentUser(user);
+          setProfileForm({
+            nome: user?.nome || "",
+            cognome: user?.cognome || "",
+            email: user?.email || "",
+            eta: user?.eta ?? "",
+            ruolo: user?.ruolo || "",
+            livello: user?.livello || "",
+            durata: user?.durata || "",
+            interessi: user?.interessi || [],
+          });
+          setAuthChecked(true);
+        }
+      } catch {
+        window.location.replace("/");
+      }
+    }
+    ensureAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Load museo ─────────────────────────────────────────────────────────────
   const loadMuseo = useCallback(async () => {
@@ -215,6 +263,73 @@ export default function App() {
     showToast("API Key rimossa");
   };
 
+  const PROFILE_INTERESTS = [
+    ["storia", "Storia"],
+    ["storia_arte", "Storia dell'arte"],
+    ["vita_artista", "Vita artista"],
+    ["tecniche_materiali", "Tecniche e materiali"],
+    ["estetica", "Estetica"],
+    ["sensorialita", "Sensorialita"],
+    ["filosofia_significato", "Filosofia e significato"],
+    ["moda_costumi", "Moda e costumi"],
+  ];
+
+  const toggleInterest = (value) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      interessi: prev.interessi.includes(value)
+        ? prev.interessi.filter((item) => item !== value)
+        : [...prev.interessi, value],
+    }));
+  };
+
+  const openProfile = () => setProfileOpen(true);
+  const closeProfile = () => setProfileOpen(false);
+
+  const saveProfile = async (e) => {
+    e.preventDefault();
+    if (profileForm.interessi.length < 1) {
+      showToast("Seleziona almeno un interesse", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: profileForm.nome.trim(),
+          cognome: profileForm.cognome.trim(),
+          eta: Number(profileForm.eta),
+          livello: profileForm.livello,
+          durata: profileForm.durata,
+          interessi: profileForm.interessi,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Aggiornamento profilo fallito", "error");
+        return;
+      }
+      const user = data.user || null;
+      setCurrentUser(user);
+      setProfileForm({
+        nome: user?.nome || "",
+        cognome: user?.cognome || "",
+        email: user?.email || "",
+        eta: user?.eta ?? "",
+        ruolo: user?.ruolo || "",
+        livello: user?.livello || "",
+        durata: user?.durata || "",
+        interessi: user?.interessi || [],
+      });
+      showToast("Profilo aggiornato");
+      setProfileOpen(false);
+    } catch {
+      showToast("Impossibile aggiornare il profilo", "error");
+    }
+  };
+
   // ── CRUD ───────────────────────────────────────────────────────────────────
   const handleDeleteOggetto = async (nome) => {
     if (!confirm(`Eliminare "${nome}"?`)) return;
@@ -242,6 +357,14 @@ export default function App() {
   };
 
   // ── No museo ───────────────────────────────────────────────────────────────
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>
+        Verifica accesso...
+      </div>
+    );
+  }
+
   if (!MUSEO) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
@@ -260,11 +383,12 @@ export default function App() {
         <header style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr 1fr" : "1fr 1fr 1fr", alignItems: "center", padding: isMobile ? "18px 0 22px" : "26px 0 30px", borderBottom: "1px solid var(--border)", marginBottom: isMobile ? 26 : 44, gap: isMobile ? 14 : 24 }}>
           {/* Left */}
           <div style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 18, letterSpacing: isMobile ? "0.12em" : "0.18em", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? "center" : "left", flexWrap: "wrap" }}>
-            <div style={{ position: "relative", width: 34, height: 34, display: "grid", placeItems: "center", border: "1.5px solid var(--gold)", borderRadius: "50%", boxShadow: "0 0 18px var(--gold-glow)" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.14em", transform: "translateX(-1px)" }}>
-                <span style={{ color: "var(--text)" }}>A</span>
-                <span style={{ color: "var(--gold)" }}>A</span>
-              </span>
+            <div style={{ position: "relative", width: 34, height: 34, display: "grid", placeItems: "center" }}>
+              <img
+                src="/img/logo.jpg"
+                alt="ArtAround logo"
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
             </div>
             <span style={{ color: "var(--gold)", fontWeight: 600, letterSpacing: "0.18em" }}>MARKETPLACE</span>
           </div>
@@ -277,6 +401,9 @@ export default function App() {
 
           {/* Right */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: isMobile ? "center" : "flex-end", flexWrap: "wrap" }}>
+            <button onClick={openProfile} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none", textTransform: "uppercase", cursor: "pointer" }}>
+              Profilo
+            </button>
             <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Home</a>
             {apiKeyActive && (
               <>
@@ -399,6 +526,78 @@ export default function App() {
         )}
 
       </div>
+
+      {profileOpen && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) closeProfile(); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div style={{ width: isMobile ? "min(620px, 100%)" : "min(620px, 90vw)", maxHeight: isMobile ? "calc(100vh - 32px)" : "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: isMobile ? 18 : 12 }}>
+            <button onClick={closeProfile} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Account</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>Profilo</h3>
+            <form onSubmit={saveProfile} style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+                <input value={profileForm.nome} onChange={(e) => setProfileForm((p) => ({ ...p, nome: e.target.value }))} placeholder="Nome" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+                <input value={profileForm.cognome} onChange={(e) => setProfileForm((p) => ({ ...p, cognome: e.target.value }))} placeholder="Cognome" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+                <input value={profileForm.email} disabled placeholder="Email" style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+                <input value={profileForm.eta} onChange={(e) => setProfileForm((p) => ({ ...p, eta: e.target.value }))} type="number" min="1" max="120" placeholder="Eta" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12 }}>
+                <input value={profileForm.ruolo} disabled placeholder="Ruolo" style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+                <select value={profileForm.livello} onChange={(e) => setProfileForm((p) => ({ ...p, livello: e.target.value }))} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+                  <option value="">Livello</option>
+                  <option value="bambino">Bambino</option>
+                  <option value="studente">Studente</option>
+                  <option value="esperto">Esperto</option>
+                  <option value="avanzato">Avanzato</option>
+                </select>
+                <select value={profileForm.durata} onChange={(e) => setProfileForm((p) => ({ ...p, durata: e.target.value }))} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+                  <option value="">Durata spiegazioni</option>
+                  <option value="corto">Corto</option>
+                  <option value="medio">Medio</option>
+                  <option value="lungo">Lungo</option>
+                </select>
+              </div>
+              <div>
+                <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 10, fontFamily: "var(--font-head)" }}>Interessi</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: isMobile ? "center" : "flex-start" }}>
+                  {PROFILE_INTERESTS.map(([value, label]) => {
+                    const active = profileForm.interessi.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleInterest(value)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 999,
+                          border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`,
+                          background: active ? "var(--gold-dim)" : "transparent",
+                          color: active ? "var(--gold)" : "var(--text-dim)",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          letterSpacing: "0.05em",
+                          maxWidth: "100%",
+                          textAlign: "center",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+                <button type="button" onClick={closeProfile} style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Chiudi</button>
+                <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Salva profilo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ApiKeyModal open={modalOpen} onClose={() => setModalOpen(false)} onConfirm={handleApiKey} />
       <Toast ref={toastRef} />

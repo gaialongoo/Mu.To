@@ -156,6 +156,11 @@ app.get(["/marketplace", "/marketplace/*"], (req, res) => {
 // STATIC — VIEWER  (/assets/*, /vite.svg, ecc.)
 // ============================================================
 app.use(
+  "/img",
+  express.static(path.join(__dirname, "img"), { index: false })
+);
+
+app.use(
   express.static(path.join(__dirname, "viewer/dist"), { index: false })
 );
 
@@ -201,6 +206,7 @@ app.use("/api", (req, res, next) => {
     const forwardHeaders = { "X-API-KEY": API_KEY };
     if (req.headers.accept) forwardHeaders["accept"] = req.headers.accept;
     if (req.headers["content-type"]) forwardHeaders["content-type"] = req.headers["content-type"];
+    if (req.headers.cookie) forwardHeaders["cookie"] = req.headers.cookie;
 
     const fetchOptions = { method: req.method, headers: forwardHeaders, dispatcher };
 
@@ -224,6 +230,10 @@ app.use("/api", (req, res, next) => {
     if (ct) res.set("Content-Type", ct);
     const cc = r.headers.get("cache-control");
     if (cc) res.set("Cache-Control", cc);
+    const setCookie = r.headers.getSetCookie?.() || [];
+    if (setCookie.length > 0) {
+      res.setHeader("Set-Cookie", setCookie);
+    }
     res.send(buffer);
   } catch (e) {
     console.error("🔥 API PROXY ERROR:", e.message);

@@ -15,8 +15,45 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: muto_auth
 
   schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        nome: { type: string }
+        cognome: { type: string }
+        email: { type: string, format: email }
+        eta: { type: integer, minimum: 1, maximum: 120 }
+        interessi:
+          type: array
+          items:
+            type: string
+            enum:
+              - storia
+              - storia_arte
+              - vita_artista
+              - tecniche_materiali
+              - estetica
+              - sensorialita
+              - filosofia_significato
+              - moda_costumi
+        livello:
+          type: string
+          enum: [bambino, studente, esperto, avanzato]
+        durata:
+          type: string
+          enum: [corto, medio, lungo]
+        ruolo:
+          type: string
+          enum: [utente, professore, admin]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     PointRel:
       type: object
       description: Posizione relativa dentro la stanza (0..1).
@@ -934,3 +971,134 @@ paths:
           description: Layout non trovato per questo museo
         '500':
           description: Errore di connessione o eliminazione su MongoDB
+
+  /users/register:
+    post:
+      summary: Registra un nuovo utente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, cognome, email, password, eta]
+              properties:
+                nome: { type: string }
+                cognome: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                eta: { type: integer, minimum: 1, maximum: 120 }
+                interessi:
+                  type: array
+                  items: { type: string }
+                livello:
+                  type: string
+                  enum: [bambino, studente, esperto, avanzato]
+                durata:
+                  type: string
+                  enum: [corto, medio, lungo]
+                codiceRuolo:
+                  type: string
+                  description: Se valido, l'utente viene creato come professore; se omesso resta utente base.
+      responses:
+        '201':
+          description: Utente creato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '403':
+          description: Ruolo non consentito o codice professore errato
+        '409':
+          description: Email gia registrata
+
+  /users/login:
+    post:
+      summary: Login utente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login effettuato, cookie di sessione impostato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Credenziali non valide
+
+  /users/logout:
+    post:
+      summary: Logout utente
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Logout effettuato
+
+  /users/me:
+    get:
+      summary: Profilo dell'utente autenticato
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Profilo utente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Utente non autenticato
+    put:
+      summary: Aggiorna il profilo dell'utente autenticato
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome: { type: string }
+                cognome: { type: string }
+                eta: { type: integer, minimum: 1, maximum: 120 }
+                interessi:
+                  type: array
+                  items: { type: string }
+                livello:
+                  type: string
+                  enum: [bambino, studente, esperto, avanzato]
+                durata:
+                  type: string
+                  enum: [corto, medio, lungo]
+      responses:
+        '200':
+          description: Profilo aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Utente non autenticato

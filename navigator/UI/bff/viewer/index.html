@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArtAround</title>
+  <link rel="icon" type="image/jpeg" href="/img/logo.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
@@ -112,6 +113,21 @@
     }
     .nav-links a:hover { color: var(--text); }
     .nav-links a:hover::after { right: 0; }
+    .nav-links .auth-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: .35rem .7rem;
+      font-size: .72rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color .25s, color .25s;
+    }
+    .nav-links .auth-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
 
     /* hamburger */
     .hamburger {
@@ -166,6 +182,17 @@
       transition: color .25s;
     }
     .mobile-menu a:hover { color: var(--gold); }
+    .mobile-menu .auth-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: .65rem 1.1rem;
+      font-family: 'Cinzel', serif;
+      font-size: 1rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
 
     .mobile-menu-close {
       position: absolute;
@@ -791,6 +818,178 @@
     }
     .overlay-actions .btn-primary { flex: 1; justify-content: center; }
 
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: .7rem;
+    }
+    .auth-form input,
+    .auth-form select {
+      background: rgba(240,234,216,.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: .65rem .8rem;
+      font-family: 'Raleway', sans-serif;
+      font-size: .84rem;
+    }
+    .auth-form select option {
+      background: #161410;
+      color: var(--text);
+    }
+    .auth-form small { color: var(--text-dim); font-size: .72rem; }
+    .auth-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+    }
+    .auth-switch {
+      display: flex;
+      gap: .55rem;
+      margin-bottom: .9rem;
+    }
+    .auth-switch button {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: .5rem;
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      cursor: pointer;
+    }
+    .auth-switch button.active {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .auth-interests {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .auth-interests label {
+      font-size: .72rem;
+      color: var(--text-dim);
+      display: inline-flex;
+      gap: .4rem;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      padding: .45rem .75rem;
+      background: transparent;
+    }
+    .auth-interests label input {
+      appearance: none;
+      width: 0;
+      height: 0;
+      margin: 0;
+    }
+    .auth-interests label input:checked + span {
+      color: var(--gold);
+    }
+    .auth-interests label:has(input:checked) {
+      border-color: var(--gold);
+      background: var(--gold-soft);
+    }
+    .auth-interest-title {
+      font-size: .72rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-top: .2rem;
+    }
+    .auth-status {
+      min-height: 1rem;
+      color: #e07070;
+      font-size: .73rem;
+    }
+    .auth-status.success {
+      color: var(--gold);
+    }
+    .auth-hidden { display: none !important; }
+    #profileOverlay .overlay-panel {
+      width: min(620px, 90vw);
+      max-height: none;
+      overflow: visible;
+      border-radius: 18px;
+      padding: 28px;
+      transform: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+    #profileOverlay .overlay-panel::before {
+      display: none;
+    }
+    #profileOverlay .auth-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    #profileOverlay .auth-interests {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    #profileOverlay .auth-interests .interest-chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      padding: .45rem .75rem;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: .72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    #profileOverlay .auth-interests .interest-chip input {
+      appearance: none;
+      width: 0;
+      height: 0;
+      margin: 0;
+    }
+    #profileOverlay .auth-interests .interest-chip input:checked + span {
+      color: var(--gold);
+    }
+    #profileOverlay .auth-interests .interest-chip:has(input:checked) {
+      border-color: var(--gold);
+      background: var(--gold-soft);
+    }
+    @media (max-width: 640px) {
+      .auth-grid {
+        grid-template-columns: 1fr;
+      }
+      .auth-switch {
+        flex-direction: column;
+      }
+      .auth-switch button,
+      .auth-form .btn-primary,
+      .auth-form .btn-secondary {
+        width: 100%;
+      }
+      .auth-interests {
+        gap: .45rem;
+      }
+      .auth-interests label {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+      #profileOverlay .overlay-panel {
+        width: min(620px, 100%);
+        padding: 18px 14px;
+      }
+      #profileOverlay .auth-grid {
+        grid-template-columns: 1fr;
+      }
+      #profileOverlay .auth-interests .interest-chip,
+      #profileOverlay .auth-interests label {
+        width: auto;
+        max-width: 100%;
+      }
+    }
+
     /* ── PROJECT SECTION ───────────────────────────── */
     .section-project {
       padding: clamp(4rem, 8vw, 8rem) clamp(1.5rem, 6vw, 6rem);
@@ -1002,6 +1201,7 @@
     <ul class="nav-links">
       <li><a href="#about">Esplora</a></li>
       <li><a href="#project">Info</a></li>
+      <li><button class="auth-btn" id="navAuthBtn" type="button">Login</button></li>
     </ul>
     <button class="hamburger" id="hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
@@ -1016,6 +1216,7 @@
     </button>
     <a href="#about" onclick="closeMobile()">Esplora</a>
     <a href="#project" onclick="closeMobile()">Info</a>
+    <button class="auth-btn" id="mobileAuthBtn" type="button">Login</button>
   </div>
 
   <!-- ── HERO ────────────────────────────────── -->
@@ -1158,11 +1359,411 @@
     </div>
   </div>
 
+  <div class="overlay" id="authOverlay">
+    <div class="overlay-panel">
+      <button class="overlay-close" onclick="closeAuthOverlay()">✕</button>
+      <p class="overlay-museum-name">Account</p>
+      <h3 class="overlay-title">Login / Profilo</h3>
+
+      <div class="auth-switch">
+        <button id="authModeLogin" type="button" onclick="setAuthMode('login')">Login</button>
+        <button id="authModeRegister" type="button" onclick="setAuthMode('register')">Registrati</button>
+      </div>
+
+      <form class="auth-form" id="loginForm">
+        <input id="loginEmail" type="email" placeholder="Email" required />
+        <input id="loginPassword" type="password" placeholder="Password" required />
+        <button class="btn-primary" type="submit">Accedi</button>
+      </form>
+
+      <form class="auth-form auth-hidden" id="registerForm">
+        <div class="auth-grid">
+          <input id="regNome" type="text" placeholder="Nome" required />
+          <input id="regCognome" type="text" placeholder="Cognome" required />
+        </div>
+        <div class="auth-grid">
+          <input id="regEmail" type="email" placeholder="Email" required />
+          <input id="regPassword" type="password" placeholder="Password (min 8)" required />
+        </div>
+        <div class="auth-grid">
+          <input id="regEta" type="number" min="1" max="120" placeholder="Eta" required />
+          <input id="regCodiceRuolo" type="text" placeholder="Codice accesso professore (opzionale)" />
+        </div>
+        <div class="auth-grid">
+          <select id="regLivello">
+            <option value="">Livello</option>
+            <option value="bambino">Bambino</option>
+            <option value="studente">Studente</option>
+            <option value="esperto">Esperto</option>
+            <option value="avanzato">Avanzato</option>
+          </select>
+          <select id="regDurata">
+            <option value="">Durata spiegazioni</option>
+            <option value="corto">Corto</option>
+            <option value="medio">Medio</option>
+            <option value="lungo">Lungo</option>
+          </select>
+        </div>
+        <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
+        <div class="auth-interests" id="interestList"></div>
+        <button class="btn-primary" type="submit">Crea account</button>
+      </form>
+
+      <form class="auth-form auth-hidden" id="profileForm">
+        <div class="auth-grid">
+          <input id="profileNome" type="text" placeholder="Nome" />
+          <input id="profileCognome" type="text" placeholder="Cognome" />
+        </div>
+        <div class="auth-grid">
+          <input id="profileEmail" type="email" placeholder="Email" disabled />
+          <input id="profileEta" type="number" min="1" max="120" placeholder="Eta" />
+        </div>
+        <div class="auth-grid">
+          <input id="profileRuolo" type="text" placeholder="Ruolo" disabled />
+        </div>
+        <div class="auth-grid">
+          <select id="profileLivello">
+            <option value="">Livello</option>
+            <option value="bambino">Bambino</option>
+            <option value="studente">Studente</option>
+            <option value="esperto">Esperto</option>
+            <option value="avanzato">Avanzato</option>
+          </select>
+          <select id="profileDurata">
+            <option value="">Durata spiegazioni</option>
+            <option value="corto">Corto</option>
+            <option value="medio">Medio</option>
+            <option value="lungo">Lungo</option>
+          </select>
+        </div>
+        <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
+        <div class="auth-interests" id="profileInterestList"></div>
+        <button class="btn-primary" type="submit">Salva profilo</button>
+        <button class="btn-secondary" type="button" onclick="logoutUser()">Logout</button>
+      </form>
+      <p class="auth-status" id="authStatus"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="profileOverlay">
+    <div class="overlay-panel">
+      <button class="overlay-close" onclick="closeProfileOverlay()">✕</button>
+      <p class="overlay-museum-name">Account</p>
+      <h3 class="overlay-title">Profilo</h3>
+      <form class="auth-form" id="profileStandaloneForm">
+        <div class="auth-grid">
+          <input id="profileStandaloneNome" type="text" placeholder="Nome" />
+          <input id="profileStandaloneCognome" type="text" placeholder="Cognome" />
+        </div>
+        <div class="auth-grid">
+          <input id="profileStandaloneEmail" type="email" placeholder="Email" disabled />
+          <input id="profileStandaloneEta" type="number" min="1" max="120" placeholder="Eta" />
+        </div>
+        <div class="auth-grid">
+          <input id="profileStandaloneRuolo" type="text" placeholder="Ruolo" disabled />
+        </div>
+        <div class="auth-grid">
+          <select id="profileStandaloneLivello">
+            <option value="">Livello</option>
+            <option value="bambino">Bambino</option>
+            <option value="studente">Studente</option>
+            <option value="esperto">Esperto</option>
+            <option value="avanzato">Avanzato</option>
+          </select>
+          <select id="profileStandaloneDurata">
+            <option value="">Durata spiegazioni</option>
+            <option value="corto">Corto</option>
+            <option value="medio">Medio</option>
+            <option value="lungo">Lungo</option>
+          </select>
+        </div>
+        <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
+        <div class="auth-interests" id="profileStandaloneInterestList"></div>
+        <button class="btn-primary" type="submit">Salva profilo</button>
+        <button class="btn-secondary" type="button" onclick="logoutUser()">Logout</button>
+        <p class="auth-status" id="profileStatus"></p>
+      </form>
+    </div>
+  </div>
+
   <!-- ================= ROOT REACT ================= -->
   <div id="root" class="hidden"></div>
 
 <script>
   const API = '/api';
+  const AUTH_INTERESTS = [
+    ["storia", "Storia"],
+    ["storia_arte", "Storia dell'arte"],
+    ["vita_artista", "Vita artista"],
+    ["tecniche_materiali", "Tecniche e materiali"],
+    ["estetica", "Estetica"],
+    ["sensorialita", "Sensorialita"],
+    ["filosofia_significato", "Filosofia e significato"],
+    ["moda_costumi", "Moda e costumi"],
+  ];
+  let currentUser = null;
+  let pendingMuseumSelection = false;
+  let authMode = "login";
+
+  function showAuthError(msg = "", type = "error") {
+    const el = document.getElementById("authStatus");
+    if (el) {
+      el.textContent = msg;
+      el.classList.toggle("success", type === "success");
+    }
+  }
+
+  function showProfileStatus(msg = "", type = "error") {
+    const el = document.getElementById("profileStatus");
+    if (el) {
+      el.textContent = msg;
+      el.classList.toggle("success", type === "success");
+    }
+  }
+
+  function collectCheckedInterests(containerId) {
+    const root = document.getElementById(containerId);
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('input[type="checkbox"]:checked')).map((i) => i.value);
+  }
+
+  function renderInterestCheckboxes(containerId, selected = []) {
+    const root = document.getElementById(containerId);
+    if (!root) return;
+    root.innerHTML = AUTH_INTERESTS.map(([value, label]) => `
+      <label>
+        <input type="checkbox" value="${value}" ${selected.includes(value) ? "checked" : ""} />
+        <span>${label}</span>
+      </label>
+    `).join("");
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    const loginForm = document.getElementById("loginForm");
+    const registerForm = document.getElementById("registerForm");
+    const modeLogin = document.getElementById("authModeLogin");
+    const modeRegister = document.getElementById("authModeRegister");
+
+    loginForm.classList.toggle("auth-hidden", mode !== "login");
+    registerForm.classList.toggle("auth-hidden", mode !== "register");
+
+    modeLogin.classList.toggle("active", mode === "login");
+    modeRegister.classList.toggle("active", mode === "register");
+    showAuthError("");
+  }
+
+  function updateAuthButtons() {
+    const label = currentUser ? "Profilo" : "Login";
+    const navBtn = document.getElementById("navAuthBtn");
+    const mobileBtn = document.getElementById("mobileAuthBtn");
+    if (navBtn) navBtn.textContent = label;
+    if (mobileBtn) mobileBtn.textContent = label;
+  }
+
+  function openAuthOverlay(mode = "login") {
+    const overlay = document.getElementById("authOverlay");
+    if (!overlay) return;
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+    setAuthMode(mode);
+  }
+
+  function closeAuthOverlay() {
+    const overlay = document.getElementById("authOverlay");
+    if (!overlay) return;
+    overlay.classList.remove("active");
+    document.body.style.overflow = "";
+    showAuthError("");
+  }
+
+  function openProfileOverlay() {
+    const overlay = document.getElementById("profileOverlay");
+    if (!overlay) return;
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+    showProfileStatus("");
+  }
+
+  function closeProfileOverlay() {
+    const overlay = document.getElementById("profileOverlay");
+    if (!overlay) return;
+    overlay.classList.remove("active");
+    document.body.style.overflow = "";
+    showProfileStatus("");
+  }
+
+  function fillProfileForm(user) {
+    document.getElementById("profileStandaloneNome").value = user?.nome || "";
+    document.getElementById("profileStandaloneCognome").value = user?.cognome || "";
+    document.getElementById("profileStandaloneEmail").value = user?.email || "";
+    document.getElementById("profileStandaloneEta").value = user?.eta ?? "";
+    document.getElementById("profileStandaloneRuolo").value = user?.ruolo || "";
+    document.getElementById("profileStandaloneLivello").value = user?.livello || "";
+    document.getElementById("profileStandaloneDurata").value = user?.durata || "";
+    renderInterestCheckboxes("profileStandaloneInterestList", user?.interessi || []);
+  }
+
+  async function refreshCurrentUser() {
+    try {
+      const r = await fetch(`${API}/users/me`, { credentials: "include" });
+      if (!r.ok) {
+        currentUser = null;
+      } else {
+        const data = await r.json();
+        currentUser = data.user || null;
+      }
+    } catch {
+      currentUser = null;
+    }
+    updateAuthButtons();
+    if (currentUser) fillProfileForm(currentUser);
+  }
+
+  async function logoutUser() {
+    await fetch(`${API}/users/logout`, { method: "POST", credentials: "include" });
+    currentUser = null;
+    updateAuthButtons();
+    closeProfileOverlay();
+    setAuthMode("login");
+  }
+
+  async function initAuthUi() {
+    renderInterestCheckboxes("interestList", []);
+    renderInterestCheckboxes("profileStandaloneInterestList", []);
+    await refreshCurrentUser();
+
+    const navAuthBtn = document.getElementById("navAuthBtn");
+    const mobileAuthBtn = document.getElementById("mobileAuthBtn");
+    const authOverlay = document.getElementById("authOverlay");
+    const profileOverlay = document.getElementById("profileOverlay");
+
+    function openLoginOrProfile() {
+      closeMobile();
+      if (currentUser) {
+        openProfileOverlay();
+      } else {
+        openAuthOverlay("login");
+      }
+    }
+    if (navAuthBtn) navAuthBtn.addEventListener("click", openLoginOrProfile);
+    if (mobileAuthBtn) mobileAuthBtn.addEventListener("click", openLoginOrProfile);
+
+    if (authOverlay) {
+      authOverlay.addEventListener("click", function (e) {
+        if (e.target === this) closeAuthOverlay();
+      });
+    }
+    if (profileOverlay) {
+      profileOverlay.addEventListener("click", function (e) {
+        if (e.target === this) closeProfileOverlay();
+      });
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showAuthError("");
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const r = await fetch(`${API}/users/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return showAuthError(data.error || "Login fallito");
+      currentUser = data.user || null;
+      updateAuthButtons();
+      if (currentUser) fillProfileForm(currentUser);
+      closeAuthOverlay();
+      if (pendingMuseumSelection) {
+        pendingMuseumSelection = false;
+        openOverlay(museo ? museo.value || null : null);
+      }
+    });
+
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showAuthError("");
+      const interessi = collectCheckedInterests("interestList");
+      if (interessi.length < 1) {
+        return showAuthError("Seleziona almeno un interesse.");
+      }
+      const payload = {
+        nome: document.getElementById("regNome").value.trim(),
+        cognome: document.getElementById("regCognome").value.trim(),
+        email: document.getElementById("regEmail").value.trim(),
+        password: document.getElementById("regPassword").value,
+        eta: Number(document.getElementById("regEta").value),
+        livello: document.getElementById("regLivello").value,
+        durata: document.getElementById("regDurata").value,
+        interessi,
+        codiceRuolo: document.getElementById("regCodiceRuolo").value.trim(),
+      };
+      let rr;
+      try {
+        rr = await fetch(`${API}/users/register`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch (err) {
+        return showAuthError("Impossibile contattare il server. Controlla che BFF/OpenAPI siano avviati.");
+      }
+
+      const raw = await rr.text().catch(() => "");
+      let rd = {};
+      try { rd = raw ? JSON.parse(raw) : {}; } catch {}
+      if (!rr.ok) {
+        const msg = rd.error || rd.message || (raw && raw.slice(0, 180)) || `HTTP ${rr.status}`;
+        return showAuthError(`Registrazione fallita: ${msg}`);
+      }
+      setAuthMode("login");
+      showAuthError("Registrazione completata: effettua il login.", "success");
+    });
+
+    document.getElementById("profileStandaloneForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!currentUser) return;
+      showProfileStatus("");
+      const interessi = collectCheckedInterests("profileStandaloneInterestList");
+      if (interessi.length < 1) {
+        return showProfileStatus("Seleziona almeno un interesse.");
+      }
+      const payload = {
+        nome: document.getElementById("profileStandaloneNome").value.trim(),
+        cognome: document.getElementById("profileStandaloneCognome").value.trim(),
+        eta: Number(document.getElementById("profileStandaloneEta").value),
+        livello: document.getElementById("profileStandaloneLivello").value,
+        durata: document.getElementById("profileStandaloneDurata").value,
+        interessi,
+      };
+      const r = await fetch(`${API}/users/me`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return showProfileStatus(data.error || "Aggiornamento fallito");
+      currentUser = data.user || null;
+      fillProfileForm(currentUser);
+      showProfileStatus("Profilo aggiornato.", "success");
+    });
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("profile") === "1") {
+      if (currentUser) openProfileOverlay();
+      else openAuthOverlay("login");
+      url.searchParams.delete("profile");
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    if (!currentUser && new URLSearchParams(window.location.search).has("stanza")) {
+      window.location.replace("/");
+    }
+  }
 
   /* ================= SESSION ================= */
   const COOKIE = "museo_session";
@@ -1274,6 +1875,11 @@
   /* ── OVERLAY open/close ────────────────────── */
   function handlemuseo() {
     if (!museo || !museo.value) return;
+    if (!currentUser) {
+      pendingMuseumSelection = true;
+      openAuthOverlay("login");
+      return;
+    }
     openOverlay(museo.value);
   }
 
@@ -1452,6 +2058,7 @@
     });
   }, { threshold: .15 });
   revealEls.forEach(el => observer.observe(el));
+  initAuthUi();
 </script>
 
 <!-- React -->

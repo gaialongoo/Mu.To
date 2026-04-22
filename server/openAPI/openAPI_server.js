@@ -1,7 +1,8 @@
 const cors = require("cors");
 const https = require("https");
 const express = require("express");
-const { MongoClient } = require("mongodb");
+const crypto = require("crypto");
+const { MongoClient, ObjectId } = require("mongodb");
 const { caricaMuseiDaJSON } = require("./parser_musei.js");
 const { SistemaMusei } = require("./sistema_musei.js");
 const { upsertMuseo, syncMuseiSuMongo } = require("./mongo_upload.js");
@@ -31,6 +32,136 @@ const LAYOUT_FILE = path.join(__dirname, "layout.json");
 const DB_NAME = "musei";
 const MUSEI_COLLECTION = "musei_db";
 const LAYOUT_COLLECTION = "musei_layout";
+const USERS_DB_NAME = "utenti";
+const USERS_COLLECTION = "users";
+const SESSIONS_COLLECTION = "sessions";
+const SESSION_COOKIE_NAME = "muto_auth";
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const PROFESSOR_CODE = process.env.PROFESSOR_CODE || "";
+
+const ALLOWED_INTERESTS = [
+  "storia",
+  "storia_arte",
+  "vita_artista",
+  "tecniche_materiali",
+  "estetica",
+  "sensorialita",
+  "filosofia_significato",
+  "moda_costumi",
+];
+const ALLOWED_LEVELS = ["bambino", "studente", "esperto", "avanzato"];
+const ALLOWED_DURATIONS = ["corto", "medio", "lungo"];
+
+function parseCookieHeader(cookieHeader = "") {
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, part) => {
+      const idx = part.indexOf("=");
+      if (idx <= 0) return acc;
+      const key = part.slice(0, idx).trim();
+      const value = part.slice(idx + 1).trim();
+      acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {});
+}
+
+function setAuthCookie(res, token) {
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`
+  );
+}
+
+function clearAuthCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  );
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, encoded) {
+  const [salt, storedHash] = String(encoded || "").split(":");
+  if (!salt || !storedHash) return false;
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  const a = Buffer.from(hash, "hex");
+  const b = Buffer.from(storedHash, "hex");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function normalizeUserInput(body = {}) {
+  const nome = String(body.nome || "").trim();
+  const cognome = String(body.cognome || "").trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const eta = Number(body.eta);
+  const interessiRaw = Array.isArray(body.interessi) ? body.interessi : [];
+  const interessi = interessiRaw
+    .map((it) => String(it || "").trim().toLowerCase())
+    .filter((it) => ALLOWED_INTERESTS.includes(it));
+  const livello = String(body.livello || "").trim().toLowerCase();
+  const durata = String(body.durata || "").trim().toLowerCase();
+  return { nome, cognome, email, password, eta, interessi, livello, durata };
+}
+
+function userPublicView(user) {
+  return {
+    id: String(user._id),
+    nome: user.nome,
+    cognome: user.cognome,
+    email: user.email,
+    eta: user.eta,
+    interessi: user.interessi || [],
+    livello: user.livello || "",
+    durata: user.durata || "",
+    ruolo: user.ruolo,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+async function withUsersDb(run) {
+  const client = new MongoClient(MONGO_URI);
+  try {
+    await client.connect();
+    return await run(client.db(USERS_DB_NAME));
+  } finally {
+    await client.close();
+  }
+}
+
+async function getSessionUser(req) {
+  const cookies = parseCookieHeader(req.headers.cookie || "");
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (!token) return null;
+
+  return withUsersDb(async (db) => {
+    const sessionsCol = db.collection(SESSIONS_COLLECTION);
+    const usersCol = db.collection(USERS_COLLECTION);
+    const now = new Date();
+    const session = await sessionsCol.findOne({ token, expiresAt: { $gt: now } });
+    if (!session) return null;
+    const user = await usersCol.findOne({ _id: session.userId });
+    if (!user) return null;
+    return { token, user };
+  });
+}
+
+async function ensureUserIndexes() {
+  await withUsersDb(async (db) => {
+    await db.collection(USERS_COLLECTION).createIndex({ email: 1 }, { unique: true });
+    await db.collection(SESSIONS_COLLECTION).createIndex({ token: 1 }, { unique: true });
+    await db.collection(SESSIONS_COLLECTION).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  });
+}
 
 function parseCliArgs(argv) {
   const args = { bootstrapMode: "disk-override", help: false, version: false };
@@ -170,6 +301,8 @@ async function startServer(cliOptions) {
   } finally {
     await probe.close();
   }
+  await ensureUserIndexes();
+  console.log("✅ Indici utenti/sessioni pronti");
 
   // --- Caricamento dati bootstrap ---
   let sistema;
@@ -188,6 +321,190 @@ async function startServer(cliOptions) {
     syncLayoutSuMongo(LAYOUT_FILE);
   }
   console.log(`✅ Sistema pronto con ${sistema.musei.size} musei`);
+
+  // ==========================================================
+  // ROUTE — USERS / AUTH
+  // ==========================================================
+
+  app.post("/users/register", async (req, res) => {
+    try {
+      const input = normalizeUserInput(req.body);
+      const codiceRuolo = String(req.body?.codiceRuolo || "");
+      const roleRequested = String(req.body?.ruolo || "").trim().toLowerCase();
+
+      if (!input.nome || !input.cognome || !input.email || !input.password) {
+        return res.status(400).json({ error: "nome, cognome, email e password sono obbligatori" });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {
+        return res.status(400).json({ error: "email non valida" });
+      }
+      if (input.password.length < 8) {
+        return res.status(400).json({ error: "password troppo corta (minimo 8 caratteri)" });
+      }
+      if (!Number.isFinite(input.eta) || input.eta < 1 || input.eta > 120) {
+        return res.status(400).json({ error: "eta non valida" });
+      }
+      if (input.interessi.length < 1) {
+        return res.status(400).json({ error: "seleziona almeno un interesse" });
+      }
+      if (input.livello && !ALLOWED_LEVELS.includes(input.livello)) {
+        return res.status(400).json({ error: "livello non valido" });
+      }
+      if (input.durata && !ALLOWED_DURATIONS.includes(input.durata)) {
+        return res.status(400).json({ error: "durata non valida" });
+      }
+      if (roleRequested === "admin") {
+        return res.status(403).json({ error: "creazione admin non consentita via API" });
+      }
+
+      let ruolo = "utente";
+      if (codiceRuolo) {
+        if (!PROFESSOR_CODE || codiceRuolo !== PROFESSOR_CODE) {
+          return res.status(403).json({ error: "codice professore non valido" });
+        }
+        ruolo = "professore";
+      }
+
+      const now = new Date();
+      const userDoc = {
+        nome: input.nome,
+        cognome: input.cognome,
+        email: input.email,
+        passwordHash: hashPassword(input.password),
+        interessi: input.interessi,
+        livello: input.livello || "",
+        durata: input.durata || "",
+        eta: input.eta,
+        ruolo,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const created = await withUsersDb(async (db) => {
+        const result = await db.collection(USERS_COLLECTION).insertOne(userDoc);
+        return db.collection(USERS_COLLECTION).findOne({ _id: result.insertedId });
+      });
+      res.status(201).json({ user: userPublicView(created) });
+    } catch (err) {
+      if (String(err.message || "").includes("E11000")) {
+        return res.status(409).json({ error: "email gia registrata" });
+      }
+      console.error("Errore register:", err.message);
+      res.status(500).json({ error: "errore creazione utente" });
+    }
+  });
+
+  app.post("/users/login", async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const password = String(req.body?.password || "");
+      if (!email || !password) {
+        return res.status(400).json({ error: "email e password obbligatorie" });
+      }
+
+      const { user, token } = await withUsersDb(async (db) => {
+        const usersCol = db.collection(USERS_COLLECTION);
+        const sessionsCol = db.collection(SESSIONS_COLLECTION);
+        const userDoc = await usersCol.findOne({ email });
+        if (!userDoc || !verifyPassword(password, userDoc.passwordHash)) return { user: null, token: null };
+
+        const sessionToken = crypto.randomBytes(32).toString("hex");
+        await sessionsCol.insertOne({
+          token: sessionToken,
+          userId: userDoc._id,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+        });
+        return { user: userDoc, token: sessionToken };
+      });
+
+      if (!user || !token) return res.status(401).json({ error: "credenziali non valide" });
+      setAuthCookie(res, token);
+      res.json({ user: userPublicView(user) });
+    } catch (err) {
+      console.error("Errore login:", err.message);
+      res.status(500).json({ error: "errore login" });
+    }
+  });
+
+  app.post("/users/logout", async (req, res) => {
+    try {
+      const cookies = parseCookieHeader(req.headers.cookie || "");
+      const token = cookies[SESSION_COOKIE_NAME];
+      if (token) {
+        await withUsersDb(async (db) => {
+          await db.collection(SESSIONS_COLLECTION).deleteOne({ token });
+        });
+      }
+      clearAuthCookie(res);
+      res.json({ message: "logout effettuato" });
+    } catch (err) {
+      console.error("Errore logout:", err.message);
+      res.status(500).json({ error: "errore logout" });
+    }
+  });
+
+  app.get("/users/me", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      res.json({ user: userPublicView(session.user) });
+    } catch (err) {
+      console.error("Errore me:", err.message);
+      res.status(500).json({ error: "errore recupero profilo" });
+    }
+  });
+
+  app.put("/users/me", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (req.body?.ruolo && String(req.body.ruolo).toLowerCase() !== session.user.ruolo) {
+        return res.status(403).json({ error: "ruolo non modificabile via API" });
+      }
+
+      const input = normalizeUserInput({
+        ...session.user,
+        ...req.body,
+        email: session.user.email,
+      });
+      if (!Number.isFinite(input.eta) || input.eta < 1 || input.eta > 120) {
+        return res.status(400).json({ error: "eta non valida" });
+      }
+      if (input.interessi.length < 1) {
+        return res.status(400).json({ error: "seleziona almeno un interesse" });
+      }
+      if (input.livello && !ALLOWED_LEVELS.includes(input.livello)) {
+        return res.status(400).json({ error: "livello non valido" });
+      }
+      if (input.durata && !ALLOWED_DURATIONS.includes(input.durata)) {
+        return res.status(400).json({ error: "durata non valida" });
+      }
+
+      const userId = new ObjectId(String(session.user._id));
+      const updated = await withUsersDb(async (db) => {
+        await db.collection(USERS_COLLECTION).updateOne(
+          { _id: userId },
+          {
+            $set: {
+              nome: input.nome,
+              cognome: input.cognome,
+              eta: input.eta,
+              interessi: input.interessi,
+              livello: input.livello || "",
+              durata: input.durata || "",
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return db.collection(USERS_COLLECTION).findOne({ _id: userId });
+      });
+      res.json({ user: userPublicView(updated) });
+    } catch (err) {
+      console.error("Errore update profilo:", err.message);
+      res.status(500).json({ error: "errore aggiornamento profilo" });
+    }
+  });
 
   // ==========================================================
   // ROUTE — GET
