@@ -158,6 +158,18 @@ export default function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Disabilitare lo scroll quando il profilo è aperto
+  useEffect(() => {
+    if (profileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [profileOpen]);
   const isTablet = viewportW <= 1024;
   const isMobile = viewportW <= 768;
 

@@ -624,11 +624,13 @@
     .overlay-panel {
       background: var(--surface);
       border: 1px solid var(--border);
-      padding: 3rem;
+      padding: 2rem 2rem 1.5rem;
       width: min(520px, 90vw);
       position: relative;
       transform: translateY(20px) scale(.97);
       transition: transform .4s var(--ease-back);
+      max-height: 92svh;
+      overflow-y: auto;
     }
     .overlay.active .overlay-panel { transform: none; }
     @media (max-width: 640px) {
@@ -643,7 +645,7 @@
         max-height: 92svh;
         overflow-y: auto;
         border-radius: 18px;
-        padding: 1.25rem 1rem 1.1rem;
+        padding: 1.1rem 1rem 1rem;
       }
       .overlay-panel::before {
         left: 1rem;
@@ -686,10 +688,10 @@
     }
     .overlay-title {
       font-family: 'Cinzel', serif;
-      font-size: 1.8rem;
+      font-size: 1.6rem;
       font-weight: 300;
       color: var(--text);
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
     }
 
     .choice-grid {
@@ -848,14 +850,14 @@
     .auth-form {
       display: flex;
       flex-direction: column;
-      gap: .7rem;
+      gap: .5rem;
     }
     .auth-form input,
     .auth-form select {
       background: rgba(240,234,216,.04);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: .65rem .8rem;
+      padding: .5rem .75rem;
       font-family: 'Raleway', sans-serif;
       font-size: .84rem;
     }
@@ -872,7 +874,7 @@
     .auth-switch {
       display: flex;
       gap: .55rem;
-      margin-bottom: .9rem;
+      margin-bottom: .6rem;
     }
     .auth-switch button {
       flex: 1;
@@ -920,11 +922,60 @@
       background: var(--gold-soft);
     }
     .auth-interest-title {
-      font-size: .72rem;
+      font-size: .68rem;
       letter-spacing: .14em;
       text-transform: uppercase;
       color: var(--text-dim);
-      margin-top: .2rem;
+      margin-top: .1rem;
+      margin-bottom: -.1rem;
+    }
+
+    /* Stile per il campo codice facoltativo */
+    .auth-code-field {
+      grid-column: 1 / -1;
+      margin-top: 0;
+      padding: .6rem .75rem;
+      background: var(--gold-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .auth-code-label {
+      display: flex;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.4rem;
+    }
+    .auth-code-title {
+      font-size: .82rem;
+      font-weight: 400;
+      color: var(--text);
+    }
+    .auth-code-optional {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--gold);
+      font-weight: 500;
+    }
+    .auth-code-field input {
+      width: 100%;
+      padding: .5rem .75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .84rem;
+    }
+    .auth-code-field input::placeholder {
+      color: var(--text-dim);
+    }
+    .auth-code-field input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 2px rgba(92,191,128,0.15);
     }
     .auth-status {
       min-height: 1rem;
@@ -1390,7 +1441,7 @@
     <div class="overlay-panel">
       <button class="overlay-close" onclick="closeAuthOverlay()">✕</button>
       <p class="overlay-museum-name">Account</p>
-      <h3 class="overlay-title">Login / Profilo</h3>
+      <h3 class="overlay-title">Login</h3>
 
       <div class="auth-switch">
         <button id="authModeLogin" type="button" onclick="setAuthMode('login')">Login</button>
@@ -1412,11 +1463,8 @@
           <input id="regEmail" type="email" placeholder="Email" required />
           <input id="regPassword" type="password" placeholder="Password (min 8)" required />
         </div>
-        <div class="auth-grid">
-          <input id="regEta" type="number" min="1" max="120" placeholder="Eta" required />
-          <input id="regCodiceRuolo" type="text" placeholder="Codice accesso professore (opzionale)" />
-        </div>
-        <div class="auth-grid">
+        <div class="auth-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <input id="regEta" type="number" min="1" max="120" placeholder="Età" required />
           <select id="regLivello">
             <option value="">Livello</option>
             <option value="bambino">Bambino</option>
@@ -1425,11 +1473,18 @@
             <option value="avanzato">Avanzato</option>
           </select>
           <select id="regDurata">
-            <option value="">Durata spiegazioni</option>
+            <option value="">Durata</option>
             <option value="corto">Corto</option>
             <option value="medio">Medio</option>
             <option value="lungo">Lungo</option>
           </select>
+        </div>
+        <div class="auth-code-field">
+          <label class="auth-code-label">
+            <span class="auth-code-title">Codice professore</span>
+            <span class="auth-code-optional">(facoltativo)</span>
+          </label>
+          <input id="regCodiceRuolo" type="text" placeholder="Inserisci codice se sei un insegnante" />
         </div>
         <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
         <div class="auth-interests" id="interestList"></div>
@@ -1578,6 +1633,29 @@
     modeLogin.classList.toggle("active", mode === "login");
     modeRegister.classList.toggle("active", mode === "register");
     showAuthError("");
+
+    // Reset del form di registrazione quando si passa a Registrati
+    if (mode === "register") {
+      registerForm.reset();
+      // Resetta esplicitamente ogni campo per assicurarsi che sia vuoto
+      document.getElementById("regNome").value = "";
+      document.getElementById("regCognome").value = "";
+      document.getElementById("regEmail").value = "";
+      document.getElementById("regPassword").value = "";
+      document.getElementById("regEta").value = "";
+      document.getElementById("regCodiceRuolo").value = "";
+      document.getElementById("regLivello").value = "";
+      document.getElementById("regDurata").value = "";
+      // Resetta anche i checkbox degli interessi
+      document.querySelectorAll("#interestList input[type='checkbox']").forEach(cb => {
+        cb.checked = false;
+      });
+    } else if (mode === "login") {
+      // Resetta anche il form di login
+      loginForm.reset();
+      document.getElementById("loginEmail").value = "";
+      document.getElementById("loginPassword").value = "";
+    }
   }
 
   function updateAuthButtons() {
