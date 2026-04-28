@@ -49,6 +49,7 @@ function isSessionValid(session: Session | null): session is Session {
 
 const SVG_SERVER_BASE = "/svg";
 const API_BASE = "/api";
+const MOBILE_BREAKPOINT = 768;
 
 /* ===================== STANZA / PATH LOGIC ===================== */
 
@@ -130,7 +131,11 @@ export default function SvgViewer() {
   }, []);
 
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
-  const [freeExplore, setFreeExplore] = useState(true);
+  // Mobile: default delock (freeExplore=true). Desktop: default lock (freeExplore=false).
+  const [freeExplore, setFreeExplore] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+  });
   const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
   const [currentStanzaParam, setCurrentStanzaParam] = useState<string | null>(null);
   const [svgLoadTick, setSvgLoadTick] = useState(0);
@@ -1125,9 +1130,122 @@ function corridorAttachDir(room: RectBox, corridor: RectBox, orientation: "verti
 const previewExistsCache = new Map<string, boolean>();
 // Deduplica le richieste HEAD in corso per lo stesso oggetto.
 const previewRequestCache = new Map<string, Promise<boolean>>();
+// Cache stanza per oggetto: evita roundtrip ripetuti su Next/Prev.
+const objectRoomCache = new Map<string, string>();
+const objectRoomRequestCache = new Map<string, Promise<string>>();
+let cachedUserPreferences: { livello?: string; durata?: string } | null = null;
+let userPreferencesInFlight: Promise<{ livello?: string; durata?: string } | null> | null = null;
 
 function previewCacheKey(museo: string, nome: string): string {
   return `${museo}__${nome}`;
+}
+
+function objectRoomCacheKey(museo: string, nome: string): string {
+  return `${museo}__${nome}`;
+}
+
+async function fetchObjectRoom(museo: string, oggettoNome: string): Promise<string> {
+  const key = objectRoomCacheKey(museo, oggettoNome);
+  const cached = objectRoomCache.get(key);
+  if (cached) return cached;
+
+  const inFlight = objectRoomRequestCache.get(key);
+  if (inFlight) return inFlight;
+
+  const req = fetch(
+    `${API_BASE}/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(oggettoNome)}`
+  )
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Oggetto non trovato");
+      const oggetto = await res.json();
+      const stanza = String(oggetto?.stanza || "").trim();
+      if (!stanza) throw new Error("Stanza mancante");
+      objectRoomCache.set(key, stanza);
+      return stanza;
+    })
+    .finally(() => {
+      objectRoomRequestCache.delete(key);
+    });
+
+  objectRoomRequestCache.set(key, req);
+  return req;
+}
+
+function prefetchNavigatorSvg(museo: string, fromObj: string, toObj: string) {
+  const url = `${SVG_SERVER_BASE}/${encodeURIComponent(museo)}/path/${encodeURIComponent(fromObj)}/${encodeURIComponent(toObj)}`;
+  // fire-and-forget: warmup cache per ridurre latenza al click successivo
+  fetch(url).catch(() => {});
+}
+
+function levelToIndex(livello?: string): number {
+  const key = String(livello || "").trim().toLowerCase();
+  if (key === "bambino") return 0;
+  if (key === "studente") return 1;
+  if (key === "esperto") return 2;
+  if (key === "avanzato") return 3;
+  return 1;
+}
+
+function durationToIndex(durata?: string): number {
+  const key = String(durata || "").trim().toLowerCase();
+  if (key === "corto") return 0;
+  if (key === "medio") return 1;
+  if (key === "lungo") return 2;
+  return 1;
+}
+
+function pickDescriptionByPreferences(
+  descrizioni: unknown,
+  preferences: { livello?: string; durata?: string } | null
+): string | null {
+  if (!Array.isArray(descrizioni) || descrizioni.length === 0) return null;
+
+  const preferredLevel = levelToIndex(preferences?.livello);
+  const preferredDuration = durationToIndex(preferences?.durata);
+
+  const levelGroupRaw = descrizioni[preferredLevel] ?? descrizioni[Math.min(preferredLevel, descrizioni.length - 1)];
+  if (!Array.isArray(levelGroupRaw) || levelGroupRaw.length === 0) return null;
+
+  const text = levelGroupRaw[preferredDuration] ?? levelGroupRaw[Math.min(preferredDuration, levelGroupRaw.length - 1)];
+  if (typeof text === "string" && text.trim().length > 0) return text;
+
+  for (const candidate of levelGroupRaw) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+  }
+
+  // fallback globale: prima stringa non vuota trovata
+  for (const group of descrizioni) {
+    if (!Array.isArray(group)) continue;
+    for (const candidate of group) {
+      if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function getUserPreferences(): Promise<{ livello?: string; durata?: string } | null> {
+  if (cachedUserPreferences) return cachedUserPreferences;
+  if (userPreferencesInFlight) return userPreferencesInFlight;
+
+  userPreferencesInFlight = fetch(`${API_BASE}/users/me`, { credentials: "include" })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => ({}));
+      const user = data?.user || {};
+      const prefs = {
+        livello: typeof user.livello === "string" ? user.livello : "",
+        durata: typeof user.durata === "string" ? user.durata : "",
+      };
+      cachedUserPreferences = prefs;
+      return prefs;
+    })
+    .catch(() => null)
+    .finally(() => {
+      userPreferencesInFlight = null;
+    });
+
+  return userPreferencesInFlight;
 }
 
 function replaceCircleWithImage(
@@ -1454,15 +1572,18 @@ function ObjectOverlay({
   useEffect(() => {
     setSlideIdx(0);
 
-    // carica descrizione
-    fetch(
-      `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
-    )
-      .then(r => r.json())
-      .then(d => {
-        const prima = d.descrizioni?.[0]?.[0] ?? null;
-        setDescrizione(prima);
-      });
+    // carica descrizione personalizzata in base a livello/durata profilo
+    Promise.all([
+      fetch(
+        `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
+      ).then(r => r.json()),
+      getUserPreferences(),
+    ])
+      .then(([d, prefs]) => {
+        const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
+        setDescrizione(best);
+      })
+      .catch(() => setDescrizione(null));
 
     // carica lista immagini, esclude preview
     fetch(
@@ -1478,18 +1599,28 @@ function ObjectOverlay({
       .catch(() => setImmagini([]));
   }, [nome, session]);
 
-  const fetchStanza = async (oggettoNome: string): Promise<string> => {
-    const res = await fetch(
-      `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(oggettoNome)}`
-    );
-    if (!res.ok) throw new Error("Oggetto non trovato");
-    const oggetto = await res.json();
-    return oggetto.stanza ?? session.percorso[0];
-  };
+  useEffect(() => {
+    const percorso = session.percorso;
+    const index = percorso.indexOf(nome);
+    if (index === -1) return;
+
+    const curr = percorso[index];
+    const prev = index > 0 ? percorso[index - 1] : null;
+    const next = index < percorso.length - 1 ? percorso[index + 1] : null;
+
+    // Pre-carico stanza corrente e adiacenti per evitare fetch al click.
+    fetchObjectRoom(session.museo, curr).catch(() => {});
+    if (prev) fetchObjectRoom(session.museo, prev).catch(() => {});
+    if (next) fetchObjectRoom(session.museo, next).catch(() => {});
+
+    // Preload delle prossime SVG probabili (prev/next).
+    if (prev) prefetchNavigatorSvg(session.museo, prev, curr);
+    if (next) prefetchNavigatorSvg(session.museo, curr, next);
+  }, [nome, session]);
 
   const updateURL = async (oggettoCorrente: string, oggettoAltro: string) => {
     try {
-      const stanzaOggetto = await fetchStanza(oggettoCorrente);
+      const stanzaOggetto = await fetchObjectRoom(session.museo, oggettoCorrente);
       history.pushState(null, "", `/?stanza=${stanzaOggetto}/path/${oggettoCorrente}/${oggettoAltro}`);
       onClose();
       window.dispatchEvent(new PopStateEvent("popstate"));

@@ -104,12 +104,41 @@ app.use((req, res, next) => {
   next();
 });
 
+async function requireAdminForEditor(req, res, next) {
+  const cookie = req.headers.cookie || "";
+  if (!cookie) return res.redirect(302, "/");
+
+  try {
+    const meUrl = `${API_BASE}/users/me`;
+    const r = await fetch(meUrl, {
+      method: "GET",
+      headers: {
+        "X-API-KEY": API_KEY,
+        cookie,
+        accept: "application/json",
+      },
+      dispatcher,
+    });
+
+    if (!r.ok) return res.redirect(302, "/");
+    const data = await r.json().catch(() => ({}));
+    const role = String(data?.user?.ruolo || "").toLowerCase();
+    if (role !== "admin") return res.redirect(302, "/");
+
+    next();
+  } catch (e) {
+    console.error("🔥 EDITOR AUTH ERROR:", e.message);
+    return res.redirect(302, "/");
+  }
+}
+
 // ============================================================
 // STATIC — EDITOR  (/editor/assets/*, ecc.)
 // Deve stare PRIMA dello static del viewer per evitare collisioni
 // ============================================================
 app.use(
   "/editor",
+  requireAdminForEditor,
   express.static(path.join(__dirname, "editor/dist"), { index: false })
 );
 
@@ -117,6 +146,7 @@ app.use(
 // SPA FALLBACK — EDITOR  (/editor  e  /editor/*)
 // ============================================================
 app.get(["/editor", "/editor/*"], (req, res) => {
+  return requireAdminForEditor(req, res, () => {
   if (!editorAvailable) {
     return res
       .status(503)
@@ -126,6 +156,7 @@ app.get(["/editor", "/editor/*"], (req, res) => {
       );
   }
   res.sendFile(distEditorIndex);
+  });
 });
 
 // ============================================================

@@ -52,6 +52,24 @@ const ALLOWED_INTERESTS = [
 const ALLOWED_LEVELS = ["bambino", "studente", "esperto", "avanzato"];
 const ALLOWED_DURATIONS = ["corto", "medio", "lungo"];
 
+function normalizePrezzo(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round(parsed * 100) / 100;
+}
+
+function normalizePercorso(percorso = {}) {
+  return {
+    nome: String(percorso.nome || "").trim(),
+    oggetti: Array.isArray(percorso.oggetti) ? percorso.oggetti : [],
+    prezzo: normalizePrezzo(percorso.prezzo),
+  };
+}
+
+function percorsoPurchaseKey(museoNome, percorsoNome) {
+  return `${String(museoNome || "").trim()}::${String(percorsoNome || "").trim()}`;
+}
+
 function parseCookieHeader(cookieHeader = "") {
   return cookieHeader
     .split(";")
@@ -137,6 +155,7 @@ function userPublicView(user) {
     livello: user.livello || "",
     durata: user.durata || "",
     ruolo: user.ruolo,
+    percorsiAcquistati: user.percorsiAcquistati || [],
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -389,6 +408,7 @@ async function startServer(cliOptions) {
         durata: input.durata || "",
         eta: input.eta,
         ruolo,
+        percorsiAcquistati: [],
         createdAt: now,
         updatedAt: now,
       };
@@ -465,6 +485,68 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore me:", err.message);
       res.status(500).json({ error: "errore recupero profilo" });
+    }
+  });
+
+  app.get("/users/me/percorsi", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const museo = String(req.query?.museo || "").trim();
+      const purchased = Array.isArray(session.user.percorsiAcquistati) ? session.user.percorsiAcquistati : [];
+      const filtered = museo ? purchased.filter((p) => p?.museo === museo) : purchased;
+      const keys = filtered.map((p) => percorsoPurchaseKey(p.museo, p.percorso));
+      res.json({ percorsiAcquistati: filtered, chiaviAcquisto: keys });
+    } catch (err) {
+      console.error("Errore lista percorsi acquistati:", err.message);
+      res.status(500).json({ error: "errore recupero percorsi acquistati" });
+    }
+  });
+
+  app.post("/users/me/percorsi/acquista", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+
+      const nomeMuseo = String(req.body?.museo || "").trim();
+      const nomePercorso = String(req.body?.percorso || "").trim();
+      if (!nomeMuseo || !nomePercorso) {
+        return res.status(400).json({ error: "museo e percorso sono obbligatori" });
+      }
+
+      const museo = sistema.get_museo(nomeMuseo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      if (!museo.percorsi) museo.percorsi = [];
+      const percorso = museo.percorsi.find((p) => p.nome === nomePercorso);
+      if (!percorso) return res.status(404).json({ error: "Percorso non trovato" });
+      const percorsoNorm = normalizePercorso(percorso);
+      if (percorsoNorm.prezzo <= 0) {
+        return res.status(400).json({ error: "Il percorso e gia incluso nell'account" });
+      }
+
+      const key = percorsoPurchaseKey(nomeMuseo, nomePercorso);
+      const existing = Array.isArray(session.user.percorsiAcquistati) ? session.user.percorsiAcquistati : [];
+      if (existing.some((p) => percorsoPurchaseKey(p.museo, p.percorso) === key)) {
+        return res.json({ giaAcquistato: true, acquisto: existing.find((p) => percorsoPurchaseKey(p.museo, p.percorso) === key) });
+      }
+
+      const userId = new ObjectId(String(session.user._id));
+      const acquisto = {
+        museo: nomeMuseo,
+        percorso: nomePercorso,
+        prezzo: percorsoNorm.prezzo,
+        purchasedAt: new Date(),
+      };
+      await withUsersDb(async (db) => {
+        await db.collection(USERS_COLLECTION).updateOne(
+          { _id: userId },
+          { $push: { percorsiAcquistati: acquisto }, $set: { updatedAt: new Date() } }
+        );
+      });
+      res.status(201).json({ giaAcquistato: false, acquisto });
+    } catch (err) {
+      console.error("Errore acquisto percorso:", err.message);
+      res.status(500).json({ error: "errore acquisto percorso" });
     }
   });
 
@@ -587,7 +669,7 @@ async function startServer(cliOptions) {
 
     if (!museo.percorsi) museo.percorsi = [];
     console.log(`Restituisco ${museo.percorsi.length} percorsi di '${museo.nome}'`);
-    res.json({ percorsi: museo.percorsi });
+    res.json({ percorsi: museo.percorsi.map(normalizePercorso) });
   });
 
   // 6️⃣ Dettagli percorso specifico
@@ -600,7 +682,7 @@ async function startServer(cliOptions) {
     if (!percorso) return res.status(404).json({ error: "Percorso non trovato" });
 
     console.log(`Restituisco percorso '${percorso.nome}' di '${museo.nome}'`);
-    res.json(percorso);
+    res.json(normalizePercorso(percorso));
   });
 
   // 9️⃣ Layout grafico — GET
@@ -739,6 +821,7 @@ async function startServer(cliOptions) {
     if (!museo) return res.status(404).json({ error: "Museo non trovato" });
 
     const { nome, oggetti } = req.body;
+    const prezzo = normalizePrezzo(req.body?.prezzo);
     if (!nome) return res.status(400).json({ error: "Nome percorso obbligatorio" });
     if (!Array.isArray(oggetti) || oggetti.length === 0)
       return res.status(400).json({ error: "Array oggetti obbligatorio e non vuoto" });
@@ -752,7 +835,7 @@ async function startServer(cliOptions) {
         return res.status(404).json({ error: `Oggetto '${nomeOggetto}' non trovato` });
     }
 
-    const nuovoPercorso = { nome, oggetti };
+    const nuovoPercorso = { nome, oggetti, prezzo };
     museo.percorsi.push(nuovoPercorso);
     sistema.salvaSuFile(FILE_JSON);
 

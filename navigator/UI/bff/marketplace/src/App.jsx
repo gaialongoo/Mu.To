@@ -75,8 +75,17 @@ function Pagination({ total, current, onChange }) {
   );
 }
 
+function formatPrezzo(prezzo) {
+  const amount = Number(prezzo);
+  if (!Number.isFinite(amount) || amount <= 0) return "Incluso";
+  return `${amount.toFixed(2).replace(".", ",")} EUR`;
+}
+
 // ─── Visit card ──────────────────────────────────────────────────────────────
-function VisitCard({ percorso, onView, delay }) {
+function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
+  const prezzo = Number(percorso.prezzo || 0);
+  const included = prezzo <= 0;
+  const disabled = !included && !canView && buying;
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
@@ -86,7 +95,10 @@ function VisitCard({ percorso, onView, delay }) {
       <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div style={{ padding: "20px 22px 14px" }}>
         <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{percorso.nome}</div>
-        <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)", marginBottom: 14 }}>{(percorso.oggetti || []).length} opere</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)" }}>{(percorso.oggetti || []).length} opere</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--gold)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo)}</div>
+        </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {(percorso.oggetti || []).slice(0, 3).map((n) => (
             <span key={n} style={{ background: "var(--gold-dim)", color: "var(--gold)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{n}</span>
@@ -95,25 +107,51 @@ function VisitCard({ percorso, onView, delay }) {
         </div>
       </div>
       <div style={{ padding: "10px 22px 18px" }}>
-        <button
-          onClick={() => onView?.(percorso)}
-          style={{
-            width: "100%",
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => onView?.(percorso)}
+            disabled={!canView}
+            style={{
+              flex: 1,
             padding: "8px 10px",
             background: "transparent",
-            border: "1px solid var(--border)",
+            border: `1px solid ${canView ? "var(--border)" : "rgba(255,255,255,0.08)"}`,
             borderRadius: "var(--radius)",
-            cursor: "pointer",
+            cursor: canView ? "pointer" : "not-allowed",
             fontFamily: "var(--font-head)",
             fontSize: 9,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-            color: "var(--gold)",
+            color: canView ? "var(--gold)" : "var(--text-faint)",
             transition: "all 0.2s",
+            opacity: canView ? 1 : 0.7,
           }}
-        >
-          Visualizza
-        </button>
+          >
+            Visualizza
+          </button>
+          {!included && !canView && (
+            <button
+              onClick={() => onBuy?.(percorso)}
+              disabled={disabled}
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                background: "var(--gold-dim)",
+                border: "1px solid rgba(92,191,128,0.3)",
+                borderRadius: "var(--radius)",
+                cursor: disabled ? "not-allowed" : "pointer",
+                fontFamily: "var(--font-head)",
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--gold)",
+                opacity: disabled ? 0.7 : 1,
+              }}
+            >
+              {buying ? "Acquisto..." : "Acquista"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -187,6 +225,8 @@ export default function App() {
   const [percorsiLoaded, setPercorsiLoaded] = useState(false);
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingVisits,setLoadingVisits]= useState(false);
+  const [buyingPath, setBuyingPath] = useState(null);
+  const [purchasedKeys, setPurchasedKeys] = useState(new Set());
   const [stanze,       setStanze]       = useState([]);
   const [search,       setSearch]       = useState("");
   const [stanzaFilter, setStanzaFilter] = useState("");
@@ -260,7 +300,20 @@ export default function App() {
     }
   }, [MUSEO]);
 
+  const loadPurchasedPaths = useCallback(async () => {
+    if (!MUSEO) return;
+    try {
+      const data = await api(`/users/me/percorsi?museo=${enc(MUSEO)}`, { credentials: "include" });
+      const keys = Array.isArray(data.chiaviAcquisto) ? data.chiaviAcquisto : [];
+      setPurchasedKeys(new Set(keys));
+    } catch (e) {
+      setPurchasedKeys(new Set());
+      showToast("Errore caricamento acquisti: " + e.message, "error");
+    }
+  }, [MUSEO]);
+
   useEffect(() => { loadMuseo(); }, [loadMuseo]);
+  useEffect(() => { if (authChecked) loadPurchasedPaths(); }, [authChecked, loadPurchasedPaths]);
 
   // ── Filtered items ─────────────────────────────────────────────────────────
   const filtered = allOggetti.filter((o) => {
@@ -380,7 +433,36 @@ export default function App() {
   };
 
   const openPathDetails = (percorso) => {
+    if (!canAccessPath(percorso)) {
+      showToast("Acquista il percorso per visualizzarlo", "error");
+      return;
+    }
     setSelectedPath(percorso);
+  };
+
+  const makePurchaseKey = (percorso) => `${MUSEO}::${percorso.nome}`;
+  const canAccessPath = (percorso) => Number(percorso?.prezzo || 0) <= 0 || purchasedKeys.has(makePurchaseKey(percorso));
+
+  const buyPath = async (percorso) => {
+    if (!percorso?.nome) return;
+    if (canAccessPath(percorso)) {
+      showToast("Percorso gia disponibile");
+      return;
+    }
+    setBuyingPath(percorso.nome);
+    try {
+      await api("/users/me/percorsi/acquista", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ museo: MUSEO, percorso: percorso.nome }),
+      });
+      setPurchasedKeys((prev) => new Set([...prev, makePurchaseKey(percorso)]));
+      showToast(`Percorso "${percorso.nome}" acquistato`);
+    } catch (e) {
+      showToast("Errore acquisto percorso: " + e.message, "error");
+    } finally {
+      setBuyingPath(null);
+    }
   };
 
   const getPreferredDescription = (oggetto) => {
@@ -528,7 +610,15 @@ export default function App() {
                 : pagedVisits.length === 0
                   ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>Nessun percorso creato</p></div>
                   : pagedVisits.map((p, i) => (
-                    <VisitCard key={p.nome} percorso={p} onView={openPathDetails} delay={i * 0.06} />
+                    <VisitCard
+                      key={p.nome}
+                      percorso={p}
+                      canView={canAccessPath(p)}
+                      onView={openPathDetails}
+                      onBuy={buyPath}
+                      buying={buyingPath === p.nome}
+                      delay={i * 0.06}
+                    />
                   ))
               }
             </div>
@@ -770,6 +860,7 @@ export default function App() {
             <button onClick={closePathModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
             <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Percorso</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedPath.nome}</h3>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>Prezzo: <span style={{ color: "var(--gold)", fontFamily: "var(--font-head)" }}>{formatPrezzo(selectedPath.prezzo)}</span></p>
             <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
               <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10, fontFamily: "var(--font-head)" }}>Opere del percorso in ordine</p>
               <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10 }}>

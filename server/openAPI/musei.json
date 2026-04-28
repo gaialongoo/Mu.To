@@ -96,6 +96,7 @@
       "percorsi": [
         {
           "nome": "Percorso rapido",
+          "prezzo": 0,
           "oggetti": [
             "statua",
             "dipinto"
@@ -103,6 +104,7 @@
         },
         {
           "nome": "Percorso completo",
+          "prezzo": 9.99,
           "oggetti": [
             "statua",
             "dipinto",
@@ -111,6 +113,7 @@
         },
         {
           "nome": "Percorso archeologico",
+          "prezzo": 4.5,
           "oggetti": [
             "dipinto",
             "anfora"
@@ -294,6 +297,7 @@
       "percorsi": [
         {
           "nome": "Percorso essenziale",
+          "prezzo": 0,
           "oggetti": [
             "sarcofago",
             "mummia"
@@ -301,6 +305,7 @@
         },
         {
           "nome": "Percorso egizio",
+          "prezzo": 7.5,
           "oggetti": [
             "sarcofago",
             "mummia",
@@ -309,6 +314,7 @@
         },
         {
           "nome": "Percorso del potere",
+          "prezzo": 5,
           "oggetti": [
             "collana",
             "scettro",
@@ -317,6 +323,7 @@
         },
         {
           "nome": "Percorso completo",
+          "prezzo": 11.9,
           "oggetti": [
             "sarcofago",
             "mummia",
@@ -390,6 +397,7 @@
       "percorsi": [
         {
           "nome": "Percorso Base",
+          "prezzo": 0,
           "oggetti": [
             "Vaso Antico",
             "Quadro Astratto",

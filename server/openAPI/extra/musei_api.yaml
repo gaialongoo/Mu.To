@@ -3,7 +3,7 @@ openapi: 3.0.3
 info:
   title: Sistema Musei API
   description: API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi, layout grafici e immagini
-  version: 2.3.0
+  version: 2.4.0
 
 servers:
   - url: https://localhost:3000
@@ -21,6 +21,36 @@ components:
       name: muto_auth
 
   schemas:
+    Percorso:
+      type: object
+      required: [nome, oggetti, prezzo]
+      properties:
+        nome:
+          type: string
+        oggetti:
+          type: array
+          items:
+            type: string
+        prezzo:
+          type: number
+          minimum: 0
+          description: Prezzo in EUR. Se 0 il percorso e incluso nell'account.
+          example: 9.99
+
+    PercorsoAcquisto:
+      type: object
+      properties:
+        museo:
+          type: string
+        percorso:
+          type: string
+        prezzo:
+          type: number
+          minimum: 0
+        purchasedAt:
+          type: string
+          format: date-time
+
     User:
       type: object
       properties:
@@ -51,6 +81,10 @@ components:
         ruolo:
           type: string
           enum: [utente, professore, admin]
+        percorsiAcquistati:
+          type: array
+          items:
+            $ref: '#/components/schemas/PercorsoAcquisto'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -222,14 +256,7 @@ paths:
                 percorsi:
                   type: array
                   items:
-                    type: object
-                    properties:
-                      nome:
-                        type: string
-                      oggetti:
-                        type: array
-                        items:
-                          type: string
+                    $ref: '#/components/schemas/Percorso'
       responses:
         '201':
           description: Museo creato con successo
@@ -283,14 +310,7 @@ paths:
                     type: array
                     description: Percorsi statici del museo
                     items:
-                      type: object
-                      properties:
-                        nome:
-                          type: string
-                        oggetti:
-                          type: array
-                          items:
-                            type: string
+                      $ref: '#/components/schemas/Percorso'
         '404':
           description: Museo non trovato
 
@@ -736,14 +756,7 @@ paths:
                   percorsi:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        nome:
-                          type: string
-                        oggetti:
-                          type: array
-                          items:
-                            type: string
+                      $ref: '#/components/schemas/Percorso'
         '404':
           description: Museo non trovato
 
@@ -774,6 +787,11 @@ paths:
                   items:
                     type: string
                   example: ["Venere", "David", "Perseo"]
+                prezzo:
+                  type: number
+                  minimum: 0
+                  description: Prezzo in EUR. Se omesso, default 0.
+                  example: 4.5
       responses:
         '201':
           description: Percorso creato
@@ -785,14 +803,7 @@ paths:
                   message:
                     type: string
                   percorso:
-                    type: object
-                    properties:
-                      nome:
-                        type: string
-                      oggetti:
-                        type: array
-                        items:
-                          type: string
+                    $ref: '#/components/schemas/Percorso'
         '400':
           description: Percorso già esistente o dati non validi
         '404':
@@ -819,14 +830,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  nome:
-                    type: string
-                  oggetti:
-                    type: array
-                    items:
-                      type: string
+                $ref: '#/components/schemas/Percorso'
         '404':
           description: Museo o percorso non trovato
 
@@ -1067,6 +1071,87 @@ paths:
                     $ref: '#/components/schemas/User'
         '401':
           description: Utente non autenticato
+
+  /users/me/percorsi:
+    get:
+      summary: Lista percorsi acquistati dall'utente autenticato
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: query
+          name: museo
+          required: false
+          schema:
+            type: string
+          description: Se presente, filtra gli acquisti per museo.
+      responses:
+        '200':
+          description: Lista acquisti caricata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsiAcquistati:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PercorsoAcquisto'
+                  chiaviAcquisto:
+                    type: array
+                    description: Chiavi nel formato museo::percorso.
+                    items:
+                      type: string
+        '401':
+          description: Utente non autenticato
+
+  /users/me/percorsi/acquista:
+    post:
+      summary: Acquista un percorso a pagamento per l'utente autenticato
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, percorso]
+              properties:
+                museo:
+                  type: string
+                percorso:
+                  type: string
+      responses:
+        '201':
+          description: Acquisto completato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  giaAcquistato:
+                    type: boolean
+                    example: false
+                  acquisto:
+                    $ref: '#/components/schemas/PercorsoAcquisto'
+        '200':
+          description: Percorso gia acquistato in precedenza
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  giaAcquistato:
+                    type: boolean
+                    example: true
+                  acquisto:
+                    $ref: '#/components/schemas/PercorsoAcquisto'
+        '400':
+          description: Dati mancanti o percorso incluso (prezzo 0)
+        '401':
+          description: Utente non autenticato
+        '404':
+          description: Museo o percorso non trovato
     put:
       summary: Aggiorna il profilo dell'utente autenticato
       security:

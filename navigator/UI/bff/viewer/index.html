@@ -2047,6 +2047,10 @@
     checkConfirm();
   }
 
+  function makePurchaseKey(museoNome, percorsoNome) {
+    return `${String(museoNome || "").trim()}::${String(percorsoNome || "").trim()}`;
+  }
+
   /* ── PERCORSI — GET /api/musei/{nome}/percorsi */
   function loadPercorsi() {
     const overlay = document.getElementById('overlay');
@@ -2070,22 +2074,41 @@
       return;
     }
 
-    fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(d => {
+    Promise.all([
+      fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi`)
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+      fetch(`${API}/users/me/percorsi?museo=${encodeURIComponent(museoNome)}`, { credentials: "include" })
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+    ])
+      .then(([percorsiData, acquistiData]) => {
         loading.classList.remove('visible');
-        d.percorsi.forEach(p => {
+        const keys = new Set(Array.isArray(acquistiData?.chiaviAcquisto) ? acquistiData.chiaviAcquisto : []);
+        const percorsiDisponibili = (Array.isArray(percorsiData?.percorsi) ? percorsiData.percorsi : [])
+          .filter((p) => {
+            const prezzo = Number(p?.prezzo || 0);
+            const incluso = Number.isFinite(prezzo) && prezzo <= 0;
+            return incluso || keys.has(makePurchaseKey(museoNome, p?.nome));
+          });
+
+        if (percorsiDisponibili.length === 0) {
+          error.textContent = 'Non hai ancora percorsi disponibili per questo museo.';
+          error.classList.add('visible');
+          percorso.disabled = true;
+          return;
+        }
+
+        percorsiDisponibili.forEach(p => {
           const o = document.createElement('option');
           o.value = p.nome;
           o.textContent = p.nome;
           percorso.appendChild(o);
         });
         percorso.disabled = false;
-        percorso.addEventListener('change', checkConfirm);
+        percorso.onchange = checkConfirm;
       })
       .catch(() => {
         loading.classList.remove('visible');
-        error.textContent = 'Impossibile caricare i percorsi. Riprova.';
+        error.textContent = 'Impossibile caricare i percorsi acquistati. Riprova.';
         error.classList.add('visible');
       });
   }

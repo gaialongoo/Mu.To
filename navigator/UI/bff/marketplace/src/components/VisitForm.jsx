@@ -12,6 +12,7 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
   const isMobile = viewportW <= 768;
 
   const [nome,          setNome]     = useState("");
+  const [prezzo,        setPrezzo]   = useState("0");
   const [visitOggetti,  setVisit]    = useState([]);
   const [selected,      setSelected] = useState("");
   const [saving,        setSaving]   = useState(false);
@@ -30,10 +31,10 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
     try {
       await api(`/musei/${enc(museo)}/percorsi`, {
         method: "POST",
-        body: JSON.stringify({ nome: nome.trim(), oggetti: visitOggetti }),
+        body: JSON.stringify({ nome: nome.trim(), oggetti: visitOggetti, prezzo: Number(prezzo) || 0 }),
       });
       toast(`Percorso "${nome}" creato`);
-      setNome(""); setVisit([]);
+      setNome(""); setPrezzo("0"); setVisit([]);
       onSaved();
     } catch (err) {
       toast("Errore: " + err.message, "error");
@@ -56,6 +57,19 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
         <div style={{ marginBottom: 22 }}>
           <label style={labelStyle}>Nome del Percorso</label>
           <input style={inputStyle} value={nome} onChange={(e) => setNome(e.target.value)} required placeholder="Es: Rinascimento Fiorentino" />
+        </div>
+        <div style={{ marginBottom: 22 }}>
+          <label style={labelStyle}>Prezzo (EUR)</label>
+          <input
+            style={inputStyle}
+            value={prezzo}
+            onChange={(e) => setPrezzo(e.target.value)}
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            placeholder="0.00"
+          />
         </div>
 
         <div style={{ marginBottom: 22 }}>

@@ -1442,6 +1442,26 @@ export default function MuseoEditor() {
     });
   }, []);
 
+  const reattachCorridorsForRoom = useCallback((stanzeNext, corridoiList, roomName) => {
+    return (corridoiList || []).map((c) => {
+      if (c.a !== roomName && c.b !== roomName) return c;
+      const autoGeom = computeAutoCorridoioGeom(stanzeNext, c);
+      if (!autoGeom) return c;
+
+      // Mantieni lo spessore corrente del corridoio, ma riaggancialo alle porte.
+      const currentThickness = Math.max(
+        10,
+        Math.min(120, Math.round(Math.min(c.w || 40, c.h || 40)))
+      );
+      if (autoGeom.w >= autoGeom.h) {
+        const yMid = autoGeom.y + autoGeom.h / 2;
+        return { ...c, x: autoGeom.x, y: yMid - currentThickness / 2, w: autoGeom.w, h: currentThickness };
+      }
+      const xMid = autoGeom.x + autoGeom.w / 2;
+      return { ...c, x: xMid - currentThickness / 2, y: autoGeom.y, w: currentThickness, h: autoGeom.h };
+    });
+  }, []);
+
   // ─── DRAG/RESIZE (stanze + oggetti) ───────────────────────────────────
   const dragRef = useRef(null);
 
@@ -1465,21 +1485,31 @@ export default function MuseoEditor() {
       if (d.type === "room") {
         const dx = p.x - d.start.x;
         const dy = p.y - d.start.y;
-        setMuseo((m) => ({
-          ...m,
-          stanze: m.stanze.map((s) => s.nome === d.nome ? { ...s, x: d.room.x + dx, y: d.room.y + dy } : s),
-        }));
+        setMuseo((m) => {
+          const stanzeNext = m.stanze.map((s) => s.nome === d.nome ? { ...s, x: d.room.x + dx, y: d.room.y + dy } : s);
+          const corridoiNext = reattachCorridorsForRoom(stanzeNext, m.corridoi, d.nome);
+          return {
+            ...m,
+            stanze: stanzeNext,
+            corridoi: normalizeCorridoi(stanzeNext, corridoiNext),
+          };
+        });
       } else if (d.type === "room-resize") {
         const dx = p.x - d.start.x;
         const dy = p.y - d.start.y;
-        setMuseo((m) => ({
-          ...m,
-          stanze: m.stanze.map((s) => s.nome === d.nome ? {
+        setMuseo((m) => {
+          const stanzeNext = m.stanze.map((s) => s.nome === d.nome ? {
             ...s,
             w: Math.max(40, d.room.w + dx),
             h: Math.max(40, d.room.h + dy),
-          } : s),
-        }));
+          } : s);
+          const corridoiNext = reattachCorridorsForRoom(stanzeNext, m.corridoi, d.nome);
+          return {
+            ...m,
+            stanze: stanzeNext,
+            corridoi: normalizeCorridoi(stanzeNext, corridoiNext),
+          };
+        });
       } else if (d.type === "obj") {
         const room = d.room;
         const xRel = clamp01((p.x - room.x) / room.w);
@@ -1511,7 +1541,7 @@ export default function MuseoEditor() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [updateCorridoio]);
+  }, [reattachCorridorsForRoom, updateCorridoio]);
 
   const startDragRoom = (e, nome, kind = "move") => {
     if (percorsoEdit) return;
