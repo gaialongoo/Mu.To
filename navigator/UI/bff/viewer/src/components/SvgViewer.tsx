@@ -15,6 +15,8 @@ type Session = {
   museo: string;
   percorso: string[];
   createdAt: number;
+  livello?: string;
+  durata?: string;
 };
 
 function getSession(): Session | null {
@@ -69,6 +71,16 @@ function parseStanzaFromUrl(session: Session): ParsedStanza {
   };
 }
 
+function getCurrentPathEndpointsFromUrl(session: Session): { from: string | null; to: string | null } {
+  const { svgPath } = parseStanzaFromUrl(session);
+  if (!svgPath) return { from: null, to: null };
+  const parts = svgPath.split("/").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 3 && normalize(parts[0]) === "path") {
+    return { from: parts[1] || null, to: parts[2] || null };
+  }
+  return { from: null, to: null };
+}
+
 function computeSvgUrl(session: Session): string {
   const { svgPath } = parseStanzaFromUrl(session);
   const museo = encodeURIComponent(session.museo);
@@ -120,6 +132,11 @@ type NavigatorGraphCache = {
 
 export default function SvgViewer() {
   const [session, setSession] = useState<Session | null>(null);
+  const [availableQuickRooms, setAvailableQuickRooms] = useState({
+    shop: false,
+    wc: false,
+    out: false,
+  });
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -181,6 +198,19 @@ export default function SvgViewer() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [session, freeExplore]);
+
+  useEffect(() => {
+    const host = document.getElementById("svg-host");
+    const svg = host?.querySelector<SVGSVGElement>("svg");
+    if (!svg) return;
+    const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))
+      .map((el) => normalize(el.textContent ?? ""));
+    setAvailableQuickRooms({
+      shop: labels.includes("shop"),
+      wc: labels.includes("wc"),
+      out: labels.includes("out"),
+    });
+  }, [svgLoadTick]);
 
   // HOME: blocca zoom/pan e disabilita la modalità esplora.
   useEffect(() => {
@@ -467,6 +497,62 @@ export default function SvgViewer() {
     window.location.replace(url.toString());
   };
 
+  const handleQuickRoomNavigate = async (roomLabel: string) => {
+    if (!session) return;
+    const percorso = Array.isArray(session.percorso) ? session.percorso : [];
+    const fallbackFrom = percorso.length > 1 ? percorso[1] : null;
+    const { from: fromInUrl } = getCurrentPathEndpointsFromUrl(session);
+    const currentFrom =
+      focusedObject ||
+      fromInUrl ||
+      fallbackFrom;
+
+    if (!currentFrom) return;
+
+    try {
+      const stanzaFromObj = isSpecialRouteNode(currentFrom)
+        ? (currentStanzaLabel || currentFrom)
+        : await fetchObjectRoom(session.museo, currentFrom);
+      const nextUrl = `/?stanza=${encodeURIComponent(stanzaFromObj)}/path/${encodeURIComponent(currentFrom)}/${encodeURIComponent(roomLabel)}`;
+      setFocusedObject(null);
+      window.history.pushState({}, "", nextUrl);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch (err) {
+      console.error("Errore navigazione rapida stanza:", err);
+    }
+  };
+
+  const handleResumePath = async () => {
+    if (!session) return;
+    const percorso = Array.isArray(session.percorso) ? session.percorso : [];
+    const { from: fromInUrl, to: toInUrl } = getCurrentPathEndpointsFromUrl(session);
+    const from = fromInUrl;
+    if (!from || !isSpecialRouteNode(toInUrl || "")) return;
+    const idx = percorso.indexOf(from);
+    if (idx < 0 || idx >= percorso.length - 1) return;
+    const next = percorso[idx + 1];
+    if (!next) return;
+    try {
+      const stanzaFromObj = isSpecialRouteNode(from)
+        ? (currentStanzaLabel || from)
+        : await fetchObjectRoom(session.museo, from);
+      const nextUrl = `/?stanza=${encodeURIComponent(stanzaFromObj)}/path/${encodeURIComponent(from)}/${encodeURIComponent(next)}`;
+      setFocusedObject(null);
+      window.history.pushState({}, "", nextUrl);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch (err) {
+      console.error("Errore ripresa percorso:", err);
+    }
+  };
+
+  const { from: fromInUrl, to: toInUrl } = session ? getCurrentPathEndpointsFromUrl(session) : { from: null, to: null };
+  const canResumePath = !!session
+    && !!fromInUrl
+    && isSpecialRouteNode(toInUrl || "")
+    && Array.isArray(session.percorso)
+    && session.percorso.indexOf(fromInUrl) >= 0
+    && session.percorso.indexOf(fromInUrl) < session.percorso.length - 1;
+
   if (!session) return <div style={{ padding: 20 }}>Caricamento…</div>;
 
   return (
@@ -561,6 +647,74 @@ export default function SvgViewer() {
           Trascina per spostarti<br />
           Pizzica per zoomare
         </div>
+      )}
+
+      <div
+        style={{
+          position: "fixed",
+          left: 16,
+          bottom: 16,
+          zIndex: 1000,
+          display: "flex",
+          gap: 8,
+          background: "rgba(0,0,0,0.45)",
+          padding: "8px 10px",
+          borderRadius: 10,
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
+      >
+        {[
+          { key: "shop", label: "SHOP" },
+          { key: "wc", label: "WC" },
+          { key: "out", label: "OUT" },
+        ].map((item) => {
+          const enabled = availableQuickRooms[item.key as keyof typeof availableQuickRooms];
+          return (
+            <button
+              key={item.key}
+              onClick={() => enabled && handleQuickRoomNavigate(item.label)}
+              disabled={!enabled}
+              style={{
+                border: "1px solid rgba(255,255,255,0.28)",
+                background: enabled ? "rgba(24,95,165,0.9)" : "rgba(90,90,90,0.4)",
+                color: "#fff",
+                borderRadius: 8,
+                padding: "7px 10px",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                cursor: enabled ? "pointer" : "not-allowed",
+              }}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+      {canResumePath && (
+        <button
+          onClick={handleResumePath}
+          style={{
+            position: "fixed",
+            left: 16,
+            bottom: 74,
+            zIndex: 1001,
+            border: "1px solid rgba(255,255,255,0.3)",
+            background: "rgba(15,110,86,0.92)",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "8px 12px",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            cursor: "pointer",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          RIPRENDI PERCORSO
+        </button>
       )}
 
       <div
@@ -1225,6 +1379,13 @@ function pickDescriptionByPreferences(
 }
 
 async function getUserPreferences(): Promise<{ livello?: string; durata?: string } | null> {
+  const session = getSession();
+  const livelloFromSession = typeof session?.livello === "string" ? session.livello : "";
+  const durataFromSession = typeof session?.durata === "string" ? session.durata : "";
+  if (livelloFromSession || durataFromSession) {
+    return { livello: livelloFromSession, durata: durataFromSession };
+  }
+
   if (cachedUserPreferences) return cachedUserPreferences;
   if (userPreferencesInFlight) return userPreferencesInFlight;
 
@@ -1504,6 +1665,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function isSpecialRouteNode(name: string): boolean {
+  const key = normalize(name || "");
+  return key === "in" || key === "out" || key === "shop" || key === "wc";
+}
+
 /* ===================== URL HELPERS ===================== */
 
 function goToRoom(label: string) {
@@ -1568,6 +1734,9 @@ function ObjectOverlay({
   const [descrizione, setDescrizione] = useState<string | null>(null);
   const [immagini, setImmagini]       = useState<{ tipo: string; url: string }[]>([]);
   const [slideIdx, setSlideIdx]       = useState(0);
+  const percorso = Array.isArray(session?.percorso) ? session.percorso : [];
+  const pathIndex = percorso.indexOf(nome);
+  const isObjectInPath = pathIndex !== -1;
 
   useEffect(() => {
     setSlideIdx(0);
@@ -1765,7 +1934,7 @@ function ObjectOverlay({
         </div>
 
         {/* ── Navigazione percorso ── */}
-        {showNav && (
+        {showNav && isObjectInPath && (
           <div style={{
             display: "flex", justifyContent: "space-between",
             padding: "12px 24px", borderTop: "1px solid #eee", flexShrink: 0,

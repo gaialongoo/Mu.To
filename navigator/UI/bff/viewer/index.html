@@ -1865,7 +1865,7 @@
       url.searchParams.delete("profile");
       history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     }
-    if (!currentUser && new URLSearchParams(window.location.search).has("stanza")) {
+    if (!currentUser && !validSession(getSession()) && new URLSearchParams(window.location.search).has("stanza")) {
       window.location.replace("/");
     }
   }
@@ -1888,6 +1888,35 @@
     document.cookie =
       COOKIE + "=" + encodeURIComponent(JSON.stringify(s)) +
       "; max-age=" + (MAX_AGE / 1000) + "; path=/; SameSite=Lax";
+  }
+
+  function decodeBase64UrlJson(input) {
+    if (!input) return null;
+    try {
+      const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+      const decoded = atob(padded);
+      return JSON.parse(decoded);
+    } catch {
+      return null;
+    }
+  }
+
+  function buildPublicSessionFromSharePayload(payload) {
+    const museo = String(payload?.museo || "").trim();
+    const oggetti = Array.isArray(payload?.oggetti)
+      ? payload.oggetti.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const livello = String(payload?.livello || "").trim().toLowerCase();
+    const durata = String(payload?.durata || "").trim().toLowerCase();
+    if (!museo || oggetti.length < 1) return null;
+    return {
+      museo,
+      percorso: ["IN", ...oggetti, "OUT"],
+      createdAt: Date.now(),
+      livello,
+      durata,
+    };
   }
 
   function validSession(s) {
@@ -1939,6 +1968,19 @@
   /* ── MUSEUM SELECT — GET /api/musei ────────── */
   const museo = document.getElementById('museo');
   const ctaBtn = document.getElementById('ctaBtn');
+
+  const shareParam = new URLSearchParams(window.location.search).get("share");
+  if (shareParam) {
+    const payload = decodeBase64UrlJson(shareParam);
+    const publicSession = buildPublicSessionFromSharePayload(payload);
+    if (publicSession) {
+      setSession(publicSession);
+      const redirectUrl = getNavigatorRedirectUrl(publicSession);
+      if (redirectUrl) {
+        window.location.replace(redirectUrl);
+      }
+    }
+  }
 
   // Se esiste una sessione valida, vai direttamente a React
   const session = getSession();

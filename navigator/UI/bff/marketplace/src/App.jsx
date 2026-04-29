@@ -81,6 +81,96 @@ function formatPrezzo(prezzo) {
   return `${amount.toFixed(2).replace(".", ",")} EUR`;
 }
 
+function encodeSharePayload(payload) {
+  const json = JSON.stringify(payload);
+  return btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function buildObjectGraph(oggetti = []) {
+  const graph = new Map();
+  for (const obj of oggetti) {
+    const name = String(obj?.nome || "").trim();
+    if (!name) continue;
+    if (!graph.has(name)) graph.set(name, new Set());
+  }
+  for (const obj of oggetti) {
+    const from = String(obj?.nome || "").trim();
+    if (!from || !graph.has(from)) continue;
+    const connessi = Array.isArray(obj?.connessi) ? obj.connessi : [];
+    for (const nextRaw of connessi) {
+      const to = String(nextRaw || "").trim();
+      if (!to || !graph.has(to)) continue;
+      graph.get(from).add(to);
+      graph.get(to).add(from);
+    }
+  }
+  return graph;
+}
+
+function shortestDistance(graph, start, goal) {
+  if (!start || !goal) return Number.POSITIVE_INFINITY;
+  if (start === goal) return 0;
+  if (!graph.has(start) || !graph.has(goal)) return Number.POSITIVE_INFINITY;
+  const queue = [{ node: start, dist: 0 }];
+  const visited = new Set([start]);
+  while (queue.length > 0) {
+    const { node, dist } = queue.shift();
+    for (const next of graph.get(node) || []) {
+      if (visited.has(next)) continue;
+      if (next === goal) return dist + 1;
+      visited.add(next);
+      queue.push({ node: next, dist: dist + 1 });
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function optimizeObjectsOrderByPath(selectedNames, allObjects) {
+  if (!Array.isArray(selectedNames) || selectedNames.length <= 1) return selectedNames || [];
+  const selected = selectedNames.map((x) => String(x || "").trim()).filter(Boolean);
+  if (selected.length <= 1) return selected;
+
+  const graph = buildObjectGraph(allObjects);
+  const objectByName = new Map(
+    (Array.isArray(allObjects) ? allObjects : [])
+      .map((obj) => [String(obj?.nome || "").trim(), obj])
+      .filter(([name]) => !!name)
+  );
+  const hasIN = graph.has("IN");
+  let current = hasIN ? "IN" : selected[0];
+  const remaining = new Set(selected);
+  const ordered = [];
+
+  while (remaining.size > 0) {
+    let best = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const currentRoom = String(objectByName.get(current)?.stanza || "").trim().toLowerCase();
+    for (const candidate of remaining) {
+      const d = shortestDistance(graph, current, candidate);
+      const candidateRoom = String(objectByName.get(candidate)?.stanza || "").trim().toLowerCase();
+      const roomPenalty = currentRoom && candidateRoom && currentRoom === candidateRoom ? 0 : 1000;
+      const score = roomPenalty + d;
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    if (!best) {
+      // fallback robusto: se non troviamo connessioni, preserviamo un ordine stabile
+      const first = Array.from(remaining).sort((a, b) => a.localeCompare(b))[0];
+      ordered.push(first);
+      remaining.delete(first);
+      current = first;
+      continue;
+    }
+    ordered.push(best);
+    remaining.delete(best);
+    current = best;
+  }
+
+  return ordered;
+}
+
 // ─── Visit card ──────────────────────────────────────────────────────────────
 function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
   const prezzo = Number(percorso.prezzo || 0);
@@ -234,6 +324,12 @@ export default function App() {
   const [appliedStanza, setAppliedStanza] = useState("");
   const [itemPage,     setItemPage]     = useState(1);
   const [visitPage,    setVisitPage]    = useState(1);
+  const [teacherBuilderOpen, setTeacherBuilderOpen] = useState(false);
+  const [teacherSelectedObjects, setTeacherSelectedObjects] = useState([]);
+  const [teacherLevel, setTeacherLevel] = useState("studente");
+  const [teacherDuration, setTeacherDuration] = useState("medio");
+  const [teacherLink, setTeacherLink] = useState("");
+  const [teacherOptimizedOrder, setTeacherOptimizedOrder] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -355,6 +451,7 @@ export default function App() {
     ["filosofia_significato", "Filosofia e significato"],
     ["moda_costumi", "Moda e costumi"],
   ];
+  const isProfessor = String(currentUser?.ruolo || "").toLowerCase() === "professore";
 
   const toggleInterest = (value) => {
     setProfileForm((prev) => ({
@@ -374,6 +471,42 @@ export default function App() {
     setSelectedGalleryIndex(0);
   };
   const closePathModal = () => setSelectedPath(null);
+  const closeTeacherBuilder = () => {
+    setTeacherBuilderOpen(false);
+    setTeacherLink("");
+    setTeacherOptimizedOrder([]);
+  };
+  const toggleTeacherObject = (name) => {
+    setTeacherSelectedObjects((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
+  };
+  const generateTeacherLink = () => {
+    if (!MUSEO || teacherSelectedObjects.length < 1) {
+      showToast("Seleziona almeno un oggetto", "error");
+      return;
+    }
+    const optimizedObjects = optimizeObjectsOrderByPath(teacherSelectedObjects, allOggetti);
+    const token = encodeSharePayload({
+      museo: MUSEO,
+      oggetti: optimizedObjects,
+      livello: teacherLevel,
+      durata: teacherDuration,
+    });
+    const link = `${window.location.origin}/?share=${token}`;
+    setTeacherLink(link);
+    setTeacherOptimizedOrder(optimizedObjects);
+    showToast(`Ordine ottimizzato: ${optimizedObjects.join(" -> ")}`);
+  };
+  const copyTeacherLink = async () => {
+    if (!teacherLink) return;
+    try {
+      await navigator.clipboard.writeText(teacherLink);
+      showToast("Link copiato");
+    } catch {
+      showToast("Copia non riuscita", "error");
+    }
+  };
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -565,6 +698,19 @@ export default function App() {
               }}>{t.label}</button>
             ))}
           </div>
+          {activeTab === "visits" && isProfessor && (
+            <button
+              onClick={() => {
+                setTeacherSelectedObjects([]);
+                setTeacherLink("");
+                setTeacherOptimizedOrder([]);
+                setTeacherBuilderOpen(true);
+              }}
+              style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", width: isMobile ? "100%" : "auto" }}
+            >
+              Crea percorso classe
+            </button>
+          )}
         </nav>
 
         {/* ── Filters (only on items tab) ── */}
@@ -877,6 +1023,71 @@ export default function App() {
                 })}
               </ol>
             </div>
+          </div>
+        </div>
+      )}
+
+      {teacherBuilderOpen && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) closeTeacherBuilder(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 720, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ width: isMobile ? "min(760px, 100%)" : "min(860px, 94vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
+            <button onClick={closeTeacherBuilder} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Professore</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 16 }}>Percorso personalizzato classe</h3>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <select value={teacherLevel} onChange={(e) => setTeacherLevel(e.target.value)} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+                <option value="bambino">Bambino</option>
+                <option value="studente">Studente</option>
+                <option value="esperto">Esperto</option>
+                <option value="avanzato">Avanzato</option>
+              </select>
+              <select value={teacherDuration} onChange={(e) => setTeacherDuration(e.target.value)} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+                <option value="corto">Corto</option>
+                <option value="medio">Medio</option>
+                <option value="lungo">Lungo</option>
+              </select>
+            </div>
+
+            <p style={{ fontSize: 11, letterSpacing: "0.12em", color: "var(--text-dim)", marginBottom: 10 }}>
+              Seleziona gli oggetti del percorso (ordine libero): {teacherSelectedObjects.length} selezionati.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 8, marginBottom: 14 }}>
+              {allOggetti.map((obj) => {
+                const checked = teacherSelectedObjects.includes(obj.nome);
+                return (
+                  <button
+                    type="button"
+                    key={obj.nome}
+                    onClick={() => toggleTeacherObject(obj.nome)}
+                    style={{ textAlign: "left", padding: "10px 12px", border: `1px solid ${checked ? "var(--gold)" : "var(--border)"}`, background: checked ? "var(--gold-dim)" : "var(--bg-card)", color: checked ? "var(--gold)" : "var(--text-dim)", borderRadius: 8, cursor: "pointer" }}
+                  >
+                    {obj.nome}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
+              <button type="button" onClick={generateTeacherLink} style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
+                Genera link
+              </button>
+              {teacherLink && (
+                <button type="button" onClick={copyTeacherLink} style={{ padding: "11px 16px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
+                  Copia link
+                </button>
+              )}
+            </div>
+
+            {teacherOptimizedOrder.length > 0 && (
+              <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+                Ordine finale percorso: <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
+              </p>
+            )}
+
+            {teacherLink && (
+              <input readOnly value={teacherLink} style={{ width: "100%", padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+            )}
           </div>
         </div>
       )}
