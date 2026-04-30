@@ -1065,6 +1065,10 @@ export default function MuseoEditor() {
           objectType: String(o.objectType || "").toLowerCase() === "text" ? "text" : "normal",
           textTitle: String(o.textTitle || ""),
           textBody: String(o.textBody || ""),
+          autore: String(o.autore || ""),
+          licenza: String(o.licenza || ""),
+          correnteArtistica: String(o.correnteArtistica || ""),
+          anno: String(o.anno || ""),
         })),
         percorsi: percorsiData?.percorsi ?? data.percorsi ?? [],
         corridoi: normalizeCorridoi(stanze, layout?.corridoi || []),
@@ -1107,6 +1111,10 @@ export default function MuseoEditor() {
               objectType: o.objectType || "normal",
               textTitle: o.textTitle || "",
               textBody: o.textBody || "",
+              autore: o.autore || "",
+              licenza: o.licenza || "",
+              correnteArtistica: o.correnteArtistica || "",
+              anno: o.anno || "",
             })
           }
         )
@@ -1386,6 +1394,10 @@ export default function MuseoEditor() {
         visibile:true,
         descrizioni:textDescriptions,
         objectType,
+        autore:"",
+        licenza:"",
+        correnteArtistica:"",
+        anno:"",
       };
       setMuseo(m=>({...m,oggetti:[...m.oggetti,nuovoOggetto]}));
       setSelected({type:"oggetto",nome:n}); setMode("select");
@@ -1399,6 +1411,10 @@ export default function MuseoEditor() {
             visibile:true,
             descrizioni:nuovoOggetto.descrizioni,
             objectType: nuovoOggetto.objectType,
+            autore: nuovoOggetto.autore,
+            licenza: nuovoOggetto.licenza,
+            correnteArtistica: nuovoOggetto.correnteArtistica,
+            anno: nuovoOggetto.anno,
           })});
       } catch(err){showToast(`⚠ Oggetto solo locale (${err.message})`,false);}
     } else if (!percorsoEdit) {
@@ -2467,6 +2483,46 @@ export default function MuseoEditor() {
                 <div style={{marginTop:10,padding:"8px 10px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,fontSize:11,color:THEME.textDim}}>
                   Per gli oggetti di tipo Testo, il titolo mostrato e' il nome oggetto.
                   Usa la sezione DESCRIZIONI per inserire i contenuti in base alle preferenze utente.
+                </div>
+              )}
+              {String(selItem.objectType || "").toLowerCase() !== "text" && (
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8,marginTop:10}}>
+                  <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                    <FLabel>Autore</FLabel>
+                    <input
+                      value={String(selItem.autore || "")}
+                      onChange={e=>updOggetto(selItem.nome,{autore:e.target.value})}
+                      placeholder="Es. Caravaggio"
+                      style={{...INP,marginBottom:0}}
+                    />
+                  </div>
+                  <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                    <FLabel>Licenza</FLabel>
+                    <input
+                      value={String(selItem.licenza || "")}
+                      onChange={e=>updOggetto(selItem.nome,{licenza:e.target.value})}
+                      placeholder="Es. CC BY-SA 4.0"
+                      style={{...INP,marginBottom:0}}
+                    />
+                  </div>
+                  <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                    <FLabel>Corrente artistica</FLabel>
+                    <input
+                      value={String(selItem.correnteArtistica || "")}
+                      onChange={e=>updOggetto(selItem.nome,{correnteArtistica:e.target.value})}
+                      placeholder="Es. Barocco"
+                      style={{...INP,marginBottom:0}}
+                    />
+                  </div>
+                  <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                    <FLabel>Anno</FLabel>
+                    <input
+                      value={String(selItem.anno || "")}
+                      onChange={e=>updOggetto(selItem.nome,{anno:e.target.value})}
+                      placeholder="Es. 1602-1603"
+                      style={{...INP,marginBottom:0}}
+                    />
+                  </div>
                 </div>
               )}
               <div style={{marginTop:10}}>

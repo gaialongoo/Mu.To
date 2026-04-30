@@ -42,7 +42,15 @@ class SistemaMusei {
           stanza: ogg.stanza,
           pos: ogg.pos,
           connessi: ogg.connessi || [],
-          descrizioni: ogg.descrizioni || []
+          descrizioni: ogg.descrizioni || [],
+          visibile: ogg.visibile,
+          objectType: ogg.objectType || "normal",
+          textTitle: ogg.textTitle || "",
+          textBody: ogg.textBody || "",
+          autore: ogg.autore || "",
+          licenza: ogg.licenza || "",
+          correnteArtistica: ogg.correnteArtistica || "",
+          anno: ogg.anno || "",
         })),
         percorsi: museo.percorsi || []
       };

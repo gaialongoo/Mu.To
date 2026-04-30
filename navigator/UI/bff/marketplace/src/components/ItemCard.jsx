@@ -61,6 +61,11 @@ export default function ItemCard({ oggetto, museo, onView, delay = 0 }) {
           </span>
         </div>
 
+        <div style={{ display: "grid", gap: 4, marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Autore: {oggetto.autore || "N/D"}</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Anno: {oggetto.anno || "N/D"}</span>
+        </div>
+
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {oggetto.stanza && (
             <span style={{

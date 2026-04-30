@@ -86,6 +86,23 @@ function encodeSharePayload(payload) {
   return btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function parseAnnoValue(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return null;
+  const match = raw.match(/-?\d+/);
+  if (!match) return null;
+  const value = Math.abs(Number(match[0]));
+  if (!Number.isFinite(value)) return null;
+  const hasAc = /a\s*\.?\s*c\s*\.?/i.test(raw);
+  return hasAc ? -value : value;
+}
+
+function yearInputToSigned(yearValue, era) {
+  const n = Math.abs(Number(yearValue));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return era === "ac" ? -n : n;
+}
+
 function buildObjectGraph(oggetti = []) {
   const graph = new Map();
   for (const obj of oggetti) {
@@ -332,8 +349,20 @@ export default function App() {
   const [stanze,       setStanze]       = useState([]);
   const [search,       setSearch]       = useState("");
   const [stanzaFilter, setStanzaFilter] = useState("");
+  const [autoreFilter, setAutoreFilter] = useState("");
+  const [correnteFilter, setCorrenteFilter] = useState("");
+  const [yearFrom, setYearFrom] = useState("");
+  const [yearTo, setYearTo] = useState("");
+  const [yearFromEra, setYearFromEra] = useState("ac");
+  const [yearToEra, setYearToEra] = useState("dc");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [appliedStanza, setAppliedStanza] = useState("");
+  const [appliedAutore, setAppliedAutore] = useState("");
+  const [appliedCorrente, setAppliedCorrente] = useState("");
+  const [appliedYearFrom, setAppliedYearFrom] = useState("");
+  const [appliedYearTo, setAppliedYearTo] = useState("");
+  const [appliedYearFromEra, setAppliedYearFromEra] = useState("ac");
+  const [appliedYearToEra, setAppliedYearToEra] = useState("dc");
   const [itemPage,     setItemPage]     = useState(1);
   const [visitPage,    setVisitPage]    = useState(1);
   const [teacherBuilderOpen, setTeacherBuilderOpen] = useState(false);
@@ -437,9 +466,42 @@ export default function App() {
   useEffect(() => { if (authChecked) loadPurchasedPaths(); }, [authChecked, loadPurchasedPaths]);
 
   // ── Filtered items ─────────────────────────────────────────────────────────
+  const autori = [...new Set(
+    allOggetti
+      .map((o) => String(o?.autore || "").trim())
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+  const correntiArtistiche = [...new Set(
+    allOggetti
+      .map((o) => String(o?.correnteArtistica || "").trim())
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
   const filtered = allOggetti.filter((o) => {
-    if (appliedSearch && !o.nome.toLowerCase().includes(appliedSearch.toLowerCase())) return false;
+    if (appliedSearch) {
+      const q = appliedSearch.toLowerCase();
+      const searchable = [
+        o?.nome,
+        o?.autore,
+        o?.correnteArtistica,
+        o?.anno,
+      ]
+        .map((v) => String(v || "").toLowerCase())
+        .join(" ");
+      if (!searchable.includes(q)) return false;
+    }
     if (appliedStanza && o.stanza !== appliedStanza) return false;
+    if (appliedAutore && String(o?.autore || "").trim() !== appliedAutore) return false;
+    if (appliedCorrente && String(o?.correnteArtistica || "").trim() !== appliedCorrente) return false;
+    const fromSigned = yearInputToSigned(appliedYearFrom, appliedYearFromEra);
+    const toSigned = yearInputToSigned(appliedYearTo, appliedYearToEra);
+    if (fromSigned != null || toSigned != null) {
+      const annoOggetto = parseAnnoValue(o?.anno);
+      if (annoOggetto == null) return false;
+      const minYear = Math.min(fromSigned ?? annoOggetto, toSigned ?? annoOggetto);
+      const maxYear = Math.max(fromSigned ?? annoOggetto, toSigned ?? annoOggetto);
+      if (annoOggetto < minYear || annoOggetto > maxYear) return false;
+    }
     return true;
   });
   const pagedItems = filtered.slice((itemPage - 1) * PAGE_SIZE, itemPage * PAGE_SIZE);
@@ -1017,7 +1079,19 @@ export default function App() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 28 }}>
             <input
               type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { setAppliedSearch(search); setAppliedStanza(stanzaFilter); setItemPage(1); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setAppliedSearch(search);
+                  setAppliedStanza(stanzaFilter);
+                  setAppliedAutore(autoreFilter);
+                  setAppliedCorrente(correnteFilter);
+                  setAppliedYearFrom(yearFrom);
+                  setAppliedYearTo(yearTo);
+                  setAppliedYearFromEra(yearFromEra);
+                  setAppliedYearToEra(yearToEra);
+                  setItemPage(1);
+                }
+              }}
               placeholder="Cerca oggetti..."
               style={{ flex: 1, minWidth: isMobile ? "100%" : 200, width: isMobile ? "100%" : undefined, padding: "11px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
             />
@@ -1025,7 +1099,72 @@ export default function App() {
               <option value="">Tutte le stanze</option>
               {stanze.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button onClick={() => { setAppliedSearch(search); setAppliedStanza(stanzaFilter); setItemPage(1); }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Filtra</button>
+            <select value={autoreFilter} onChange={(e) => setAutoreFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
+              <option value="">Tutti gli autori</option>
+              {autori.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={correnteFilter} onChange={(e) => setCorrenteFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
+              <option value="">Tutte le correnti</option>
+              {correntiArtistiche.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <div style={{ display: "flex", gap: 6, width: isMobile ? "100%" : undefined }}>
+              <input
+                type="number"
+                min="1"
+                value={yearFrom}
+                onChange={(e) => setYearFrom(e.target.value)}
+                placeholder="Anno da"
+                style={{ padding: "11px 14px", width: isMobile ? "100%" : 120, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
+              />
+              <select value={yearFromEra} onChange={(e) => setYearFromEra(e.target.value)} style={{ padding: "11px 10px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
+                <option value="ac">a.C.</option>
+                <option value="dc">d.C.</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: 6, width: isMobile ? "100%" : undefined }}>
+              <input
+                type="number"
+                min="1"
+                value={yearTo}
+                onChange={(e) => setYearTo(e.target.value)}
+                placeholder="Anno a"
+                style={{ padding: "11px 14px", width: isMobile ? "100%" : 120, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
+              />
+              <select value={yearToEra} onChange={(e) => setYearToEra(e.target.value)} style={{ padding: "11px 10px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
+                <option value="ac">a.C.</option>
+                <option value="dc">d.C.</option>
+              </select>
+            </div>
+            <button onClick={() => {
+              setAppliedSearch(search);
+              setAppliedStanza(stanzaFilter);
+              setAppliedAutore(autoreFilter);
+              setAppliedCorrente(correnteFilter);
+              setAppliedYearFrom(yearFrom);
+              setAppliedYearTo(yearTo);
+              setAppliedYearFromEra(yearFromEra);
+              setAppliedYearToEra(yearToEra);
+              setItemPage(1);
+            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Filtra</button>
+            <button onClick={() => {
+              setSearch("");
+              setStanzaFilter("");
+              setAutoreFilter("");
+              setCorrenteFilter("");
+              setYearFrom("");
+              setYearTo("");
+              setYearFromEra("ac");
+              setYearToEra("dc");
+              setAppliedSearch("");
+              setAppliedStanza("");
+              setAppliedAutore("");
+              setAppliedCorrente("");
+              setAppliedYearFrom("");
+              setAppliedYearTo("");
+              setAppliedYearFromEra("ac");
+              setAppliedYearToEra("dc");
+              setItemPage(1);
+            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Reset</button>
           </div>
         )}
 
@@ -1206,6 +1345,10 @@ export default function App() {
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px, 1fr) minmax(0, 2fr)", gap: 12 }}>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Stanza:</strong> {selectedItem.stanza || "N/D"}</p>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>Connessi:</strong> {(selectedItem.connessi || []).join(", ") || "Nessuno"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Autore:</strong> {selectedItem.autore || "N/D"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Corrente artistica:</strong> {selectedItem.correnteArtistica || "N/D"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>Licenza:</strong> {selectedItem.licenza || "N/D"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Anno:</strong> {selectedItem.anno || "N/D"}</p>
                   </div>
                 </div>
                 <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>

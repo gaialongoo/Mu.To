@@ -31,7 +31,14 @@
               "La statua è un esempio significativo dell’arte rinascimentale",
               "L’opera testimonia la ricerca di perfezione formale e anatomica"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "dipinto",
@@ -61,7 +68,14 @@
               "L’opera rappresenta una sintesi di tecnica e narrazione",
               "Il dipinto è considerato un esempio fondamentale della pittura rinascimentale"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "anfora",
@@ -90,7 +104,14 @@
               "Questo reperto fornisce informazioni sugli usi quotidiani antichi",
               "L’anfora rappresenta un importante esempio di ceramica storica"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         }
       ],
       "percorsi": [
@@ -156,7 +177,14 @@
               "Il sarcofago mostra un’iconografia funeraria articolata",
               "L’analisi del sarcofago rivela una complessa simbologia religiosa"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Egizi",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": "3100 aC"
         },
         {
           "nome": "collana",
@@ -190,7 +218,14 @@
               "Collana storica rinascimentale con perle e gemme",
               "L’oggetto rappresenta la maestria artigianale del Rinascimento"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "scettro",
@@ -224,7 +259,14 @@
               "Lo scettro è un simbolo di potere politico o religioso",
               "L’oggetto testimonia l’importanza delle cerimonie ufficiali"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "maschera",
@@ -257,7 +299,14 @@
               "Questa maschera è un importante reperto antropologico",
               "L’oggetto fornisce informazioni sulle credenze dell’epoca"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "mummia",
@@ -291,7 +340,14 @@
               "Questo reperto è fondamentale per lo studio dei riti funerari",
               "La mummia rappresenta una testimonianza unica della civiltà egizia"
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "njaskdjas",
@@ -322,7 +378,14 @@
               "",
               ""
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         }
       ],
       "percorsi": [
@@ -379,7 +442,14 @@
             [
               "Vaso etrusco decorato a figure nere."
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "Quadro Astratto",
@@ -393,7 +463,14 @@
             [
               "Composizione astratta su tela."
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         },
         {
           "nome": "Oggetto 3",
@@ -422,7 +499,14 @@
               "",
               ""
             ]
-          ]
+          ],
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "",
+          "licenza": "",
+          "correnteArtistica": "",
+          "anno": ""
         }
       ],
       "percorsi": [

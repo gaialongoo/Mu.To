@@ -2192,6 +2192,9 @@ function ObjectOverlay({
   showNav: boolean;
 }) {
   const [descrizione, setDescrizione] = useState<string | null>(null);
+  const [autore, setAutore] = useState<string>("");
+  const [correnteArtistica, setCorrenteArtistica] = useState<string>("");
+  const [anno, setAnno] = useState<string>("");
   const [immagini, setImmagini]       = useState<{ tipo: string; url: string }[]>([]);
   const [slideIdx, setSlideIdx]       = useState(0);
   const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
@@ -2207,6 +2210,9 @@ function ObjectOverlay({
   useEffect(() => {
     setSlideIdx(0);
     if (virtualObject) {
+      setAutore("");
+      setCorrenteArtistica("");
+      setAnno("");
       getUserPreferences()
         .then((prefs) => setDescrizione(pickDescriptionByPreferences(virtualObject.descrizioni, prefs)))
         .catch(() => setDescrizione(null));
@@ -2214,23 +2220,30 @@ function ObjectOverlay({
       return;
     }
     const guidedText = String(session?.guidedCustomDescriptions?.[nome] || "").trim();
-    if (guidedText) {
-      setDescrizione(guidedText);
-    } else {
-
-      // carica descrizione personalizzata in base a livello/durata profilo
-      Promise.all([
-        fetch(
-          `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
-        ).then(r => r.json()),
-        getUserPreferences(),
-      ])
-        .then(([d, prefs]) => {
-          const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
-          setDescrizione(best);
-        })
-        .catch(() => setDescrizione(null));
-    }
+    // Carica dettagli oggetto (descrizione + meta dati autore/corrente).
+    Promise.all([
+      fetch(
+        `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
+      ).then(r => r.json()),
+      getUserPreferences(),
+    ])
+      .then(([d, prefs]) => {
+        setAutore(String(d?.autore || "").trim());
+        setCorrenteArtistica(String(d?.correnteArtistica || "").trim());
+        setAnno(String(d?.anno || "").trim());
+        if (guidedText) {
+          setDescrizione(guidedText);
+          return;
+        }
+        const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
+        setDescrizione(best);
+      })
+      .catch(() => {
+        setAutore("");
+        setCorrenteArtistica("");
+        setAnno("");
+        setDescrizione(guidedText || null);
+      });
 
     // carica lista immagini, esclude preview
     fetch(
@@ -2535,6 +2548,11 @@ function ObjectOverlay({
         {/* ── Testo ── */}
         <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>
           <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{objectTitle}</h2>
+          <div style={{ marginBottom: 10, display: "grid", gap: 2 }}>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Autore:</strong> {autore || "N/D"}</p>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Anno:</strong> {anno || "N/D"}</p>
+            {correnteArtistica && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Corrente:</strong> {correnteArtistica}</p>}
+          </div>
           {descrizione
             ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
             : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>Caricamento…</p>

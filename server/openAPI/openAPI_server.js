@@ -1607,7 +1607,20 @@ async function startServer(cliOptions) {
     const oggetto = museo.get_oggetto(req.params.oggetto);
     if (!oggetto) return res.status(404).json({ error: "Oggetto non trovato" });
 
-    const { nome, stanza, connessi, descrizioni, pos, objectType, textTitle, textBody } = req.body;
+    const {
+      nome,
+      stanza,
+      connessi,
+      descrizioni,
+      pos,
+      objectType,
+      textTitle,
+      textBody,
+      autore,
+      licenza,
+      correnteArtistica,
+      anno,
+    } = req.body;
     if (nome && nome !== oggetto.nome) {
       museo.oggetti.delete(oggetto.nome);
       oggetto.nome = nome;
@@ -1623,6 +1636,10 @@ async function startServer(cliOptions) {
     if (objectType != null) oggetto.objectType = String(objectType || "").trim() || "normal";
     if (textTitle != null) oggetto.textTitle = String(textTitle || "").trim();
     if (textBody != null) oggetto.textBody = String(textBody || "").trim();
+    if (autore != null) oggetto.autore = String(autore || "").trim();
+    if (licenza != null) oggetto.licenza = String(licenza || "").trim();
+    if (correnteArtistica != null) oggetto.correnteArtistica = String(correnteArtistica || "").trim();
+    if (anno != null) oggetto.anno = String(anno || "").trim();
 
     sistema.salvaSuFile(FILE_JSON);
 
