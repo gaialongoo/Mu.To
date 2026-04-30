@@ -354,8 +354,9 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
 
       const objectLabel = o.label != null ? o.label : o.nome;
       const radius = o.isVirtualText ? 7 : 10;
-      svg += `\n<circle cx="${x}" cy="${y}" r="${radius}" class="oggetto" data-object-name="${escapeXml(o.nome)}"/>`;
-      svg += `\n<text x="${x}" y="${y + 3}" class="oggetto-label" data-object-name="${escapeXml(o.nome)}">${escapeXml(objectLabel)}</text>`;
+      const objectType = o.objectType === "text" ? "text" : "normal";
+      svg += `\n<circle cx="${x}" cy="${y}" r="${radius}" class="oggetto" data-object-name="${escapeXml(o.nome)}" data-object-type="${objectType}"/>`;
+      svg += `\n<text x="${x}" y="${y + 3}" class="oggetto-label" data-object-name="${escapeXml(o.nome)}" data-object-type="${objectType}">${escapeXml(objectLabel)}</text>`;
     }
   }
 

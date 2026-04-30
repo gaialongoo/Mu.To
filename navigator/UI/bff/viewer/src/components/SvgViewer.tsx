@@ -1858,7 +1858,8 @@ function replaceCircleWithImage(
   svg: SVGSVGElement,
   circle: SVGCircleElement,
   nome: string,
-  museo: string
+  museo: string,
+  objectType: string = "normal"
 ): void {
   const ns = "http://www.w3.org/2000/svg";
 
@@ -1867,7 +1868,8 @@ function replaceCircleWithImage(
   const r  = parseFloat(circle.getAttribute("r")  ?? "10");
 
   const isVirtualTextNode = String(nome || "").startsWith("__text__");
-  const PREVIEW_SCALE = isVirtualTextNode ? 1.6 : 2.5;
+  const isTextObject = String(objectType || "").toLowerCase() === "text";
+  const PREVIEW_SCALE = (isVirtualTextNode || isTextObject) ? 1.6 : 2.5;
   const displayR = r * PREVIEW_SCALE;
   const size = displayR * 2;
 
@@ -2158,6 +2160,9 @@ function bindObjectClicks(svg: SVGSVGElement, session: Session) {
     const dataName = circle.getAttribute("data-object-name")
       || t?.getAttribute("data-object-name")
       || "";
+    const dataType = circle.getAttribute("data-object-type")
+      || t?.getAttribute("data-object-type")
+      || "normal";
     const nome = (dataName || t?.textContent || "").trim();
     if (!nome) return;
 
@@ -2169,7 +2174,7 @@ function bindObjectClicks(svg: SVGSVGElement, session: Session) {
       openObjectFocus(nome);
     });
 
-    replaceCircleWithImage(svg, circle, nome, session.museo);
+    replaceCircleWithImage(svg, circle, nome, session.museo, dataType);
   });
 }
 

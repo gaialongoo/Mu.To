@@ -29,6 +29,7 @@ const VALID_API_KEYS = [API_KEY];
 
 const FILE_JSON   = path.join(__dirname, "musei.json");
 const LAYOUT_FILE = path.join(__dirname, "layout.json");
+const DEFAULT_TEXT_PREVIEW_PATH = path.resolve(__dirname, "../../foto/pt.png");
 const DB_NAME = "musei";
 const MUSEI_COLLECTION = "musei_db";
 const LAYOUT_COLLECTION = "musei_layout";
@@ -1606,7 +1607,7 @@ async function startServer(cliOptions) {
     const oggetto = museo.get_oggetto(req.params.oggetto);
     if (!oggetto) return res.status(404).json({ error: "Oggetto non trovato" });
 
-    const { nome, stanza, connessi, descrizioni, pos } = req.body;
+    const { nome, stanza, connessi, descrizioni, pos, objectType, textTitle, textBody } = req.body;
     if (nome && nome !== oggetto.nome) {
       museo.oggetti.delete(oggetto.nome);
       oggetto.nome = nome;
@@ -1619,6 +1620,9 @@ async function startServer(cliOptions) {
       oggetto.connessi.forEach(c => museo.collega_oggetti(oggetto.nome, c));
     }
     if (descrizioni) oggetto.descrizioni = descrizioni;
+    if (objectType != null) oggetto.objectType = String(objectType || "").trim() || "normal";
+    if (textTitle != null) oggetto.textTitle = String(textTitle || "").trim();
+    if (textBody != null) oggetto.textBody = String(textBody || "").trim();
 
     sistema.salvaSuFile(FILE_JSON);
 
@@ -1878,6 +1882,9 @@ async function startServer(cliOptions) {
   // ==========================================================
   app.get("/musei/:nome_museo/oggetti/:oggetto/immagini/:tipo", async (req, res) => {
     const { nome_museo, oggetto, tipo } = req.params;
+    const museo = sistema.get_museo(nome_museo);
+    const oggettoDoc = museo?.get_oggetto(oggetto);
+    const isTextObject = String(oggettoDoc?.objectType || "").toLowerCase() === "text";
 
     const client = new MongoClient(MONGO_URI);
     try {
@@ -1885,7 +1892,15 @@ async function startServer(cliOptions) {
       const col = client.db("musei").collection("oggetti_immagini");
 
       const doc = await col.findOne({ _id: imgDocId(nome_museo, oggetto, tipo) });
-      if (!doc) return res.status(404).json({ error: "Immagine non trovata" });
+      if (!doc) {
+        if (tipo === "preview" && isTextObject && fs.existsSync(DEFAULT_TEXT_PREVIEW_PATH)) {
+          const data = fs.readFileSync(DEFAULT_TEXT_PREVIEW_PATH);
+          res.set("Content-Type", "image/png");
+          res.set("Cache-Control", "public, max-age=300");
+          return res.send(data);
+        }
+        return res.status(404).json({ error: "Immagine non trovata" });
+      }
 
       let data = doc.data.buffer ?? doc.data;
       let mimeType = doc.mimeType;

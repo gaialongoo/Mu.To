@@ -292,16 +292,36 @@ function useLayout(stanze, oggetti, corridoiCfg = []) {
     return pos;
   }, [stanze, oggetti, roomPos]);
 
-  const svgW = useMemo(() => {
-    const xs = Object.values(roomPos).map(p => p.x + p.w);
-    return xs.length ? Math.max(...xs) + 200 : 800;
-  }, [roomPos]);
-  const svgH = useMemo(() => {
-    const ys = Object.values(roomPos).map(p => p.y + p.h);
-    return ys.length ? Math.max(...ys) + 200 : 600;
-  }, [roomPos]);
+  const bounds = useMemo(() => {
+    const xs = [];
+    const ys = [];
+    for (const p of Object.values(roomPos)) {
+      xs.push(p.x, p.x + p.w);
+      ys.push(p.y, p.y + p.h);
+    }
+    for (const c of corridors) {
+      xs.push(c.x, c.x + c.w);
+      ys.push(c.y, c.y + c.h);
+    }
+    for (const [x, y] of Object.values(objPos)) {
+      xs.push(x - 40, x + 40);
+      ys.push(y - 40, y + 40);
+    }
+    if (xs.length < 1 || ys.length < 1) {
+      return { minX: 0, minY: 0, maxX: 800, maxY: 600 };
+    }
+    return {
+      minX: Math.min(...xs) - 120,
+      minY: Math.min(...ys) - 120,
+      maxX: Math.max(...xs) + 120,
+      maxY: Math.max(...ys) + 120,
+    };
+  }, [roomPos, corridors, objPos]);
 
-  return { roomPos, corridors, objPos, svgW, svgH };
+  const svgW = Math.max(800, bounds.maxX - bounds.minX);
+  const svgH = Math.max(600, bounds.maxY - bounds.minY);
+
+  return { roomPos, corridors, objPos, svgW, svgH, svgMinX: bounds.minX, svgMinY: bounds.minY };
 }
 
 // ─── ROUTING BFS ───────────────────────────────────────────────────────────
@@ -408,6 +428,11 @@ function useObjPreviews(nomeMuseo, oggetti, refreshKey = 0) {
     const results = {};
 
     Promise.all(oggetti.map(async (o) => {
+      if (String(o?.objectType || "").toLowerCase() === "text") {
+        const baseUrl = `/api/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(o.nome)}/immagini/preview`;
+        results[o.nome] = refreshKey > 0 ? `${baseUrl}?v=${refreshKey}` : baseUrl;
+        return;
+      }
       const baseUrl = `/api/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(o.nome)}/immagini/preview`;
       try {
         const res = await fetch(baseUrl, {
@@ -907,6 +932,7 @@ export default function MuseoEditor() {
   const [loadingMuseo, setLoadingMuseo] = useState(null);
   const [descTab, setDescTab]           = useState(0);
   const [savingAll, setSavingAll]       = useState(false);
+  const [addObjectKind, setAddObjectKind] = useState("normal");
   const [deletingMuseo, setDeletingMuseo] = useState(false);
   const [toast, setToast]               = useState(null);
   const [modal, setModal]               = useState(null);
@@ -952,7 +978,7 @@ export default function MuseoEditor() {
     if (isMobile) setMobileSection("canvas");
   };
 
-  const { roomPos, corridors, objPos, svgW, svgH } = useLayout(museo.stanze, museo.oggetti, museo.corridoi);
+  const { roomPos, corridors, objPos, svgW, svgH, svgMinX, svgMinY } = useLayout(museo.stanze, museo.oggetti, museo.corridoi);
 
   // passa previewRefreshKey: quando cambia, il hook ri-fetcha e busta la cache
   const objPreviews = useObjPreviews(museo.nome, museo.oggetti, previewRefreshKey);
@@ -1032,7 +1058,14 @@ export default function MuseoEditor() {
           : [];
       setMuseo({
         nome: data.nome, stanze,
-        oggetti: (data.oggetti??[]).map(o=>({...o,visibile:true, pos: o.pos ?? {x:0.5,y:0.5}})),
+        oggetti: (data.oggetti??[]).map(o=>({
+          ...o,
+          visibile:true,
+          pos: o.pos ?? {x:0.5,y:0.5},
+          objectType: String(o.objectType || "").toLowerCase() === "text" ? "text" : "normal",
+          textTitle: String(o.textTitle || ""),
+          textBody: String(o.textBody || ""),
+        })),
         percorsi: percorsiData?.percorsi ?? data.percorsi ?? [],
         corridoi: normalizeCorridoi(stanze, layout?.corridoi || []),
       });
@@ -1070,7 +1103,10 @@ export default function MuseoEditor() {
         apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
           { method:"PUT", body:JSON.stringify({
               stanza: o.stanza, pos: o.pos, connessi: o.connessi, visibile: o.visibile,
-              descrizioni: o.descrizioni ?? Array.from({length:4},()=>Array(3).fill(""))
+              descrizioni: o.descrizioni ?? Array.from({length:4},()=>Array(3).fill("")),
+              objectType: o.objectType || "normal",
+              textTitle: o.textTitle || "",
+              textBody: o.textBody || "",
             })
           }
         )
@@ -1335,17 +1371,35 @@ export default function MuseoEditor() {
     if (mode==="addObject") {
       const n = await showPrompt("Nome oggetto:", `Oggetto ${museo.oggetti.length+1}`);
       if (!n) return;
+      const objectType = String(addObjectKind || "normal").toLowerCase() === "text" ? "text" : "normal";
       const room = roomPos[nome];
       const p = toLocalPoint();
       const posRel = (room && p)
         ? { x: clamp01((p.x - room.x) / room.w), y: clamp01((p.y - room.y) / room.h) }
         : { x: 0.5, y: 0.5 };
-      const nuovoOggetto = { nome:n, stanza:nome, pos:posRel, connessi:[], visibile:true, descrizioni:Array.from({length:4},()=>Array(3).fill("")) };
+      const textDescriptions = Array.from({ length: 4 }, () => Array(3).fill(""));
+      const nuovoOggetto = {
+        nome:n,
+        stanza:nome,
+        pos:posRel,
+        connessi:[],
+        visibile:true,
+        descrizioni:textDescriptions,
+        objectType,
+      };
       setMuseo(m=>({...m,oggetti:[...m.oggetti,nuovoOggetto]}));
       setSelected({type:"oggetto",nome:n}); setMode("select");
       try {
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti`,
-          {method:"POST",body:JSON.stringify({nome:n,stanza:nome,pos:nuovoOggetto.pos,connessi:[],visibile:true,descrizioni:nuovoOggetto.descrizioni})});
+          {method:"POST",body:JSON.stringify({
+            nome:n,
+            stanza:nome,
+            pos:nuovoOggetto.pos,
+            connessi:[],
+            visibile:true,
+            descrizioni:nuovoOggetto.descrizioni,
+            objectType: nuovoOggetto.objectType,
+          })});
       } catch(err){showToast(`⚠ Oggetto solo locale (${err.message})`,false);}
     } else if (!percorsoEdit) {
       setSelected({type:"stanza",nome});
@@ -1785,7 +1839,7 @@ export default function MuseoEditor() {
         <div style={{fontSize:10,color:THEME.textDim,lineHeight:1.5,padding:"8px 2px 2px",display:isMobile?"none":"block"}}>
           {mode==="select" && !percorsoEdit ? "Modalita: selezione e modifica" : null}
           {mode==="addRoom" && !percorsoEdit ? "Modalita: clicca nel canvas per creare una stanza con dimensioni personalizzate" : null}
-          {mode==="addObject" && !percorsoEdit ? "Modalita: clicca nella stanza per posizionare l'oggetto nel punto scelto" : null}
+          {mode==="addObject" && !percorsoEdit ? "Modalita: scegli tipo da tendina a destra, poi clicca nella stanza per posizionare l'oggetto" : null}
           {mode==="connectPick" && !percorsoEdit ? "Modalita: clicca un oggetto da collegare" : null}
         </div>
         <div style={{flex:1,display:isMobile?"none":"block"}}/>
@@ -1843,6 +1897,7 @@ export default function MuseoEditor() {
         <svg
           width={svgW}
           height={svgH}
+          viewBox={`${svgMinX} ${svgMinY} ${svgW} ${svgH}`}
           style={{display:"block",background:"#f8f9fa",cursor:percorsoEdit?"crosshair":mode==="addRoom"?"crosshair":"default"}}
           onClick={(e)=>{
             if (percorsoEdit) return;
@@ -2006,6 +2061,7 @@ export default function MuseoEditor() {
           {museo.oggetti.filter(o=>o.visibile).map(o=>{
             const pos=objPos[o.nome]; if(!pos) return null;
             const [x,y]=pos;
+            const isTextOnlyObject = String(o.objectType || "").toLowerCase() === "text";
             const sel=!percorsoEdit&&selected?.type==="oggetto"&&selected?.nome===o.nome;
             const isPick=!percorsoEdit&&mode==="connectPick"&&!sel;
             const percIdx = percorsoAttivoOggetti.indexOf(o.nome);
@@ -2015,7 +2071,9 @@ export default function MuseoEditor() {
             const r = inPercorso||isHoverPreview ? 13 : 10;
             const fill = isHoverPreview ? "#f0a060" : isInEdit ? "#e67e22" : sel ? OBJ_SEL_FILL : OBJ_FILL;
             const stroke = isPick ? OBJ_PICK_STROKE : isInEdit||isHoverPreview ? "#d35400" : OBJ_STROKE;
-            const hasPreview = objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso;
+            const hasPreview = !isTextOnlyObject && objPreviews[o.nome] && !percorsoEdit && !isPick && !isInEdit && !inPercorso;
+            const labelText = isTextOnlyObject ? "?" : o.nome;
+            const nameText = o.nome;
             return (
               <g
                 key={o.nome}
@@ -2058,9 +2116,9 @@ export default function MuseoEditor() {
                       <text x={x} y={y+4} textAnchor="middle" style={{font:"bold 10px Arial",fill:"white",pointerEvents:"none"}}>
                         {isHoverPreview ? "+" : percIdx+1}
                       </text>
-                      <text x={x} y={y+r+11} textAnchor="middle" style={{font:"9px Arial",fill:isHoverPreview?"#f0a060":"#e67e22",pointerEvents:"none"}}>{o.nome}</text>
+                      <text x={x} y={y+r+11} textAnchor="middle" style={{font:"9px Arial",fill:isHoverPreview?"#f0a060":"#e67e22",pointerEvents:"none"}}>{nameText}</text>
                     </>
-                  : <text x={x} y={y+3} textAnchor="middle" style={{font:"10px Arial",fill:hasPreview?"#2c3e50":OBJ_TEXT,pointerEvents:"none"}}>{o.nome}</text>
+                  : <text x={x} y={y+3} textAnchor="middle" style={{font:"10px Arial",fill:hasPreview?"#2c3e50":OBJ_TEXT,pointerEvents:"none"}}>{labelText}</text>
                 }
               </g>
             );
@@ -2143,6 +2201,20 @@ export default function MuseoEditor() {
               <select value={selItem.tipo} onChange={e=>updStanza(selItem.nome,{tipo:e.target.value})} style={INP}>
                 {["normale","ingresso","uscita","bagno","servizio"].map(t=><option key={t}>{t}</option>)}
               </select>
+              {mode==="addObject" && (
+                <div style={{marginBottom:10,padding:"8px 10px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6}}>
+                  <FLabel>Nuovo oggetto: tipo</FLabel>
+                  <select value={addObjectKind} onChange={e=>setAddObjectKind(e.target.value==="text"?"text":"normal")} style={INP}>
+                    <option value="normal">Normale</option>
+                    <option value="text">Testo</option>
+                  </select>
+                  {addObjectKind === "text" && (
+                    <div style={{fontSize:11,color:THEME.textDim}}>
+                      Il titolo mostrato usa il nome oggetto. I contenuti usano le descrizioni qui sotto.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
                 <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
@@ -2345,6 +2417,17 @@ export default function MuseoEditor() {
               />
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}>
                 <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Tipo oggetto</FLabel>
+                  <select
+                    value={String(selItem.objectType || "normal").toLowerCase()==="text" ? "text" : "normal"}
+                    onChange={e=>updOggetto(selItem.nome,{objectType:e.target.value==="text"?"text":"normal"})}
+                    style={{...INP,marginBottom:0}}
+                  >
+                    <option value="normal">Normale</option>
+                    <option value="text">Testo</option>
+                  </select>
+                </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
                   <FLabel>Stanza</FLabel>
                   <select value={selItem.stanza} onChange={e=>updOggetto(selItem.nome,{stanza:e.target.value})} style={{...INP,marginBottom:0}}>
                     {museo.stanze.map(s=><option key={s.nome}>{s.nome}</option>)}
@@ -2356,7 +2439,36 @@ export default function MuseoEditor() {
                     <option value="si">Sì</option><option value="no">No</option>
                   </select>
                 </div>
+                <div style={{background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,padding:"8px 10px"}}>
+                  <FLabel>Posizione X/Y (0..1)</FLabel>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={clamp01(selItem.pos?.x ?? 0.5)}
+                      onChange={e=>updOggetto(selItem.nome,{pos:{...selItem.pos, x:clamp01(+e.target.value)}})}
+                      style={{...INP,marginBottom:0}}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={clamp01(selItem.pos?.y ?? 0.5)}
+                      onChange={e=>updOggetto(selItem.nome,{pos:{...selItem.pos, y:clamp01(+e.target.value)}})}
+                      style={{...INP,marginBottom:0}}
+                    />
+                  </div>
+                </div>
               </div>
+              {String(selItem.objectType || "").toLowerCase() === "text" && (
+                <div style={{marginTop:10,padding:"8px 10px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6,fontSize:11,color:THEME.textDim}}>
+                  Per gli oggetti di tipo Testo, il titolo mostrato e' il nome oggetto.
+                  Usa la sezione DESCRIZIONI per inserire i contenuti in base alle preferenze utente.
+                </div>
+              )}
               <div style={{marginTop:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <FLabel>Connessioni ({selItem.connessi.length})</FLabel>
@@ -2375,12 +2487,14 @@ export default function MuseoEditor() {
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:12}}>✕ Elimina oggetto</button>
             </Card>
 
-            <ImmaginiCard
-              nomeMuseo={museo.nome}
-              nomeOggetto={selItem.nome}
-              showToast={showToast}
-              onPreviewUpdated={() => setPreviewRefreshKey(k => k + 1)}
-            />
+            {String(selItem.objectType || "").toLowerCase() !== "text" && (
+              <ImmaginiCard
+                nomeMuseo={museo.nome}
+                nomeOggetto={selItem.nome}
+                showToast={showToast}
+                onPreviewUpdated={() => setPreviewRefreshKey(k => k + 1)}
+              />
+            )}
 
             <Card title="DESCRIZIONI" color="#8e44ad">
               <div style={{fontSize:10,color:"#8e44ad",background:"rgba(142,68,173,0.14)",border:`1px solid ${THEME.border}`,borderRadius:4,padding:"5px 8px",marginBottom:10}}>

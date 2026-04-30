@@ -247,6 +247,8 @@ function generaSvg(data, layout, edgeMode, edgeFocus, virtualObjects = {}) {
     const s   = stanzeMap[o.stanza];
     const obj = new Oggetto(o.nome, s, o.connessi || []);
     obj.visibile = o.visibile !== undefined ? o.visibile : true;
+    obj.objectType = String(o.objectType || "").toLowerCase() === "text" ? "text" : "normal";
+    if (obj.objectType === "text") obj.label = "?";
     if (o.pos && typeof o.pos === "object") obj.posRel = o.pos;
     s.oggetti.push(obj);
     oggettiList.push(obj);
