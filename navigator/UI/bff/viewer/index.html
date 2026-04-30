@@ -896,30 +896,21 @@
       flex-wrap: wrap;
       gap: .5rem;
     }
-    .auth-interests label {
+    .auth-interests .interest-chip {
       font-size: .72rem;
       color: var(--text-dim);
-      display: inline-flex;
-      gap: .4rem;
-      align-items: center;
+      display: inline-block;
       border: 1px solid var(--border);
       border-radius: 999px;
       cursor: pointer;
       padding: .45rem .75rem;
       background: transparent;
+      transition: border-color .2s, background .2s, color .2s;
     }
-    .auth-interests label input {
-      appearance: none;
-      width: 0;
-      height: 0;
-      margin: 0;
-    }
-    .auth-interests label input:checked + span {
-      color: var(--gold);
-    }
-    .auth-interests label:has(input:checked) {
+    .auth-interests .interest-chip.active {
       border-color: var(--gold);
       background: var(--gold-soft);
+      color: var(--gold);
     }
     .auth-interest-title {
       font-size: .68rem;
@@ -1020,19 +1011,12 @@
       display: inline-flex;
       align-items: center;
       gap: .35rem;
+      transition: border-color .2s, background .2s, color .2s;
     }
-    #profileOverlay .auth-interests .interest-chip input {
-      appearance: none;
-      width: 0;
-      height: 0;
-      margin: 0;
-    }
-    #profileOverlay .auth-interests .interest-chip input:checked + span {
-      color: var(--gold);
-    }
-    #profileOverlay .auth-interests .interest-chip:has(input:checked) {
+    #profileOverlay .auth-interests .interest-chip.active {
       border-color: var(--gold);
       background: var(--gold-soft);
+      color: var(--gold);
     }
     @media (max-width: 640px) {
       .auth-grid {
@@ -1049,7 +1033,7 @@
       .auth-interests {
         gap: .45rem;
       }
-      .auth-interests label {
+      .auth-interests .interest-chip {
         width: 100%;
         justify-content: center;
         text-align: center;
@@ -1061,8 +1045,7 @@
       #profileOverlay .auth-grid {
         grid-template-columns: 1fr;
       }
-      #profileOverlay .auth-interests .interest-chip,
-      #profileOverlay .auth-interests label {
+      #profileOverlay .auth-interests .interest-chip {
         width: auto;
         max-width: 100%;
       }
@@ -1607,18 +1590,25 @@
   function collectCheckedInterests(containerId) {
     const root = document.getElementById(containerId);
     if (!root) return [];
-    return Array.from(root.querySelectorAll('input[type="checkbox"]:checked')).map((i) => i.value);
+    return Array.from(root.querySelectorAll(".interest-chip.active"))
+      .map((el) => el.dataset.value)
+      .filter(Boolean);
   }
 
   function renderInterestCheckboxes(containerId, selected = []) {
     const root = document.getElementById(containerId);
     if (!root) return;
+    const selectedSet = new Set(Array.isArray(selected) ? selected : []);
     root.innerHTML = AUTH_INTERESTS.map(([value, label]) => `
-      <label>
-        <input type="checkbox" value="${value}" ${selected.includes(value) ? "checked" : ""} />
-        <span>${label}</span>
-      </label>
+      <button type="button" class="interest-chip ${selectedSet.has(value) ? "active" : ""}" data-value="${value}">
+        ${label}
+      </button>
     `).join("");
+    root.querySelectorAll(".interest-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.toggle("active");
+      });
+    });
   }
 
   function setAuthMode(mode) {
@@ -1647,9 +1637,9 @@
       document.getElementById("regCodiceRuolo").value = "";
       document.getElementById("regLivello").value = "";
       document.getElementById("regDurata").value = "";
-      // Resetta anche i checkbox degli interessi
-      document.querySelectorAll("#interestList input[type='checkbox']").forEach(cb => {
-        cb.checked = false;
+      // Resetta anche gli interessi selezionati
+      document.querySelectorAll("#interestList .interest-chip").forEach((btn) => {
+        btn.classList.remove("active");
       });
     } else if (mode === "login") {
       // Resetta anche il form di login
