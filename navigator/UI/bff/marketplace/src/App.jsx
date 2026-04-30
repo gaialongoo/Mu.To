@@ -171,6 +171,18 @@ function optimizeObjectsOrderByPath(selectedNames, allObjects) {
   return ordered;
 }
 
+function extractDefaultDescription(oggetto) {
+  const descrizioni = Array.isArray(oggetto?.descrizioni) ? oggetto.descrizioni : [];
+  for (const level of descrizioni) {
+    if (!Array.isArray(level)) continue;
+    for (const text of level) {
+      const value = String(text || "").trim();
+      if (value) return value;
+    }
+  }
+  return "";
+}
+
 // ─── Visit card ──────────────────────────────────────────────────────────────
 function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
   const prezzo = Number(percorso.prezzo || 0);
@@ -328,8 +340,21 @@ export default function App() {
   const [teacherSelectedObjects, setTeacherSelectedObjects] = useState([]);
   const [teacherLevel, setTeacherLevel] = useState("studente");
   const [teacherDuration, setTeacherDuration] = useState("medio");
-  const [teacherLink, setTeacherLink] = useState("");
   const [teacherOptimizedOrder, setTeacherOptimizedOrder] = useState([]);
+  const [teacherVisitName, setTeacherVisitName] = useState("");
+  const [teacherObjectDescriptions, setTeacherObjectDescriptions] = useState({});
+  const [teacherTextItems, setTeacherTextItems] = useState([]);
+  const [teacherTextDraft, setTeacherTextDraft] = useState({ name: "", room: "", text: "", insertAfterObject: "" });
+  const [teacherEditingTextItemId, setTeacherEditingTextItemId] = useState(null);
+  const [teacherQuizTitle, setTeacherQuizTitle] = useState("");
+  const [teacherQuizTimeLimit, setTeacherQuizTimeLimit] = useState(120);
+  const [teacherQuizQuestions, setTeacherQuizQuestions] = useState([
+    { id: "q1", question: "", options: ["", ""], correctIndex: 0 },
+  ]);
+  const [teacherStudentLink, setTeacherStudentLink] = useState("");
+  const [teacherDashboardLink, setTeacherDashboardLink] = useState("");
+  const [teacherSavedVisits, setTeacherSavedVisits] = useState([]);
+  const [teacherEditingVisitId, setTeacherEditingVisitId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -473,38 +498,302 @@ export default function App() {
   const closePathModal = () => setSelectedPath(null);
   const closeTeacherBuilder = () => {
     setTeacherBuilderOpen(false);
-    setTeacherLink("");
     setTeacherOptimizedOrder([]);
+    setTeacherStudentLink("");
+    setTeacherDashboardLink("");
+    setTeacherEditingTextItemId(null);
+    setTeacherEditingVisitId("");
   };
   const toggleTeacherObject = (name) => {
-    setTeacherSelectedObjects((prev) =>
-      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    setTeacherSelectedObjects((prev) => {
+      if (prev.includes(name)) return prev.filter((item) => item !== name);
+      return [...prev, name];
+    });
+    const oggetto = allOggetti.find((item) => item.nome === name);
+    const baseDescription = extractDefaultDescription(oggetto);
+    setTeacherObjectDescriptions((prev) => {
+      if (prev[name] != null) return prev;
+      return { ...prev, [name]: baseDescription };
+    });
+  };
+  const moveTeacherObject = (name, direction) => {
+    setTeacherSelectedObjects((prev) => {
+      const idx = prev.indexOf(name);
+      if (idx < 0) return prev;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[nextIdx]] = [copy[nextIdx], copy[idx]];
+      return copy;
+    });
+  };
+
+  const addTeacherTextItem = () => {
+    const name = String(teacherTextDraft.name || "").trim();
+    const room = String(teacherTextDraft.room || "").trim();
+    const text = String(teacherTextDraft.text || "").trim();
+    const insertAfterObject = String(teacherTextDraft.insertAfterObject || "").trim();
+    if (!name) {
+      showToast("Inserisci un nome per l'item testo", "error");
+      return;
+    }
+    if (!room) {
+      showToast("Seleziona una stanza per l'item testo", "error");
+      return;
+    }
+    if (teacherTextItems.some((item) => item.room === room && item.id !== teacherEditingTextItemId)) {
+      showToast("In questa stanza c'e gia un item testo", "error");
+      return;
+    }
+    if (!text) {
+      showToast("Inserisci il testo dell'item", "error");
+      return;
+    }
+    const roomObjects = teacherSelectedObjects.filter((name) => {
+      const obj = allOggetti.find((o) => o.nome === name);
+      return String(obj?.stanza || "") === room;
+    });
+    if (roomObjects.length < 1) {
+      showToast("Nella stanza selezionata non ci sono oggetti del percorso", "error");
+      return;
+    }
+    if (!insertAfterObject) {
+      showToast("Scegli dopo quale oggetto inserire l'item testo", "error");
+      return;
+    }
+    if (!roomObjects.includes(insertAfterObject)) {
+      showToast("L'oggetto scelto deve appartenere alla stanza selezionata", "error");
+      return;
+    }
+    if (teacherEditingTextItemId) {
+      setTeacherTextItems((prev) =>
+        prev.map((item) => (item.id === teacherEditingTextItemId ? { ...item, name, room, text, insertAfterObject } : item))
+      );
+    } else {
+      setTeacherTextItems((prev) => [
+        ...prev,
+        { id: `txt_${Date.now()}_${prev.length}`, name, room, text, insertAfterObject },
+      ]);
+    }
+    setTeacherTextDraft({ name: "", room: "", text: "", insertAfterObject: "" });
+    setTeacherEditingTextItemId(null);
+  };
+
+  const removeTeacherTextItem = (id) => {
+    setTeacherTextItems((prev) => prev.filter((item) => item.id !== id));
+    if (teacherEditingTextItemId === id) {
+      setTeacherEditingTextItemId(null);
+      setTeacherTextDraft({ name: "", room: "", text: "", insertAfterObject: "" });
+    }
+  };
+  const editTeacherTextItem = (id) => {
+    const item = teacherTextItems.find((x) => x.id === id);
+    if (!item) return;
+    setTeacherEditingTextItemId(id);
+    setTeacherTextDraft({ name: item.name || "", room: item.room || "", text: item.text || "", insertAfterObject: item.insertAfterObject || "" });
+  };
+  const selectedObjectRooms = Array.from(
+    new Set(
+      teacherSelectedObjects
+        .map((name) => allOggetti.find((o) => o.nome === name)?.stanza)
+        .filter(Boolean)
+    )
+  );
+  const availableTextRooms = selectedObjectRooms.filter((room) =>
+    !teacherTextItems.some((item) => item.room === room && item.id !== teacherEditingTextItemId)
+  );
+  const availableInsertAfterObjects = teacherSelectedObjects.filter((name) => {
+    const obj = allOggetti.find((o) => o.nome === name);
+    return String(obj?.stanza || "") === String(teacherTextDraft.room || "");
+  });
+
+  const copyToClipboard = async (value, successMessage) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast(successMessage);
+      return true;
+    } catch {
+      window.prompt("Copia manualmente il link:", value);
+      showToast("Copia automatica non disponibile", "error");
+      return false;
+    }
+  };
+
+  const addQuizQuestion = () => {
+    setTeacherQuizQuestions((prev) => [
+      ...prev,
+      { id: `q${Date.now()}`, question: "", options: ["", ""], correctIndex: 0 },
+    ]);
+  };
+  const removeQuizQuestion = (id) => {
+    setTeacherQuizQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((q) => q.id !== id)));
+  };
+  const updateQuizQuestion = (id, updater) => {
+    setTeacherQuizQuestions((prev) =>
+      prev.map((q) => (q.id === id ? updater(q) : q))
     );
   };
-  const generateTeacherLink = () => {
-    if (!MUSEO || teacherSelectedObjects.length < 1) {
+
+  const loadTeacherSavedVisits = useCallback(async () => {
+    if (!isProfessor) return;
+    try {
+      const data = await api("/users/me/guided-visits", { credentials: "include" });
+      setTeacherSavedVisits(Array.isArray(data.visits) ? data.visits : []);
+    } catch (e) {
+      setTeacherSavedVisits([]);
+      showToast("Errore caricamento visite guidate: " + e.message, "error");
+    }
+  }, [isProfessor]);
+
+  useEffect(() => {
+    if (authChecked && isProfessor) loadTeacherSavedVisits();
+  }, [authChecked, isProfessor, loadTeacherSavedVisits]);
+
+  const saveTeacherGuidedVisit = async () => {
+    if (!MUSEO) return;
+    const nome = String(teacherVisitName || "").trim();
+    if (!nome) {
+      showToast("Inserisci il nome della visita", "error");
+      return;
+    }
+    const orderedObjects = teacherSelectedObjects;
+    if (orderedObjects.length < 1) {
       showToast("Seleziona almeno un oggetto", "error");
       return;
     }
-    const optimizedObjects = optimizeObjectsOrderByPath(teacherSelectedObjects, allOggetti);
-    const token = encodeSharePayload({
-      museo: MUSEO,
-      oggetti: optimizedObjects,
-      livello: teacherLevel,
-      durata: teacherDuration,
-    });
-    const link = `${window.location.origin}/?share=${token}`;
-    setTeacherLink(link);
-    setTeacherOptimizedOrder(optimizedObjects);
-    showToast(`Ordine ottimizzato: ${optimizedObjects.join(" -> ")}`);
-  };
-  const copyTeacherLink = async () => {
-    if (!teacherLink) return;
+
+    const quizQuestions = teacherQuizQuestions
+      .map((q, idx) => ({
+        id: q.id || `q_${idx + 1}`,
+        question: String(q.question || "").trim(),
+        options: Array.isArray(q.options) ? q.options.map((opt) => String(opt || "").trim()).filter(Boolean) : [],
+        correctIndex: Number(q.correctIndex),
+      }));
+    const hasAnyQuizContent = quizQuestions.some((q) => q.question || q.options.some((opt) => opt));
+    const validQuizQuestions = quizQuestions
+      .filter((q) => q.question && q.options.length >= 2 && q.correctIndex >= 0 && q.correctIndex < q.options.length);
+    if (hasAnyQuizContent && validQuizQuestions.length !== quizQuestions.length) {
+      showToast("Completa tutte le domande del quiz (almeno 2 opzioni e risposta corretta)", "error");
+      return;
+    }
+
+    const objectSteps = orderedObjects.map((objectName, idx) => ({
+      id: `obj_${idx + 1}`,
+      type: "object",
+      objectName,
+      room: "",
+      label: objectName,
+      customDescription: String(teacherObjectDescriptions[objectName] || "").trim(),
+    }));
+    const textSteps = teacherTextItems.map((item, idx) => ({
+      id: `txt_${idx + 1}`,
+      type: "text",
+      label: String(item.name || "").trim(),
+      room: item.room || "",
+      text: item.text,
+      customDescription: "",
+      insertAfterObject: String(item.insertAfterObject || ""),
+    }));
+    const invalidTextRoom = textSteps.find((t) => !selectedObjectRooms.includes(t.room));
+    if (invalidTextRoom) {
+      showToast("Ogni item testo deve usare una stanza degli oggetti selezionati", "error");
+      return;
+    }
+    const orderedFlowSteps = [];
+    for (const objectStep of objectSteps) {
+      orderedFlowSteps.push(objectStep);
+      const afterSteps = textSteps.filter((t) => t.insertAfterObject === objectStep.objectName);
+      orderedFlowSteps.push(...afterSteps.map(({ insertAfterObject, ...rest }) => rest));
+    }
+    const finalSteps = [...orderedFlowSteps];
+    const flowPreview = finalSteps.map((s) =>
+      s.type === "text" ? `${s.label || "Item testo"} (${s.room || "stanza"})` : s.objectName
+    );
+
     try {
-      await navigator.clipboard.writeText(teacherLink);
-      showToast("Link copiato");
-    } catch {
-      showToast("Copia non riuscita", "error");
+      const isEditing = !!teacherEditingVisitId;
+      const data = await api(isEditing ? `/guided-visits/${enc(teacherEditingVisitId)}` : "/guided-visits", {
+        method: isEditing ? "PUT" : "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          museo: MUSEO,
+          nome,
+          steps: finalSteps,
+          quiz: {
+            title: teacherQuizTitle,
+            questions: hasAnyQuizContent ? validQuizQuestions : [],
+            timeLimitSec: Number(teacherQuizTimeLimit) || 120,
+          },
+        }),
+      });
+      const id = data?.visit?.id;
+      if (!id) throw new Error("ID visita non restituito");
+      const studentLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(id)}&role=student`;
+      const dashboardLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(id)}&role=teacher&directNavigator=1&dashboard=1`;
+      setTeacherStudentLink(studentLink);
+      setTeacherDashboardLink(dashboardLink);
+      setTeacherOptimizedOrder(flowPreview);
+      showToast(isEditing ? "Visita guidata aggiornata" : "Visita guidata salvata");
+      loadTeacherSavedVisits();
+    } catch (e) {
+      showToast("Errore salvataggio visita guidata: " + e.message, "error");
+    }
+  };
+  const startEditTeacherVisit = (visit) => {
+    if (visit?.navigationStarted) {
+      showToast("Visita gia avviata: non modificabile", "error");
+      return;
+    }
+    const steps = Array.isArray(visit?.steps) ? visit.steps : [];
+    const objectSteps = steps.filter((s) => s.type === "object" && s.objectName);
+    const textSteps = steps.filter((s) => s.type === "text");
+    setTeacherEditingVisitId(String(visit.id || ""));
+    setTeacherVisitName(String(visit.nome || ""));
+    setTeacherSelectedObjects(objectSteps.map((s) => String(s.objectName || "").trim()).filter(Boolean));
+    setTeacherObjectDescriptions(
+      objectSteps.reduce((acc, s) => {
+        const name = String(s.objectName || "").trim();
+        if (name) acc[name] = String(s.customDescription || "");
+        return acc;
+      }, {})
+    );
+    setTeacherTextItems(
+      textSteps.map((s, idx) => ({
+        id: String(s.id || `txt_${idx + 1}`),
+        name: String(s.label || ""),
+        room: String(s.room || ""),
+        text: String(s.text || ""),
+        insertAfterObject: String(s.insertAfterObject || ""),
+      }))
+    );
+    const quiz = visit.quiz || {};
+    const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+    setTeacherQuizTitle(String(quiz.title || ""));
+    setTeacherQuizTimeLimit(Number(quiz.timeLimitSec) || 120);
+    setTeacherQuizQuestions(
+      questions.length > 0
+        ? questions.map((q, idx) => ({
+            id: String(q.id || `q_${idx + 1}`),
+            question: String(q.question || ""),
+            options: Array.isArray(q.options) && q.options.length >= 2 ? q.options.map((opt) => String(opt || "")) : ["", ""],
+            correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+          }))
+        : [{ id: "q1", question: "", options: ["", ""], correctIndex: 0 }]
+    );
+    setTeacherBuilderOpen(true);
+  };
+  const deleteTeacherVisit = async (visitId) => {
+    const ok = window.confirm("Eliminare questa visita guidata?");
+    if (!ok) return;
+    try {
+      await api(`/guided-visits/${enc(visitId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      showToast("Visita guidata eliminata");
+      loadTeacherSavedVisits();
+    } catch (e) {
+      showToast("Errore eliminazione visita guidata: " + e.message, "error");
     }
   };
 
@@ -702,8 +991,18 @@ export default function App() {
             <button
               onClick={() => {
                 setTeacherSelectedObjects([]);
-                setTeacherLink("");
                 setTeacherOptimizedOrder([]);
+                setTeacherEditingVisitId("");
+                setTeacherVisitName("");
+                setTeacherObjectDescriptions({});
+                setTeacherTextItems([]);
+                setTeacherTextDraft({ name: "", room: "", text: "", insertAfterObject: "" });
+                setTeacherEditingTextItemId(null);
+                setTeacherQuizTitle("");
+                setTeacherQuizTimeLimit(120);
+                setTeacherQuizQuestions([{ id: "q1", question: "", options: ["", ""], correctIndex: 0 }]);
+                setTeacherStudentLink("");
+                setTeacherDashboardLink("");
                 setTeacherBuilderOpen(true);
               }}
               style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", width: isMobile ? "100%" : "auto" }}
@@ -750,6 +1049,54 @@ export default function App() {
         {/* ── Tab: Percorsi ── */}
         {activeTab === "visits" && (
           <>
+            {isProfessor && teacherSavedVisits.length > 0 && (
+              <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-card)" }}>
+                <p style={{ margin: "0 0 8px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>Le mie visite guidate</p>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {teacherSavedVisits.slice(0, 6).map((visit) => {
+                    const studentLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=student`;
+                    const dashboardLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=teacher&directNavigator=1&dashboard=1`;
+                    return (
+                      <div key={visit.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ color: "var(--text)", fontSize: 13 }}>{visit.nome}</span>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(studentLink, "Link alunni copiato")}
+                            style={{ padding: "6px 10px", border: "1px solid var(--border)", background: "transparent", borderRadius: 6, color: "var(--text-dim)", cursor: "pointer" }}
+                          >
+                            Link alunni
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => window.open(dashboardLink, "_blank", "noopener,noreferrer")}
+                            style={{ padding: "6px 10px", border: "1px solid var(--gold)", background: "transparent", borderRadius: 6, color: "var(--gold)", cursor: "pointer" }}
+                          >
+                            Avvia visita
+                          </button>
+                          {!visit.navigationStarted && (
+                            <button
+                              type="button"
+                              onClick={() => startEditTeacherVisit(visit)}
+                              style={{ padding: "6px 10px", border: "1px solid var(--border)", background: "transparent", borderRadius: 6, color: "var(--text-dim)", cursor: "pointer" }}
+                            >
+                              Modifica
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => deleteTeacherVisit(visit.id)}
+                            style={{ padding: "6px 10px", border: "1px solid #7a2c2c", background: "transparent", borderRadius: 6, color: "#ff9a9a", cursor: "pointer" }}
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: isMobile ? 14 : 20, marginBottom: 40 }}>
               {loadingVisits
                 ? <Skeleton />
@@ -1032,7 +1379,16 @@ export default function App() {
           <div style={{ width: isMobile ? "min(760px, 100%)" : "min(860px, 94vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closeTeacherBuilder} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
             <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Professore</p>
-            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 16 }}>Percorso personalizzato classe</h3>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 16 }}>
+              {teacherEditingVisitId ? "Modifica visita guidata classe" : "Crea visita guidata classe"}
+            </h3>
+
+            <input
+              value={teacherVisitName}
+              onChange={(e) => setTeacherVisitName(e.target.value)}
+              placeholder="Nome visita guidata"
+              style={{ width: "100%", padding: "12px 14px", marginBottom: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+            />
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <select value={teacherLevel} onChange={(e) => setTeacherLevel(e.target.value)} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
@@ -1049,7 +1405,7 @@ export default function App() {
             </div>
 
             <p style={{ fontSize: 11, letterSpacing: "0.12em", color: "var(--text-dim)", marginBottom: 10 }}>
-              Seleziona gli oggetti del percorso (ordine libero): {teacherSelectedObjects.length} selezionati.
+              Seleziona gli oggetti e ordina manualmente il percorso: {teacherSelectedObjects.length} selezionati.
             </p>
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 8, marginBottom: 14 }}>
@@ -1068,25 +1424,177 @@ export default function App() {
               })}
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
-              <button type="button" onClick={generateTeacherLink} style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
-                Genera link
+            {teacherSelectedObjects.length > 0 && (
+              <div style={{ marginBottom: 12, display: "grid", gap: 8 }}>
+                <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Ordine e descrizioni (default dal DB, modificabili)</p>
+                {teacherSelectedObjects.map((objName) => (
+                  <div key={`desc-${objName}`} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                      <strong style={{ color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 12 }}>{objName}</strong>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" onClick={() => moveTeacherObject(objName, -1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Su</button>
+                        <button type="button" onClick={() => moveTeacherObject(objName, 1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Giu</button>
+                      </div>
+                    </div>
+                    <textarea
+                      value={teacherObjectDescriptions[objName] || ""}
+                      onChange={(e) => setTeacherObjectDescriptions((prev) => ({ ...prev, [objName]: e.target.value }))}
+                      placeholder={`Descrizione per ${objName}`}
+                      style={{ width: "100%", minHeight: 70, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)" }}>
+              <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Item testo (?)</p>
+              <select
+                value={teacherTextDraft.room}
+                onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, room: e.target.value, insertAfterObject: "" }))}
+                style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+              >
+                <option value="">Seleziona stanza (solo stanze degli oggetti selezionati)</option>
+                {availableTextRooms.map((room) => (
+                  <option key={room} value={room}>{room}</option>
+                ))}
+              </select>
+              <select
+                value={teacherTextDraft.insertAfterObject}
+                onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, insertAfterObject: e.target.value }))}
+                style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+              >
+                <option value="">Seleziona oggetto della stanza</option>
+                {availableInsertAfterObjects.map((objName) => (
+                  <option key={`after-${objName}`} value={objName}>
+                    Dopo {objName}
+                  </option>
+                ))}
+              </select>
+              <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--text-faint)" }}>
+                L'item ? comparira nella stanza selezionata e nel flusso subito dopo l'oggetto scelto.
+              </p>
+              <input
+                value={teacherTextDraft.name}
+                onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome item ? (es. Domanda 1)"
+                style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+              />
+              <textarea
+                value={teacherTextDraft.text}
+                onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, text: e.target.value }))}
+                placeholder="Testo mostrato al centro stanza"
+                style={{ width: "100%", minHeight: 70, padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+              />
+              <button type="button" onClick={addTeacherTextItem} style={{ padding: "8px 12px", border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer" }}>
+                {teacherEditingTextItemId ? "Salva modifica item testo" : "Aggiungi item testo"}
               </button>
-              {teacherLink && (
-                <button type="button" onClick={copyTeacherLink} style={{ padding: "11px 16px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
-                  Copia link
-                </button>
+              {teacherTextItems.length > 0 && (
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  {teacherTextItems.map((item) => (
+                    <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", color: "var(--text-dim)" }}>
+                      <span>
+                        {item.name ? `${item.name}: ` : ""}
+                        {item.room ? `[${item.room}] ` : ""}{item.text}
+                        {item.insertAfterObject ? ` (dopo ${item.insertAfterObject})` : ""}
+                      </span>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" onClick={() => editTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>Modifica</button>
+                        <button type="button" onClick={() => removeTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>Rimuovi</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
+            </div>
+
+            <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", display: "grid", gap: 8 }}>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Quiz finale</p>
+              <input value={teacherQuizTitle} onChange={(e) => setTeacherQuizTitle(e.target.value)} placeholder="Titolo quiz" style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+              <input type="number" min="10" value={teacherQuizTimeLimit} onChange={(e) => setTeacherQuizTimeLimit(e.target.value)} placeholder="Tempo massimo (secondi)" style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+              {teacherQuizQuestions.map((question, qIdx) => (
+                <div key={question.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "8px", background: "#111" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ color: "var(--gold)", fontSize: 12 }}>Domanda {qIdx + 1}</span>
+                    <button type="button" onClick={() => removeQuizQuestion(question.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Rimuovi</button>
+                  </div>
+                  <input
+                    value={question.question}
+                    onChange={(e) => updateQuizQuestion(question.id, (q) => ({ ...q, question: e.target.value }))}
+                    placeholder="Testo domanda"
+                    style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#1a1a1a", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+                  />
+                  {question.options.map((option, optIdx) => (
+                    <div key={`${question.id}-opt-${optIdx}`} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6, marginBottom: 6 }}>
+                      <input
+                        value={option}
+                        onChange={(e) =>
+                          updateQuizQuestion(question.id, (q) => {
+                            const nextOptions = [...q.options];
+                            nextOptions[optIdx] = e.target.value;
+                            return { ...q, options: nextOptions };
+                          })
+                        }
+                        placeholder={`Opzione ${optIdx + 1}`}
+                        style={{ width: "100%", padding: "8px 10px", background: "#1a1a1a", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateQuizQuestion(question.id, (q) => {
+                            if (q.options.length <= 2) return q;
+                            const nextOptions = q.options.filter((_, idx) => idx !== optIdx);
+                            const nextCorrect = q.correctIndex >= nextOptions.length ? nextOptions.length - 1 : q.correctIndex;
+                            return { ...q, options: nextOptions, correctIndex: nextCorrect };
+                          })
+                        }
+                        style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => updateQuizQuestion(question.id, (q) => ({ ...q, options: [...q.options, ""] }))}
+                      style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "6px 10px" }}
+                    >
+                      Aggiungi opzione
+                    </button>
+                    <select
+                      value={question.correctIndex}
+                      onChange={(e) => updateQuizQuestion(question.id, (q) => ({ ...q, correctIndex: Number(e.target.value) }))}
+                      style={{ padding: "6px 10px", background: "#1a1a1a", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+                    >
+                      {question.options.map((_, idx) => (
+                        <option key={`${question.id}-correct-${idx}`} value={idx}>
+                          Risposta corretta: opzione {idx + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
+              <button type="button" onClick={addQuizQuestion} style={{ border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer", padding: "8px 10px" }}>Aggiungi domanda</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
+              <button type="button" onClick={saveTeacherGuidedVisit} style={{ padding: "11px 16px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
+                {teacherEditingVisitId ? "Salva modifiche visita" : "Salva visita guidata"}
+              </button>
             </div>
 
             {teacherOptimizedOrder.length > 0 && (
               <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-                Ordine finale percorso: <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
+                Flusso finale visita: <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
               </p>
             )}
-
-            {teacherLink && (
-              <input readOnly value={teacherLink} style={{ width: "100%", padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+            {teacherStudentLink && (
+              <input readOnly value={teacherStudentLink} style={{ width: "100%", marginTop: 8, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+            )}
+            {teacherDashboardLink && (
+              <input readOnly value={teacherDashboardLink} style={{ width: "100%", marginTop: 8, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
             )}
           </div>
         </div>

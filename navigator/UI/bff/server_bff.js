@@ -163,6 +163,11 @@ app.get(["/editor", "/editor/*"], (req, res) => {
 // STATIC — MARKETPLACE  (/marketplace/assets/*, ecc.)
 // Deve stare PRIMA dello static del viewer per evitare collisioni
 // ============================================================
+app.get("/marketplace/indexMarketplace.html", (req, res) => {
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  return res.redirect(302, `/marketplace/${qs}`);
+});
+
 app.use(
   "/marketplace",
   express.static(path.join(__dirname, "marketplace/dist"), { index: false })
@@ -189,6 +194,11 @@ app.get(["/marketplace", "/marketplace/*"], (req, res) => {
 app.use(
   "/img",
   express.static(path.join(__dirname, "img"), { index: false })
+);
+
+app.use(
+  "/foto",
+  express.static(path.resolve(__dirname, "../../..", "foto"), { index: false })
 );
 
 app.use(

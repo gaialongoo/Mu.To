@@ -17,6 +17,13 @@ type Session = {
   createdAt: number;
   livello?: string;
   durata?: string;
+  guideRole?: "teacher" | "student";
+  guidedVisitId?: string;
+  guidedParticipantToken?: string;
+  guidedCustomDescriptions?: Record<string, string>;
+  guidedTextSteps?: Array<{ id?: string; room: string; text: string }>;
+  guidedVirtualObjects?: Record<string, { room: string; label?: string; descrizioni?: string[][] }>;
+  guidedFlowNodes?: string[];
 };
 
 function getSession(): Session | null {
@@ -84,9 +91,13 @@ function getCurrentPathEndpointsFromUrl(session: Session): { from: string | null
 function computeSvgUrl(session: Session): string {
   const { svgPath } = parseStanzaFromUrl(session);
   const museo = encodeURIComponent(session.museo);
-  return svgPath
+  const base = svgPath
     ? `${SVG_SERVER_BASE}/${museo}/${svgPath}`
     : `${SVG_SERVER_BASE}/${museo}`;
+  if (session.guidedVisitId) {
+    return `${base}?guidedVisitId=${encodeURIComponent(session.guidedVisitId)}`;
+  }
+  return base;
 }
 
 /* ===================== TYPES ===================== */
@@ -158,6 +169,19 @@ export default function SvgViewer() {
   const [svgLoadTick, setSvgLoadTick] = useState(0);
   const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const isGuidedStudent = session?.guideRole === "student";
+  const [guidedQuizState, setGuidedQuizState] = useState<any>(null);
+  const [guidedQuizRequired, setGuidedQuizRequired] = useState(false);
+  const [guidedQuizSubmitted, setGuidedQuizSubmitted] = useState(false);
+  const [guidedQuizAnswers, setGuidedQuizAnswers] = useState<number[]>([]);
+  const [guidedQuizSubmitting, setGuidedQuizSubmitting] = useState(false);
+  const isGuidedTeacher = session?.guideRole === "teacher";
+  const guidedStudentSyncRef = useRef<string>("");
+  const [teacherPanelOpen, setTeacherPanelOpen] = useState(false);
+  const [teacherVisitState, setTeacherVisitState] = useState<any>(null);
+  const [teacherQuizResults, setTeacherQuizResults] = useState<any[]>([]);
+  const [teacherShowResults, setTeacherShowResults] = useState(false);
+  const isGuidedVisit = !!session?.guidedVisitId;
 
   const lockedViewBox = useRef<string | null>(null);
   const setRoomConfirmRef = useRef(setRoomConfirm);
@@ -269,6 +293,110 @@ export default function SvgViewer() {
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
+
+  useEffect(() => {
+    if (!session || !isGuidedStudent || !session.guidedVisitId || !session.guidedParticipantToken) return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const syncStudentState = async () => {
+      if (stop) return;
+      try {
+        const r = await fetch(
+          `${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId || "")}/student-state?participantToken=${encodeURIComponent(session.guidedParticipantToken || "")}`
+        );
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) return;
+        if (d.status === "removed") {
+          clearSessionCookies();
+          window.location.replace("/");
+          return;
+        }
+        const questions = Array.isArray(d.quiz?.questions) ? d.quiz.questions : [];
+        const hasSubmittedQuiz = d.grade != null;
+        setGuidedQuizRequired(questions.length > 0);
+        setGuidedQuizSubmitted(hasSubmittedQuiz);
+        if (d.quizState?.status === "running" && !hasSubmittedQuiz) {
+          setGuidedQuizState({ quiz: d.quiz || {}, quizState: d.quizState });
+        } else {
+          setGuidedQuizState(null);
+        }
+        const currentObjectName = String(d.currentObjectName || "").trim();
+        const previousObjectName = String(d.previousObjectName || "IN").trim() || "IN";
+        if (!currentObjectName) return;
+        const signature = `${previousObjectName}=>${currentObjectName}`;
+        if (guidedStudentSyncRef.current === signature) return;
+        guidedStudentSyncRef.current = signature;
+        let stanzaObj = "";
+        if (String(currentObjectName).startsWith("__text__")) {
+          stanzaObj = String(d.currentRoom || "").trim();
+          if (!stanzaObj) return;
+          const nextUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(previousObjectName)}/${encodeURIComponent(currentObjectName)}`;
+          window.history.pushState({}, "", nextUrl);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+          return;
+        } else if (isSpecialRouteNode(currentObjectName)) {
+          if (!previousObjectName || isSpecialRouteNode(previousObjectName)) return;
+          stanzaObj = await fetchObjectRoom(session.museo, previousObjectName);
+        } else {
+          stanzaObj = await fetchObjectRoom(session.museo, currentObjectName);
+        }
+        const nextUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(previousObjectName)}/${encodeURIComponent(currentObjectName)}`;
+        window.history.pushState({}, "", nextUrl);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      } catch {
+        // ignore temporary polling failures
+      } finally {
+        if (!stop) timer = setTimeout(syncStudentState, 2500);
+      }
+    };
+
+    syncStudentState();
+    return () => {
+      stop = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [session, isGuidedStudent]);
+
+  useEffect(() => {
+    if (!session || !isGuidedTeacher || !session.guidedVisitId) return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const loadTeacherState = async () => {
+      if (stop) return;
+      try {
+        const r = await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId || "")}/teacher-state`, { credentials: "include" });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) setTeacherVisitState(d.visit || null);
+        if (teacherShowResults) {
+          const rr = await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId || "")}/results`, { credentials: "include" });
+          const rd = await rr.json().catch(() => ({}));
+          if (rr.ok) setTeacherQuizResults(Array.isArray(rd.results) ? rd.results : []);
+        }
+      } catch {
+        // ignore transient failures
+      } finally {
+        if (!stop) timer = setTimeout(loadTeacherState, 2500);
+      }
+    };
+    loadTeacherState();
+    return () => {
+      stop = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [session, isGuidedTeacher, teacherShowResults]);
+
+  useEffect(() => {
+    if (!isGuidedTeacher) return;
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("dashboard") === "1") {
+      setTeacherPanelOpen(true);
+      qs.delete("dashboard");
+      const next = `${window.location.pathname}${qs.toString() ? `?${qs.toString()}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, [isGuidedTeacher]);
 
   /* ---- modalità esplora / lock ---- */
   useEffect(() => {
@@ -485,6 +613,11 @@ export default function SvgViewer() {
   };
 
   const handleExitConfirm = () => {
+    if (isGuidedStudent && guidedQuizRequired && !guidedQuizSubmitted) {
+      setExitConfirmOpen(false);
+      alert("Devi completare e inviare il quiz prima di uscire dalla visita.");
+      return;
+    }
     clearSessionCookies();
     setExitConfirmOpen(false);
     setRoomConfirm(null);
@@ -549,38 +682,120 @@ export default function SvgViewer() {
   const canResumePath = !!session
     && !!fromInUrl
     && isSpecialRouteNode(toInUrl || "")
+    && normalize(toInUrl || "") !== "out"
     && Array.isArray(session.percorso)
     && session.percorso.indexOf(fromInUrl) >= 0
     && session.percorso.indexOf(fromInUrl) < session.percorso.length - 1;
+
+  const submitGuidedQuiz = async () => {
+    if (!session?.guidedVisitId || !session?.guidedParticipantToken || !guidedQuizState?.quiz) return;
+    try {
+      setGuidedQuizSubmitting(true);
+      const r = await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId)}/quiz/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participantToken: session.guidedParticipantToken,
+          answers: guidedQuizAnswers,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Invio quiz fallito");
+      alert(`Quiz inviato. Voto: ${d.grade}/100`);
+      setGuidedQuizSubmitted(true);
+      setGuidedQuizState(null);
+    } catch (err: any) {
+      alert(err?.message || "Invio quiz fallito");
+    } finally {
+      setGuidedQuizSubmitting(false);
+    }
+  };
+
+  const teacherPost = async (path: string, body: any = {}) => {
+    const r = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Operazione non riuscita");
+    return d;
+  };
+
+  const teacherAccept = async (participantId: string) => {
+    if (!session?.guidedVisitId) return;
+    await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/participants/${encodeURIComponent(participantId)}/accept`);
+  };
+  const teacherRemove = async (participantId: string) => {
+    if (!session?.guidedVisitId) return;
+    await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/participants/${encodeURIComponent(participantId)}/remove`);
+  };
+  const teacherAcceptAll = async () => {
+    if (!session?.guidedVisitId) return;
+    await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/participants/accept-all`);
+  };
+  const teacherStartQuiz = async () => {
+    if (!session?.guidedVisitId) return;
+    const secRaw = prompt("Tempo quiz in secondi:", String(teacherVisitState?.quiz?.timeLimitSec || 120));
+    const sec = Number(secRaw);
+    await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/quiz/start`, Number.isFinite(sec) ? { timeLimitSec: sec } : {});
+  };
 
   if (!session) return <div style={{ padding: 20 }}>Caricamento…</div>;
 
   return (
     <>
-      <button
-        onClick={() => setExitConfirmOpen(true)}
-        title="Esci dal percorso"
-        style={{
-          position: "fixed",
-          top: 16,
-          right: 16,
-          zIndex: 1001,
-          border: "none",
-          borderRadius: 10,
-          background: "rgba(200, 32, 32, 0.9)",
-          color: "#fff",
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: "0.05em",
-          padding: "8px 12px",
-          cursor: "pointer",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-        }}
-      >
-        EXIT
-      </button>
+      {!isGuidedVisit && (
+        <button
+          onClick={() => setExitConfirmOpen(true)}
+          title="Esci dal percorso"
+          style={{
+            position: "fixed",
+            top: 16,
+            right: 16,
+            zIndex: 1001,
+            border: "none",
+            borderRadius: 10,
+            background: "rgba(200, 32, 32, 0.9)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            padding: "8px 12px",
+            cursor: "pointer",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          EXIT
+        </button>
+      )}
+
+      {isGuidedTeacher && session?.guidedVisitId && (
+        <button
+          onClick={() => setTeacherPanelOpen(true)}
+          style={{
+            position: "fixed",
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+            border: "none",
+            borderRadius: 10,
+            background: "rgba(24,95,165,0.92)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            padding: "8px 12px",
+            cursor: "pointer",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+          }}
+        >
+          DASHBOARD CLASSE
+        </button>
+      )}
 
       <button
         onClick={() => {
@@ -618,6 +833,7 @@ export default function SvgViewer() {
         }}
         onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
         onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+        disabled={normalize(currentStanzaLabel ?? "") === "home"}
       >
         {freeExplore ? "🔒" : "🗺"}
       </button>
@@ -649,50 +865,52 @@ export default function SvgViewer() {
         </div>
       )}
 
-      <div
-        style={{
-          position: "fixed",
-          left: 16,
-          bottom: 16,
-          zIndex: 1000,
-          display: "flex",
-          gap: 8,
-          background: "rgba(0,0,0,0.45)",
-          padding: "8px 10px",
-          borderRadius: 10,
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-        }}
-      >
-        {[
-          { key: "shop", label: "SHOP" },
-          { key: "wc", label: "WC" },
-          { key: "out", label: "OUT" },
-        ].map((item) => {
-          const enabled = availableQuickRooms[item.key as keyof typeof availableQuickRooms];
-          return (
-            <button
-              key={item.key}
-              onClick={() => enabled && handleQuickRoomNavigate(item.label)}
-              disabled={!enabled}
-              style={{
-                border: "1px solid rgba(255,255,255,0.28)",
-                background: enabled ? "rgba(24,95,165,0.9)" : "rgba(90,90,90,0.4)",
-                color: "#fff",
-                borderRadius: 8,
-                padding: "7px 10px",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                cursor: enabled ? "pointer" : "not-allowed",
-              }}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-      {canResumePath && (
+      {!isGuidedVisit && (
+        <div
+          style={{
+            position: "fixed",
+            left: 16,
+            bottom: 16,
+            zIndex: 1000,
+            display: "flex",
+            gap: 8,
+            background: "rgba(0,0,0,0.45)",
+            padding: "8px 10px",
+            borderRadius: 10,
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          {[
+            { key: "shop", label: "SHOP" },
+            { key: "wc", label: "WC" },
+            { key: "out", label: "OUT" },
+          ].map((item) => {
+            const enabled = availableQuickRooms[item.key as keyof typeof availableQuickRooms];
+            return (
+              <button
+                key={item.key}
+                onClick={() => enabled && !isGuidedStudent && handleQuickRoomNavigate(item.label)}
+                disabled={!enabled || isGuidedStudent}
+                style={{
+                  border: "1px solid rgba(255,255,255,0.28)",
+                  background: enabled ? "rgba(24,95,165,0.9)" : "rgba(90,90,90,0.4)",
+                  color: "#fff",
+                  borderRadius: 8,
+                  padding: "7px 10px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  cursor: enabled && !isGuidedStudent ? "pointer" : "not-allowed",
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {canResumePath && !isGuidedStudent && (
         <button
           onClick={handleResumePath}
           style={{
@@ -842,12 +1060,156 @@ export default function SvgViewer() {
         </div>
       )}
 
+      {teacherPanelOpen && isGuidedTeacher && (
+        <div
+          onClick={() => setTeacherPanelOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9400,
+            background: "rgba(0,0,0,0.65)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(920px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", color: "#111", borderRadius: 14, padding: "16px 18px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>Dashboard classe</h3>
+              <button onClick={() => setTeacherPanelOpen(false)} style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer" }}>×</button>
+            </div>
+            <p style={{ marginTop: 0, color: "#555", marginBottom: 12 }}>
+              {teacherVisitState?.nome || "Visita"} - {teacherVisitState?.museo || ""}
+            </p>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              <button onClick={() => teacherAcceptAll().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#f8f8f8", cursor: "pointer" }}>
+                Accetta tutti
+              </button>
+              <button onClick={() => teacherStartQuiz().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #185FA5", background: "#185FA5", color: "#fff", cursor: "pointer" }}>
+                Avvia quiz
+              </button>
+              <button onClick={() => setTeacherShowResults((v) => !v)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
+                {teacherShowResults ? "Nascondi risultati" : "Vedi risultati"}
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
+                <strong>Persone da accettare/rifiutare</strong>
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
+                    .filter((p: any) => p.status === "waiting")
+                    .map((p: any) => (
+                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span>{p.displayName}</span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => teacherAccept(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #2f8f4e", background: "#e9fff0", borderRadius: 6, cursor: "pointer" }}>Accetta</button>
+                          <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>Rifiuta</button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
+                <strong>Persone dentro (accettate)</strong>
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
+                    .filter((p: any) => p.status === "accepted")
+                    .map((p: any, idx: number) => (
+                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span>{idx + 1}. {p.displayName}</span>
+                        <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>Rimuovi</button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            {teacherShowResults && (
+              <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
+                <strong>Risultati quiz</strong>
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  {teacherQuizResults.length < 1
+                    ? <span style={{ color: "#666" }}>Nessun risultato disponibile.</span>
+                    : teacherQuizResults
+                        .slice()
+                        .sort((a, b) => (Number(b.grade) || -1) - (Number(a.grade) || -1))
+                        .map((r: any) => (
+                          <div key={r.id || r.displayName} style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span>{r.displayName}</span>
+                            <span>{r.grade == null ? "-" : `${r.grade}/100`}</span>
+                          </div>
+                        ))
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {guidedQuizState?.quiz && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9600,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div style={{ width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", borderRadius: 14, padding: "18px 20px" }}>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>{guidedQuizState.quiz.title || "Quiz finale"}</h3>
+            <p style={{ marginTop: 0, color: "#666", fontSize: 13 }}>
+              Tempo massimo: {guidedQuizState.quizState?.timeLimitSec || guidedQuizState.quiz?.timeLimitSec || 120} secondi
+            </p>
+            {(Array.isArray(guidedQuizState.quiz.questions) ? guidedQuizState.quiz.questions : []).map((q: any, qIdx: number) => (
+              <div key={q.id || `q-${qIdx}`} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <p style={{ marginTop: 0, marginBottom: 8, fontWeight: 600 }}>{qIdx + 1}. {q.question}</p>
+                {(Array.isArray(q.options) ? q.options : []).map((opt: string, optIdx: number) => (
+                  <label key={`${qIdx}-${optIdx}`} style={{ display: "block", marginBottom: 6, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name={`guided-quiz-${qIdx}`}
+                      checked={guidedQuizAnswers[qIdx] === optIdx}
+                      onChange={() => setGuidedQuizAnswers((prev) => {
+                        const next = [...prev];
+                        next[qIdx] = optIdx;
+                        return next;
+                      })}
+                      style={{ marginRight: 8 }}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={submitGuidedQuiz}
+              disabled={guidedQuizSubmitting}
+              style={{ padding: "10px 14px", borderRadius: 8, border: "none", background: "#185FA5", color: "#fff", cursor: "pointer" }}
+            >
+              {guidedQuizSubmitting ? "Invio..." : "Invia quiz"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {focusedObject && (
         <ObjectOverlay
           nome={focusedObject}
           session={session}
           onClose={closeObjectFocus}
-          showNav={true}
+          showNav={!isGuidedStudent}
         />
       )}
     </>
@@ -914,9 +1276,92 @@ function loadSvg(
 
       renderNavigation(svg);
       bindObjectClicks(svg, session);
+      renderGuidedTextMarkers(svg, session);
       mountExitInOutRoom(svg, onExitRequested);
       onLoaded?.();
     });
+}
+
+function renderGuidedTextMarkers(svg: SVGSVGElement, session: Session) {
+  if (session?.guidedVisitId) return;
+  const textSteps = Array.isArray(session?.guidedTextSteps) ? session.guidedTextSteps : [];
+  if (textSteps.length < 1) return;
+  const byRoom = new Map<string, string>();
+  for (const step of textSteps) {
+    const room = String(step?.room || "").trim();
+    if (!room) continue;
+    if (!byRoom.has(normalize(room))) byRoom.set(normalize(room), String(step?.text || "").trim());
+  }
+  if (byRoom.size < 1) return;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const rooms = Array.from(svg.querySelectorAll<SVGRectElement>("rect.stanza"));
+  const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"));
+
+  const roomCenterByLabel = new Map<string, { x: number; y: number }>();
+  for (const labelEl of labels) {
+    const name = normalize(labelEl.textContent || "");
+    if (!name || !byRoom.has(name)) continue;
+    const tx = Number(labelEl.getAttribute("x") || 0);
+    const ty = Number(labelEl.getAttribute("y") || 0);
+    let bestRect: SVGRectElement | null = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const rect of rooms) {
+      const cx = Number(rect.getAttribute("x") || 0) + Number(rect.getAttribute("width") || 0) / 2;
+      const cy = Number(rect.getAttribute("y") || 0) + Number(rect.getAttribute("height") || 0) / 2;
+      const d = Math.hypot(cx - tx, cy - ty);
+      if (d < bestDist) {
+        bestDist = d;
+        bestRect = rect;
+      }
+    }
+    if (!bestRect) continue;
+    roomCenterByLabel.set(name, {
+      x: Number(bestRect.getAttribute("x") || 0) + Number(bestRect.getAttribute("width") || 0) / 2,
+      y: Number(bestRect.getAttribute("y") || 0) + Number(bestRect.getAttribute("height") || 0) / 2,
+    });
+  }
+
+  const textNodeByRoom = new Map<string, string>();
+  for (const [nodeName, nodeData] of Object.entries(session?.guidedVirtualObjects || {})) {
+    const room = normalize(String(nodeData?.room || ""));
+    if (room && !textNodeByRoom.has(room)) textNodeByRoom.set(room, nodeName);
+  }
+
+  for (const [roomLabel] of byRoom.entries()) {
+    const center = roomCenterByLabel.get(roomLabel);
+    if (!center) continue;
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("class", "guided-text-marker");
+    g.style.cursor = "pointer";
+    g.style.pointerEvents = "all";
+    g.setAttribute("transform", `translate(${center.x}, ${center.y})`);
+
+    const c = document.createElementNS(ns, "circle");
+    c.setAttribute("cx", "0");
+    c.setAttribute("cy", "0");
+    c.setAttribute("r", "10");
+    c.setAttribute("class", "oggetto");
+    g.appendChild(c);
+
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", "0");
+    t.setAttribute("y", "3");
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("dominant-baseline", "middle");
+    t.setAttribute("class", "oggetto-label");
+    t.textContent = "?";
+    g.appendChild(t);
+    const textNode = textNodeByRoom.get(roomLabel);
+    if (textNode) {
+      g.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openObjectFocus(textNode);
+      });
+    }
+
+    svg.appendChild(g);
+  }
 }
 
 function fitSvgToViewport(svg: SVGSVGElement) {
@@ -1421,12 +1866,15 @@ function replaceCircleWithImage(
   const cy = parseFloat(circle.getAttribute("cy") ?? "0");
   const r  = parseFloat(circle.getAttribute("r")  ?? "10");
 
-  const PREVIEW_SCALE = 2.5; // ← cambia per ingrandire/ridurre le anteprime
+  const isVirtualTextNode = String(nome || "").startsWith("__text__");
+  const PREVIEW_SCALE = isVirtualTextNode ? 1.6 : 2.5;
   const displayR = r * PREVIEW_SCALE;
   const size = displayR * 2;
 
   const clipId = `clip-obj-${nome.replace(/\s+/g, "_")}-${Math.round(cx)}-${Math.round(cy)}`;
-  const previewUrl = `${API_BASE}/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(nome)}/immagini/preview`;
+  const previewUrl = isVirtualTextNode
+    ? "/foto/pt.png"
+    : `${API_BASE}/musei/${encodeURIComponent(museo)}/oggetti/${encodeURIComponent(nome)}/immagini/preview`;
   const cacheKey = previewCacheKey(museo, nome);
 
   let defsEl = svg.querySelector<SVGDefsElement>("defs");
@@ -1486,6 +1934,11 @@ function replaceCircleWithImage(
 
     imgEl.setAttribute("href", previewUrl);
     circle.insertAdjacentElement("afterend", imgEl);
+  }
+
+  if (isVirtualTextNode) {
+    mountImage(true);
+    return;
   }
 
   const cached = previewExistsCache.get(cacheKey);
@@ -1702,8 +2155,10 @@ function closeObjectFocus() {
 function bindObjectClicks(svg: SVGSVGElement, session: Session) {
   svg.querySelectorAll<SVGCircleElement>("circle.oggetto").forEach(circle => {
     const t = circle.nextElementSibling as SVGTextElement | null;
-    if (!t) return;
-    const nome = t.textContent?.trim();
+    const dataName = circle.getAttribute("data-object-name")
+      || t?.getAttribute("data-object-name")
+      || "";
+    const nome = (dataName || t?.textContent || "").trim();
     if (!nome) return;
 
     circle.style.cursor = "pointer";
@@ -1734,25 +2189,43 @@ function ObjectOverlay({
   const [descrizione, setDescrizione] = useState<string | null>(null);
   const [immagini, setImmagini]       = useState<{ tipo: string; url: string }[]>([]);
   const [slideIdx, setSlideIdx]       = useState(0);
-  const percorso = Array.isArray(session?.percorso) ? session.percorso : [];
+  const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
+    ? session.guidedFlowNodes
+    : (Array.isArray(session?.percorso) ? session.percorso : []);
   const pathIndex = percorso.indexOf(nome);
   const isObjectInPath = pathIndex !== -1;
+  const virtualObject = session?.guidedVirtualObjects?.[nome];
+  const objectTitle = virtualObject
+    ? String(virtualObject.label || "").trim() || "Item testo"
+    : nome;
 
   useEffect(() => {
     setSlideIdx(0);
+    if (virtualObject) {
+      getUserPreferences()
+        .then((prefs) => setDescrizione(pickDescriptionByPreferences(virtualObject.descrizioni, prefs)))
+        .catch(() => setDescrizione(null));
+      setImmagini([]);
+      return;
+    }
+    const guidedText = String(session?.guidedCustomDescriptions?.[nome] || "").trim();
+    if (guidedText) {
+      setDescrizione(guidedText);
+    } else {
 
-    // carica descrizione personalizzata in base a livello/durata profilo
-    Promise.all([
-      fetch(
-        `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
-      ).then(r => r.json()),
-      getUserPreferences(),
-    ])
-      .then(([d, prefs]) => {
-        const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
-        setDescrizione(best);
-      })
-      .catch(() => setDescrizione(null));
+      // carica descrizione personalizzata in base a livello/durata profilo
+      Promise.all([
+        fetch(
+          `${API_BASE}/musei/${encodeURIComponent(session.museo)}/oggetti/${encodeURIComponent(nome)}`
+        ).then(r => r.json()),
+        getUserPreferences(),
+      ])
+        .then(([d, prefs]) => {
+          const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
+          setDescrizione(best);
+        })
+        .catch(() => setDescrizione(null));
+    }
 
     // carica lista immagini, esclude preview
     fetch(
@@ -1766,7 +2239,7 @@ function ObjectOverlay({
         setImmagini(lista);
       })
       .catch(() => setImmagini([]));
-  }, [nome, session]);
+  }, [nome, session, virtualObject]);
 
   useEffect(() => {
     const percorso = session.percorso;
@@ -1789,8 +2262,15 @@ function ObjectOverlay({
 
   const updateURL = async (oggettoCorrente: string, oggettoAltro: string) => {
     try {
-      const stanzaOggetto = await fetchObjectRoom(session.museo, oggettoCorrente);
-      history.pushState(null, "", `/?stanza=${stanzaOggetto}/path/${oggettoCorrente}/${oggettoAltro}`);
+      const getNodeRoom = async (node: string) => {
+        if (String(node || "").startsWith("__text__")) {
+          return String(session.guidedVirtualObjects?.[node]?.room || "").trim();
+        }
+        if (isSpecialRouteNode(node)) return "";
+        return fetchObjectRoom(session.museo, node);
+      };
+      const stanzaFrom = await getNodeRoom(oggettoCorrente);
+      history.pushState(null, "", `/?stanza=${encodeURIComponent(stanzaFrom || "IN")}/path/${encodeURIComponent(oggettoCorrente)}/${encodeURIComponent(oggettoAltro)}`);
       onClose();
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {
@@ -1798,18 +2278,141 @@ function ObjectOverlay({
     }
   };
 
-  const handleNext = () => {
-    const percorso = session.percorso;
-    const index = percorso.indexOf(nome);
-    if (index === -1 || index >= percorso.length - 1) return;
-    updateURL(percorso[index], percorso[index + 1]);
+  const syncTeacherNavigationByObject = async (targetObject: string) => {
+    if (session.guideRole !== "teacher" || !session.guidedVisitId) return;
+    try {
+      await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId)}/navigation/by-object`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objectName: targetObject }),
+      });
+    } catch (err) {
+      console.error("Errore sync navigazione docente:", err);
+    }
+  };
+  const syncTeacherNavigationByStep = async (stepIndex: number) => {
+    if (session.guideRole !== "teacher" || !session.guidedVisitId) return;
+    try {
+      await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId)}/navigation`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepIndex }),
+      });
+    } catch (err) {
+      console.error("Errore sync navigazione step docente:", err);
+    }
+  };
+  const fetchTeacherVisitState = async () => {
+    if (session.guideRole !== "teacher" || !session.guidedVisitId) return null;
+    try {
+      const r = await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId)}/teacher-state`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return null;
+      return d.visit || null;
+    } catch {
+      return null;
+    }
+  };
+  const routeForStep = (steps: any[], targetIdx: number): { from: string; to: string } | null => {
+    const target = steps[targetIdx];
+    if (!target) return null;
+    let to = "";
+    if (target.type === "object" && target.objectName) {
+      to = String(target.objectName);
+    } else if (target.type === "text") {
+      to = `__text__${targetIdx + 1}`;
+    } else {
+      return null;
+    }
+    let from = "IN";
+    for (let i = targetIdx - 1; i >= 0; i--) {
+      const s = steps[i];
+      if (s?.type === "object" && s?.objectName) {
+        from = s.objectName;
+        break;
+      }
+      if (s?.type === "text") {
+        from = `__text__${i + 1}`;
+        break;
+      }
+    }
+    return { from, to };
+  };
+  const syncTeacherNavigationByNode = async (nodeName: string) => {
+    if (session.guideRole !== "teacher" || !session.guidedVisitId) return;
+    try {
+      await fetch(`${API_BASE}/guided-visits/${encodeURIComponent(session.guidedVisitId)}/navigation/by-node`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeName }),
+      });
+    } catch (err) {
+      console.error("Errore sync navigazione nodo docente:", err);
+    }
   };
 
-  const handlePrev = () => {
+  const handleNext = async () => {
+    if (session.guideRole === "teacher" && session.guidedVisitId) {
+      const visit = await fetchTeacherVisitState();
+      const steps = Array.isArray(visit?.steps) ? visit.steps : [];
+      const currentIdx = Number(visit?.currentStepIndex) || 0;
+      if (steps.length < 1 || currentIdx >= steps.length - 1) {
+        const percorso = session.percorso;
+        const index = percorso.indexOf(nome);
+        if (index === percorso.length - 2) {
+          await syncTeacherNavigationByNode("OUT");
+          const stanzaObj = await fetchObjectRoom(session.museo, nome);
+          history.pushState(null, "", `/?stanza=${stanzaObj}/path/${encodeURIComponent(nome)}/${encodeURIComponent("OUT")}`);
+          onClose();
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        }
+        return;
+      }
+      const nextIdx = currentIdx + 1;
+      await syncTeacherNavigationByStep(nextIdx);
+      const route = routeForStep(steps, nextIdx);
+      if (route) updateURL(route.from, route.to);
+      return;
+    }
     const percorso = session.percorso;
     const index = percorso.indexOf(nome);
-    if (index <= 0) return;
-    updateURL(percorso[index - 1], percorso[index]);
+    if (index === -1 || index >= percorso.length - 2) {
+      if (session.guideRole === "teacher" && index === percorso.length - 2) {
+        await syncTeacherNavigationByNode("OUT");
+        const stanzaObj = await fetchObjectRoom(session.museo, nome);
+        history.pushState(null, "", `/?stanza=${stanzaObj}/path/${encodeURIComponent(nome)}/${encodeURIComponent("OUT")}`);
+        onClose();
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+      return;
+    }
+    const target = percorso[index + 1];
+    await syncTeacherNavigationByObject(target);
+    updateURL(percorso[index], target);
+  };
+
+  const handlePrev = async () => {
+    if (session.guideRole === "teacher" && session.guidedVisitId) {
+      const visit = await fetchTeacherVisitState();
+      const steps = Array.isArray(visit?.steps) ? visit.steps : [];
+      const currentIdx = Number(visit?.currentStepIndex) || 0;
+      if (steps.length < 1 || currentIdx <= 0) return;
+      const prevIdx = currentIdx - 1;
+      await syncTeacherNavigationByStep(prevIdx);
+      const route = routeForStep(steps, prevIdx);
+      if (route) updateURL(route.from, route.to);
+      return;
+    }
+    const percorso = session.percorso;
+    const index = percorso.indexOf(nome);
+    if (index <= 1) return;
+    const target = percorso[index - 1];
+    await syncTeacherNavigationByObject(target);
+    const source = index - 2 >= 0 ? percorso[index - 2] : "IN";
+    updateURL(source, target);
   };
 
   const prevSlide = (e: React.MouseEvent) => {
@@ -1926,7 +2529,7 @@ function ObjectOverlay({
 
         {/* ── Testo ── */}
         <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>
-          <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{nome}</h2>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{objectTitle}</h2>
           {descrizione
             ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
             : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>Caricamento…</p>

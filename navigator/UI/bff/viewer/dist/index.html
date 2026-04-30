@@ -1269,7 +1269,7 @@
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
   </style>
-  <script type="module" crossorigin src="/assets/index-DFuB5LfV.js"></script>
+  <script type="module" crossorigin src="/assets/index-VEE7G19b.js"></script>
 </head>
 <body>
 
@@ -1586,6 +1586,7 @@
   ];
   let currentUser = null;
   let pendingMuseumSelection = false;
+  let pendingGuidedTeacherVisitId = null;
   let authMode = "login";
 
   function showAuthError(msg = "", type = "error") {
@@ -1787,6 +1788,11 @@
         pendingMuseumSelection = false;
         openOverlay(museo ? museo.value || null : null);
       }
+      if (pendingGuidedTeacherVisitId) {
+        const visitId = pendingGuidedTeacherVisitId;
+        pendingGuidedTeacherVisitId = null;
+        startGuidedTeacherFlow(visitId);
+      }
     });
 
     document.getElementById("registerForm").addEventListener("submit", async (e) => {
@@ -1943,6 +1949,436 @@
     return `/?stanza=${stanza}/path/${stanza}/${primoOggetto}`;
   }
 
+  function buildSessionFromGuidedState(state, role, visitId, participantToken = "") {
+    const percorso = Array.isArray(state?.percorso) ? state.percorso : [];
+    if (!state?.museo || percorso.length < 2) return null;
+    return {
+      museo: state.museo,
+      percorso,
+      createdAt: Date.now(),
+      guideRole: role,
+      guidedVisitId: visitId,
+      guidedParticipantToken: participantToken,
+      guidedCustomDescriptions: state?.customDescriptions || {},
+      guidedTextSteps: Array.isArray(state?.textSteps) ? state.textSteps : [],
+      guidedVirtualObjects: state?.virtualObjects || {},
+      guidedFlowNodes: Array.isArray(state?.flowNodes) ? state.flowNodes : [],
+    };
+  }
+
+  function renderGuidedContainer(title, html) {
+    if (!home) return;
+    home.innerHTML = `
+      <section class="hero" style="min-height: 100vh; display:flex; align-items:center; justify-content:center;">
+        <div class="hero-inner" style="max-width: 760px; width: 92vw; color: #f5f5f5;">
+          <h1 class="hero-title" style="font-size:2rem; margin-bottom:16px;">${title}</h1>
+          ${html}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderGuidedTextStep(step) {
+    const rawText = String(step?.text || "").trim();
+    const safeText = rawText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+    renderGuidedContainer("Tappa testuale", `
+      <div style="display:flex;justify-content:center;margin-bottom:12px;">
+        <div style="width:54px;height:54px;border-radius:50%;border:2px solid #5cbf80;color:#5cbf80;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;">?</div>
+      </div>
+      <div style="display:flex;justify-content:center;margin-bottom:14px;">
+        <img src="/foto/pt.png" alt="Item testo" style="max-width:220px;width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.2);" />
+      </div>
+      <p class="cta-desc" style="white-space:pre-wrap;">${safeText || "Messaggio del professore"}</p>
+      <p style="margin-top:10px;color:#bdbdbd;font-size:0.92rem;">Attendi il professore per proseguire alla prossima tappa.</p>
+    `);
+  }
+
+  function parseGuidedParams() {
+    const qs = new URLSearchParams(window.location.search);
+    const visitId = qs.get("guidedVisit");
+    const role = qs.get("role");
+    if (!visitId || !role) return null;
+    if (role !== "teacher" && role !== "student") return null;
+    return { visitId, role };
+  }
+
+  async function startGuidedStudentFlow(visitId) {
+    renderGuidedContainer("Visita guidata", `
+      <p class="cta-desc" style="margin-bottom:14px;">Inserisci il tuo nome e attendi l'approvazione del professore.</p>
+      <input id="guidedStudentName" type="text" placeholder="Il tuo nome" style="width:100%;padding:12px;margin-bottom:10px;" />
+      <button id="guidedStudentJoin" class="btn" style="width:100%;">Entra in attesa</button>
+      <div id="guidedStudentStatus" style="margin-top:12px;color:#d0d0d0;"></div>
+    `);
+
+    const joinBtn = document.getElementById("guidedStudentJoin");
+    const statusEl = document.getElementById("guidedStudentStatus");
+    const nameEl = document.getElementById("guidedStudentName");
+    let participantToken = "";
+    let pollTimer = null;
+
+    async function pollStudentState() {
+      if (!participantToken) return;
+      try {
+        const r = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/student-state?participantToken=${encodeURIComponent(participantToken)}`);
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Errore stato visita");
+        if (d.status === "removed") {
+          statusEl.textContent = "Sei stato rimosso dalla visita.";
+          if (pollTimer) clearInterval(pollTimer);
+          return;
+        }
+        if (d.status === "waiting") {
+          statusEl.textContent = "In attesa di approvazione del professore...";
+          return;
+        }
+        if (!d.navigationStarted) {
+          statusEl.textContent = "Approvato. In attesa che il professore avvii la navigazione...";
+          return;
+        }
+        if (d.currentStep?.type === "text") {
+          renderGuidedTextStep(d.currentStep);
+          return;
+        }
+        const session = buildSessionFromGuidedState(d, "student", visitId, participantToken);
+        const redirectUrl = session ? getNavigatorRedirectUrl(session) : null;
+        if (!session || !redirectUrl) throw new Error("Sessione visita non valida");
+        setSession(session);
+        window.location.replace(redirectUrl);
+      } catch (err) {
+        statusEl.textContent = err.message || "Errore durante l'attesa";
+      }
+    }
+
+    joinBtn?.addEventListener("click", async () => {
+      const displayName = String(nameEl?.value || "").trim();
+      if (!displayName) {
+        statusEl.textContent = "Inserisci il nome.";
+        return;
+      }
+      joinBtn.disabled = true;
+      try {
+        const r = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/join`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayName }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Impossibile entrare");
+        participantToken = d.participantToken;
+        localStorage.setItem(`guided_participant_${visitId}`, participantToken);
+        statusEl.textContent = "In attesa di approvazione del professore...";
+        pollTimer = setInterval(pollStudentState, 2500);
+        pollStudentState();
+      } catch (err) {
+        statusEl.textContent = err.message || "Errore ingresso visita";
+        joinBtn.disabled = false;
+      }
+    });
+  }
+
+  async function startGuidedTeacherFlow(visitId) {
+    if (!currentUser) {
+      await refreshCurrentUser();
+    }
+    if (!currentUser) {
+      pendingGuidedTeacherVisitId = visitId;
+      openAuthOverlay("login");
+      return;
+    }
+    if (String(currentUser.ruolo || "").toLowerCase() !== "professore") {
+      renderGuidedContainer("Accesso negato", `
+        <p class="cta-desc">Solo i professori possono aprire la dashboard docente della visita guidata.</p>
+      `);
+      return;
+    }
+    const directNavigator = new URLSearchParams(window.location.search).get("directNavigator") === "1";
+    if (directNavigator) {
+      const r = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/teacher-state`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        renderGuidedContainer("Errore apertura visita", `<p class="cta-desc">${d.error || "Impossibile aprire il navigator docente."}</p>`);
+        return;
+      }
+      const visit = d.visit || {};
+      const objectSteps = Array.isArray(visit.steps) ? visit.steps.filter((s) => s.type === "object" && s.objectName) : [];
+      if (objectSteps.length < 1) {
+        renderGuidedContainer("Visita senza oggetti", `<p class="cta-desc">Aggiungi almeno un oggetto alla visita guidata.</p>`);
+        return;
+      }
+      const currentStepIndex = Math.max(0, Math.min(Number(visit.currentStepIndex) || 0, Math.max((visit.steps || []).length - 1, 0)));
+      const orderedSteps = Array.isArray(visit.steps) ? visit.steps : [];
+      const objectCountUntilCurrent = orderedSteps.slice(0, currentStepIndex + 1).filter((s) => s.type === "object" && s.objectName).length;
+      const currentObjectPos = Math.max(0, Math.min(objectCountUntilCurrent - 1, objectSteps.length - 1));
+      const currentObjectName = objectSteps[currentObjectPos]?.objectName || objectSteps[0].objectName;
+      const objectIndex = objectSteps.findIndex((s) => s.objectName === currentObjectName);
+      const routeFromName = objectIndex <= 0 ? "IN" : objectSteps[objectIndex - 1]?.objectName || "IN";
+      const routeToName = currentObjectName;
+      const customDescriptions = objectSteps.reduce((acc, step) => {
+        acc[step.objectName] = String(step.customDescription || "");
+        return acc;
+      }, {});
+      const session = {
+        museo: visit.museo,
+        percorso: ["IN", ...objectSteps.map((s) => s.objectName), "OUT"],
+        createdAt: Date.now(),
+        guideRole: "teacher",
+        guidedVisitId: visitId,
+        guidedCustomDescriptions: customDescriptions,
+        guidedTextSteps: (Array.isArray(visit.steps) ? visit.steps : [])
+          .filter((s) => s.type === "text" && s.room && s.text)
+          .map((s) => ({ id: s.id, room: s.room, text: s.text })),
+        guidedVirtualObjects: (Array.isArray(visit.steps) ? visit.steps : []).reduce((acc, s, idx) => {
+          if (s.type !== "text") return acc;
+          const node = `__text__${idx + 1}`;
+          const text = String(s.text || "");
+          const label = String(s.label || "").trim();
+          acc[node] = { room: String(s.room || ""), label: label || "?", descrizioni: Array.from({ length: 4 }, () => [text, text, text]) };
+          return acc;
+        }, {}),
+        guidedFlowNodes: (Array.isArray(visit.steps) ? visit.steps : [])
+          .map((s, idx) => (s.type === "object" && s.objectName ? String(s.objectName) : (s.type === "text" ? `__text__${idx + 1}` : "")))
+          .filter(Boolean),
+      };
+      setSession(session);
+      let stanzaObj = "IN";
+      try {
+        const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
+        const od = await rr.json().catch(() => ({}));
+        stanzaObj = String(od?.stanza || "IN");
+      } catch {}
+      const redirectUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(routeFromName)}/${encodeURIComponent(routeToName)}&dashboard=1`;
+      window.location.replace(redirectUrl);
+      return;
+    }
+    renderGuidedContainer("Gestione visita guidata", `
+      <div id="guidedTeacherTitle" class="cta-desc" style="margin-bottom:12px;">Caricamento visita...</div>
+      <div id="guidedTeacherStatus" style="margin-bottom:12px;"></div>
+      <p class="cta-desc" style="margin-bottom:12px;">1) Accetta gli alunni, 2) seleziona la tappa, 3) apri il navigator.</p>
+      <div id="guidedTeacherSteps" style="margin-bottom:12px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button id="guidedAcceptAll" class="btn">Accetta tutti gli alunni</button>
+        <button id="guidedPrevStep" class="btn">Tappa precedente</button>
+        <button id="guidedNextStep" class="btn">Tappa successiva</button>
+        <button id="guidedOpenNavigator" class="btn">Apri navigator prof</button>
+        <button id="guidedStartQuiz" class="btn">Avvia quiz finale</button>
+      </div>
+      <div id="guidedTeacherParticipants"></div>
+      <div id="guidedTeacherResults" style="margin-top:12px;"></div>
+    `);
+    const titleEl = document.getElementById("guidedTeacherTitle");
+    const statusEl = document.getElementById("guidedTeacherStatus");
+    const stepsEl = document.getElementById("guidedTeacherSteps");
+    const participantsEl = document.getElementById("guidedTeacherParticipants");
+    const acceptAllBtn = document.getElementById("guidedAcceptAll");
+    const prevStepBtn = document.getElementById("guidedPrevStep");
+    const nextStepBtn = document.getElementById("guidedNextStep");
+    const openNavigatorBtn = document.getElementById("guidedOpenNavigator");
+    const startQuizBtn = document.getElementById("guidedStartQuiz");
+    const resultsEl = document.getElementById("guidedTeacherResults");
+    let currentVisitState = null;
+
+    async function post(path, body = {}) {
+      const r = await fetch(`${API}${path}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Errore richiesta");
+      return d;
+    }
+
+    async function loadState() {
+      try {
+        const r = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/teacher-state`, { credentials: "include" });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Errore stato visita");
+        const visit = d.visit;
+        currentVisitState = visit;
+        titleEl.textContent = `${visit.nome} - ${visit.museo}`;
+        const steps = Array.isArray(visit.steps) ? visit.steps : [];
+        const waitingCount = (Array.isArray(visit.participants) ? visit.participants : []).filter((p) => p.status === "waiting").length;
+        const acceptedCount = (Array.isArray(visit.participants) ? visit.participants : []).filter((p) => p.status === "accepted").length;
+        const quizStatus = visit.quizState?.status || "idle";
+        const visitStatus = visit.navigationStarted ? "Visita in corso" : "In attesa avvio";
+        statusEl.innerHTML = `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="padding:4px 8px;border-radius:999px;background:#1b3f2a;color:#9ff2b8;font-size:12px;">${visitStatus}</span>
+            <span style="padding:4px 8px;border-radius:999px;background:#1f2f4e;color:#a9ccff;font-size:12px;">Quiz: ${quizStatus}</span>
+            <span style="padding:4px 8px;border-radius:999px;background:#3b2f1f;color:#ffd68f;font-size:12px;">In attesa: ${waitingCount}</span>
+            <span style="padding:4px 8px;border-radius:999px;background:#243728;color:#b8ffb8;font-size:12px;">Accettati: ${acceptedCount}</span>
+          </div>
+        `;
+        if (prevStepBtn) prevStepBtn.disabled = steps.length < 1 || (Number(visit.currentStepIndex) || 0) <= 0;
+        if (nextStepBtn) nextStepBtn.disabled = steps.length < 1 || (Number(visit.currentStepIndex) || 0) >= (steps.length - 1);
+        stepsEl.innerHTML = steps.map((step, idx) => `
+          <button data-step="${idx}" style="margin:4px;padding:8px 10px;border:1px solid #444;background:${idx === visit.currentStepIndex ? "#5cbf80" : "#111"};color:${idx === visit.currentStepIndex ? "#111" : "#fff"};cursor:pointer;">
+            ${idx + 1}. ${step.type === "text" ? "?" : step.objectName || step.label || "Oggetto"}
+          </button>
+        `).join("");
+        stepsEl.querySelectorAll("button[data-step]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const idx = Number(btn.getAttribute("data-step"));
+            const step = steps[idx];
+            if (step?.type === "object" && step?.objectName) {
+              await post(`/guided-visits/${encodeURIComponent(visitId)}/navigation/by-object`, { objectName: step.objectName });
+            } else {
+              await post(`/guided-visits/${encodeURIComponent(visitId)}/navigation`, { stepIndex: idx });
+            }
+            loadState();
+          });
+        });
+        const participants = Array.isArray(visit.participants) ? visit.participants : [];
+        participantsEl.innerHTML = participants.map((p) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #333;">
+            <span>${p.displayName} - ${p.status}${p.grade != null ? ` - voto ${p.grade}` : ""}</span>
+            <span>
+              <button data-accept="${p.id}" style="margin-right:6px;">Accetta</button>
+              <button data-remove="${p.id}">Rimuovi</button>
+            </span>
+          </div>
+        `).join("");
+        participantsEl.querySelectorAll("button[data-accept]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            await post(`/guided-visits/${encodeURIComponent(visitId)}/participants/${encodeURIComponent(btn.getAttribute("data-accept"))}/accept`);
+            loadState();
+          });
+        });
+        participantsEl.querySelectorAll("button[data-remove]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            await post(`/guided-visits/${encodeURIComponent(visitId)}/participants/${encodeURIComponent(btn.getAttribute("data-remove"))}/remove`);
+            loadState();
+          });
+        });
+        const rr = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/results`, { credentials: "include" });
+        const rd = await rr.json().catch(() => ({}));
+        if (rr.ok) {
+          const results = (Array.isArray(rd.results) ? rd.results : []).slice().sort((a, b) => {
+            const ag = a.grade == null ? -1 : a.grade;
+            const bg = b.grade == null ? -1 : b.grade;
+            return bg - ag;
+          });
+          resultsEl.innerHTML = `
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #555;color:#f2f2f2;">
+              <strong style="display:block;margin-bottom:6px;color:#fff;">Risultati quiz</strong>
+              ${results.length === 0 ? "<span>Nessun risultato disponibile.</span>" : `
+                <table style="width:100%;border-collapse:collapse;">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;padding:6px;border-bottom:1px solid #666;color:#fff;">Alunno</th>
+                      <th style="text-align:left;padding:6px;border-bottom:1px solid #666;color:#fff;">Stato</th>
+                      <th style="text-align:left;padding:6px;border-bottom:1px solid #666;color:#fff;">Voto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${results.map((r) => `
+                      <tr>
+                        <td style="padding:6px;border-bottom:1px solid #444;color:#eee;">${r.displayName}</td>
+                        <td style="padding:6px;border-bottom:1px solid #444;color:#eee;">${r.status || "-"}</td>
+                        <td style="padding:6px;border-bottom:1px solid #444;color:#eee;">${r.grade == null ? "-" : `${r.grade}/100`}</td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              `}
+            </div>
+          `;
+        }
+      } catch (err) {
+        titleEl.textContent = err.message || "Errore caricamento dashboard";
+      }
+    }
+
+    acceptAllBtn?.addEventListener("click", async () => {
+      await post(`/guided-visits/${encodeURIComponent(visitId)}/participants/accept-all`);
+      loadState();
+    });
+    prevStepBtn?.addEventListener("click", async () => {
+      const current = Number(currentVisitState?.currentStepIndex) || 0;
+      if (current <= 0) return;
+      await post(`/guided-visits/${encodeURIComponent(visitId)}/navigation`, { stepIndex: current - 1 });
+      loadState();
+    });
+    nextStepBtn?.addEventListener("click", async () => {
+      const steps = Array.isArray(currentVisitState?.steps) ? currentVisitState.steps : [];
+      const current = Number(currentVisitState?.currentStepIndex) || 0;
+      if (current >= steps.length - 1) return;
+      await post(`/guided-visits/${encodeURIComponent(visitId)}/navigation`, { stepIndex: current + 1 });
+      loadState();
+    });
+    openNavigatorBtn?.addEventListener("click", async () => {
+      const r = await fetch(`${API}/guided-visits/${encodeURIComponent(visitId)}/teacher-state`, { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(d.error || "Impossibile aprire il navigator");
+        return;
+      }
+      const visit = d.visit || {};
+      const objectSteps = Array.isArray(visit.steps) ? visit.steps.filter((s) => s.type === "object" && s.objectName) : [];
+      if (objectSteps.length < 1) {
+        alert("Nessun oggetto disponibile nella visita.");
+        return;
+      }
+      const currentStepIndex = Math.max(0, Math.min(Number(visit.currentStepIndex) || 0, Math.max((visit.steps || []).length - 1, 0)));
+      const orderedSteps = Array.isArray(visit.steps) ? visit.steps : [];
+      const objectCountUntilCurrent = orderedSteps.slice(0, currentStepIndex + 1).filter((s) => s.type === "object" && s.objectName).length;
+      const currentObjectPos = Math.max(0, Math.min(objectCountUntilCurrent - 1, objectSteps.length - 1));
+      const currentObjectName = objectSteps[currentObjectPos]?.objectName || objectSteps[0].objectName;
+      const objectIndex = objectSteps.findIndex((s) => s.objectName === currentObjectName);
+      const routeFromName = objectIndex <= 0 ? "IN" : objectSteps[objectIndex - 1]?.objectName || "IN";
+      const routeToName = currentObjectName;
+      const customDescriptions = objectSteps.reduce((acc, step) => {
+        acc[step.objectName] = String(step.customDescription || "");
+        return acc;
+      }, {});
+      const session = {
+        museo: visit.museo,
+        percorso: ["IN", ...objectSteps.map((s) => s.objectName), "OUT"],
+        createdAt: Date.now(),
+        guideRole: "teacher",
+        guidedVisitId: visitId,
+        guidedCustomDescriptions: customDescriptions,
+        guidedTextSteps: (Array.isArray(visit.steps) ? visit.steps : [])
+          .filter((s) => s.type === "text" && s.room && s.text)
+          .map((s) => ({ id: s.id, room: s.room, text: s.text })),
+        guidedVirtualObjects: (Array.isArray(visit.steps) ? visit.steps : []).reduce((acc, s, idx) => {
+          if (s.type !== "text") return acc;
+          const node = `__text__${idx + 1}`;
+          const text = String(s.text || "");
+          const label = String(s.label || "").trim();
+          acc[node] = { room: String(s.room || ""), label: label || "?", descrizioni: Array.from({ length: 4 }, () => [text, text, text]) };
+          return acc;
+        }, {}),
+        guidedFlowNodes: (Array.isArray(visit.steps) ? visit.steps : [])
+          .map((s, idx) => (s.type === "object" && s.objectName ? String(s.objectName) : (s.type === "text" ? `__text__${idx + 1}` : "")))
+          .filter(Boolean),
+      };
+      setSession(session);
+      let stanzaObj = "IN";
+      try {
+        const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
+        const od = await rr.json().catch(() => ({}));
+        stanzaObj = String(od?.stanza || "IN");
+      } catch {}
+      const redirectUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(routeFromName)}/${encodeURIComponent(routeToName)}`;
+      if (redirectUrl) window.location.replace(redirectUrl);
+    });
+    startQuizBtn?.addEventListener("click", async () => {
+      const custom = prompt("Tempo quiz in secondi:", "120");
+      const sec = Number(custom);
+      await post(`/guided-visits/${encodeURIComponent(visitId)}/quiz/start`, Number.isFinite(sec) ? { timeLimitSec: sec } : {});
+      loadState();
+    });
+    loadState();
+    setInterval(loadState, 3000);
+  }
+
   /* ── NAVBAR scroll ─────────────────────────── */
   const navbar = document.getElementById('navbar');
   window.addEventListener('scroll', () => {
@@ -1970,22 +2406,31 @@
   const museo = document.getElementById('museo');
   const ctaBtn = document.getElementById('ctaBtn');
 
-  const shareParam = new URLSearchParams(window.location.search).get("share");
-  if (shareParam) {
-    const payload = decodeBase64UrlJson(shareParam);
-    const publicSession = buildPublicSessionFromSharePayload(payload);
-    if (publicSession) {
-      setSession(publicSession);
-      const redirectUrl = getNavigatorRedirectUrl(publicSession);
-      if (redirectUrl) {
-        window.location.replace(redirectUrl);
+  const guidedParams = parseGuidedParams();
+  if (guidedParams) {
+    if (guidedParams.role === "student") {
+      startGuidedStudentFlow(guidedParams.visitId);
+    } else {
+      startGuidedTeacherFlow(guidedParams.visitId);
+    }
+  } else {
+    const shareParam = new URLSearchParams(window.location.search).get("share");
+    if (shareParam) {
+      const payload = decodeBase64UrlJson(shareParam);
+      const publicSession = buildPublicSessionFromSharePayload(payload);
+      if (publicSession) {
+        setSession(publicSession);
+        const redirectUrl = getNavigatorRedirectUrl(publicSession);
+        if (redirectUrl) {
+          window.location.replace(redirectUrl);
+        }
       }
     }
   }
 
   // Se esiste una sessione valida, vai direttamente a React
   const session = getSession();
-  if (validSession(session)) {
+  if (!guidedParams && validSession(session)) {
     const hasStanzaInUrl = new URLSearchParams(window.location.search).has("stanza");
     if (!hasStanzaInUrl) {
       const redirectUrl = getNavigatorRedirectUrl(session);
@@ -1995,7 +2440,7 @@
     }
     // Sessione valida: mostra subito il navigator React
     startReact();
-  } else {
+  } else if (!guidedParams) {
     // Carica musei solo se non c'è sessione valida
     if (museo) {
       fetch(`${API}/musei`)
@@ -2179,7 +2624,7 @@
 
     if (selectedMode === 'marketplace') {
       // Se vuoi mantenere il vecchio redirect marketplace:
-      window.location.href = `/marketplace/indexMarketplace.html?museo=${encodeURIComponent(museoNome)}`;
+      window.location.href = `/marketplace/?museo=${encodeURIComponent(museoNome)}`;
       return;
     }
 

@@ -352,8 +352,10 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
         svg += `\n<circle cx="${x}" cy="${y}" r="11" class="oggetto-ripple delay2"/>`;
       }
 
-      svg += `\n<circle cx="${x}" cy="${y}" r="10" class="oggetto"/>`;
-      svg += `\n<text x="${x}" y="${y + 3}" class="oggetto-label">${o.nome}</text>`;
+      const objectLabel = o.label != null ? o.label : o.nome;
+      const radius = o.isVirtualText ? 7 : 10;
+      svg += `\n<circle cx="${x}" cy="${y}" r="${radius}" class="oggetto" data-object-name="${escapeXml(o.nome)}"/>`;
+      svg += `\n<text x="${x}" y="${y + 3}" class="oggetto-label" data-object-name="${escapeXml(o.nome)}">${escapeXml(objectLabel)}</text>`;
     }
   }
 

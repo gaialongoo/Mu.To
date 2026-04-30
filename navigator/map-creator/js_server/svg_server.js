@@ -151,6 +151,27 @@ async function getDatiMuseo(nomeMuseo) {
   return r.json();
 }
 
+async function getGuidedVisitVirtualObjects(guidedVisitId) {
+  const visitId = String(guidedVisitId || "").trim();
+  if (!visitId) return {};
+  const url = `${JSON_SERVER}/guided-visits/${encodeURIComponent(visitId)}/public`;
+  const headers = { "X-API-KEY": API_KEY, Accept: "application/json" };
+
+  let r;
+  try {
+    r = await fetch(url, { headers, agent: httpsAgent, timeout: REQUEST_TIMEOUT });
+  } catch (e) {
+    const err = new Error(`Connessione API fallita durante fetch guided visit public: ${e.message}`);
+    err.code = "API_UNREACHABLE";
+    throw err;
+  }
+  if (r.status !== 200) return {};
+  const payload = await r.json();
+  const virtualObjects = payload?.visit?.virtualObjects;
+  if (!virtualObjects || typeof virtualObjects !== "object") return {};
+  return virtualObjects;
+}
+
 // ============================================================
 // FETCH SFONDI STANZE DA API
 // ============================================================
@@ -190,7 +211,7 @@ async function fetchRoomBgImages(nomeMuseo, layoutDoc) {
 // SVG GENERATOR
 // ============================================================
 
-function generaSvg(data, layout, edgeMode, edgeFocus) {
+function generaSvg(data, layout, edgeMode, edgeFocus, virtualObjects = {}) {
   const stanzeMap   = {};
   const oggettiList = [];
 
@@ -227,6 +248,19 @@ function generaSvg(data, layout, edgeMode, edgeFocus) {
     const obj = new Oggetto(o.nome, s, o.connessi || []);
     obj.visibile = o.visibile !== undefined ? o.visibile : true;
     if (o.pos && typeof o.pos === "object") obj.posRel = o.pos;
+    s.oggetti.push(obj);
+    oggettiList.push(obj);
+  }
+
+  for (const [nodeName, vObj] of Object.entries(virtualObjects || {})) {
+    const roomName = String(vObj?.room || "").trim();
+    if (!roomName || !stanzeMap[roomName]) continue;
+    const s = stanzeMap[roomName];
+    const obj = new Oggetto(String(nodeName), s, []);
+    obj.visibile = true;
+    obj.label = "?";
+    obj.isVirtualText = true;
+    if (vObj?.pos && typeof vObj.pos === "object") obj.posRel = vObj.pos;
     s.oggetti.push(obj);
     oggettiList.push(obj);
   }
@@ -292,6 +326,7 @@ app.get("/favicon.ico", (_req, res) => res.status(204).end());
 // /<nomeMuseo>/<edgeMode>/<f1>/<f2>
 app.get("/:nomeMuseo/:edgeMode?/:f1?/:f2?", async (req, res) => {
   const { nomeMuseo, edgeMode: edgeModeParam, f1, f2 } = req.params;
+  const guidedVisitId = String(req.query?.guidedVisitId || "").trim();
 
   const edgeMode  = edgeModeParam || EDGE_MODE_DEFAULT;
   const edgeFocus = f1 && f2 ? [f1, f2] : EDGE_FOCUS_DEFAULT;
@@ -324,10 +359,20 @@ app.get("/:nomeMuseo/:edgeMode?/:f1?/:f2?", async (req, res) => {
     // non fatale: continua senza sfondi
   }
 
-  // 4. Genera SVG
+  // 4. Recupera eventuali oggetti virtuali della visita guidata
+  let virtualObjects = {};
+  if (guidedVisitId) {
+    try {
+      virtualObjects = await getGuidedVisitVirtualObjects(guidedVisitId);
+    } catch (e) {
+      log(`Avviso: errore fetch virtual objects visita guidata '${guidedVisitId}': ${e.message}`, "WARN");
+    }
+  }
+
+  // 5. Genera SVG
   let svg;
   try {
-    svg = generaSvg(data, layoutMuseo, edgeMode, edgeFocus);
+    svg = generaSvg(data, layoutMuseo, edgeMode, edgeFocus, virtualObjects);
   } catch (e) {
     log(`Errore generazione SVG: ${e.message}`, "ERROR");
     return jsonError(res, 500, "Errore generazione SVG", e.message);

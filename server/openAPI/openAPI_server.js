@@ -36,6 +36,7 @@ const USERS_DB_NAME = "utenti";
 const USERS_COLLECTION = "users";
 const SESSIONS_COLLECTION = "sessions";
 const PROFESSOR_CODES_COLLECTION = "professor_codes";
+const GUIDED_VISITS_COLLECTION = "guided_visits";
 const SESSION_COOKIE_NAME = "muto_auth";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -161,6 +162,63 @@ function userPublicView(user) {
   };
 }
 
+function isProfessor(user) {
+  return String(user?.ruolo || "").toLowerCase() === "professore";
+}
+
+function sanitizeGuidedVisitStep(step = {}, fallbackIndex = 0) {
+  const type = String(step?.type || "object").trim().toLowerCase() === "text" ? "text" : "object";
+  const room = String(step?.room || "").trim();
+  const label = String(step?.label || "").trim();
+  const customDescription = String(step?.customDescription || "").trim();
+  const objectName = String(step?.objectName || "").trim();
+  const text = String(step?.text || "").trim();
+  return {
+    id: String(step?.id || `step_${fallbackIndex + 1}`).trim(),
+    type,
+    room,
+    label,
+    objectName: type === "object" ? objectName : "",
+    text: type === "text" ? text : "",
+    customDescription,
+    icon: type === "text" ? "?" : "object",
+  };
+}
+
+function sanitizeQuiz(quiz = {}) {
+  const title = String(quiz?.title || "").trim();
+  const questionsRaw = Array.isArray(quiz?.questions) ? quiz.questions : [];
+  const questions = questionsRaw
+    .map((q, idx) => {
+      const question = String(q?.question || "").trim();
+      const options = Array.isArray(q?.options)
+        ? q.options.map((opt) => String(opt || "").trim()).filter(Boolean)
+        : [];
+      const correctIndex = Number(q?.correctIndex);
+      return {
+        id: String(q?.id || `q_${idx + 1}`).trim(),
+        question,
+        options,
+        correctIndex: Number.isInteger(correctIndex) ? correctIndex : -1,
+      };
+    })
+    .filter((q) => q.question && q.options.length >= 2 && q.correctIndex >= 0 && q.correctIndex < q.options.length);
+
+  const timeLimitSec = Math.max(10, Number(quiz?.timeLimitSec) || 120);
+  return { title, questions, timeLimitSec };
+}
+
+function sanitizeGuidedVisitInput(body = {}) {
+  const museo = String(body?.museo || "").trim();
+  const nome = String(body?.nome || "").trim();
+  const stepsRaw = Array.isArray(body?.steps) ? body.steps : [];
+  const steps = stepsRaw
+    .map((step, idx) => sanitizeGuidedVisitStep(step, idx))
+    .filter((step) => (step.type === "object" ? !!step.objectName : !!step.text));
+  const quiz = sanitizeQuiz(body?.quiz || {});
+  return { museo, nome, steps, quiz };
+}
+
 async function withUsersDb(run) {
   const client = new MongoClient(MONGO_URI);
   try {
@@ -195,6 +253,8 @@ async function ensureUserIndexes() {
     await db.collection(SESSIONS_COLLECTION).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection(PROFESSOR_CODES_COLLECTION).createIndex({ hash: 1 }, { unique: true });
     await db.collection(PROFESSOR_CODES_COLLECTION).createIndex({ enabled: 1 });
+    await db.collection(GUIDED_VISITS_COLLECTION).createIndex({ teacherId: 1, createdAt: -1 });
+    await db.collection(GUIDED_VISITS_COLLECTION).createIndex({ participantsToken: 1 });
   });
 }
 
@@ -598,6 +658,666 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore update profilo:", err.message);
       res.status(500).json({ error: "errore aggiornamento profilo" });
+    }
+  });
+
+  // ==========================================================
+  // ROUTE — GUIDED VISITS (PROFESSORI / STUDENTI)
+  // ==========================================================
+  app.get("/users/me/guided-visits", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visits = await withUsersDb(async (db) =>
+        db
+          .collection(GUIDED_VISITS_COLLECTION)
+          .find({ teacherId: String(session.user._id) }, { sort: { createdAt: -1 } })
+          .project({ _id: 1, museo: 1, nome: 1, steps: 1, quiz: 1, createdAt: 1, updatedAt: 1 })
+          .toArray()
+      );
+      res.json({
+        visits: visits.map((v) => ({
+          id: String(v._id),
+          museo: v.museo,
+          nome: v.nome,
+          steps: Array.isArray(v.steps) ? v.steps : [],
+          quiz: v.quiz || { title: "", questions: [], timeLimitSec: 120 },
+          navigationStarted: !!v.navigationStarted,
+          createdAt: v.createdAt,
+          updatedAt: v.updatedAt,
+          shareToken: `gv:${String(v._id)}`,
+        })),
+      });
+    } catch (err) {
+      console.error("Errore guided visits professore:", err.message);
+      res.status(500).json({ error: "errore recupero visite guidate" });
+    }
+  });
+
+  app.post("/guided-visits", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono creare visite" });
+
+      const input = sanitizeGuidedVisitInput(req.body);
+      if (!input.museo || !input.nome) return res.status(400).json({ error: "museo e nome sono obbligatori" });
+      if (input.steps.length < 1) return res.status(400).json({ error: "aggiungi almeno uno step" });
+      const museo = sistema.get_museo(input.museo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      for (const step of input.steps) {
+        if (step.type === "object" && !museo.get_oggetto(step.objectName)) {
+          return res.status(404).json({ error: `Oggetto '${step.objectName}' non trovato` });
+        }
+      }
+
+      const now = new Date();
+      const doc = {
+        teacherId: String(session.user._id),
+        teacherName: `${session.user.nome || ""} ${session.user.cognome || ""}`.trim(),
+        museo: input.museo,
+        nome: input.nome,
+        steps: input.steps,
+        quiz: input.quiz,
+        currentStepIndex: 0,
+        navigationStarted: false,
+        participants: [],
+        quizState: { status: "idle", startedAt: null, endsAt: null, timeLimitSec: input.quiz.timeLimitSec || 120 },
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const created = await withUsersDb(async (db) => {
+        const result = await db.collection(GUIDED_VISITS_COLLECTION).insertOne(doc);
+        return db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: result.insertedId });
+      });
+
+      res.status(201).json({ visit: { id: String(created._id), ...doc, shareToken: `gv:${String(created._id)}` } });
+    } catch (err) {
+      console.error("Errore creazione guided visit:", err.message);
+      res.status(500).json({ error: "errore creazione visita guidata" });
+    }
+  });
+
+  app.put("/guided-visits/:id", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono modificare visite" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const input = sanitizeGuidedVisitInput(req.body);
+      if (!input.museo || !input.nome) return res.status(400).json({ error: "museo e nome sono obbligatori" });
+      if (input.steps.length < 1) return res.status(400).json({ error: "aggiungi almeno uno step" });
+      const museo = sistema.get_museo(input.museo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      for (const step of input.steps) {
+        if (step.type === "object" && !museo.get_oggetto(step.objectName)) {
+          return res.status(404).json({ error: `Oggetto '${step.objectName}' non trovato` });
+        }
+      }
+
+      const updated = await withUsersDb(async (db) => {
+        const col = db.collection(GUIDED_VISITS_COLLECTION);
+        const current = await col.findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) });
+        if (!current) return null;
+        if (current.navigationStarted) return { _locked: true };
+        await col.updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          {
+            $set: {
+              museo: input.museo,
+              nome: input.nome,
+              steps: input.steps,
+              quiz: input.quiz,
+              "quizState.timeLimitSec": input.quiz.timeLimitSec || 120,
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return col.findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) });
+      });
+      if (updated?._locked) {
+        return res.status(409).json({ error: "visita gia avviata: non piu modificabile" });
+      }
+      if (!updated) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.json({ visit: { id: String(updated._id), ...updated, shareToken: `gv:${String(updated._id)}` } });
+    } catch (err) {
+      console.error("Errore update guided visit:", err.message);
+      res.status(500).json({ error: "errore aggiornamento visita guidata" });
+    }
+  });
+
+  app.get("/guided-visits/:id/public", async (req, res) => {
+    try {
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const visit = await withUsersDb(async (db) => db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId) }));
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.json({
+        visit: {
+          id: String(visit._id),
+          museo: visit.museo,
+          nome: visit.nome,
+          teacherName: visit.teacherName || "Professore",
+          stepsCount: Array.isArray(visit.steps) ? visit.steps.length : 0,
+          virtualObjects: Array.isArray(visit.steps)
+            ? visit.steps.reduce((acc, step, idx) => {
+                if (!step || step.type !== "text") return acc;
+                const nodeName = `__text__${idx + 1}`;
+                const room = String(step.room || "").trim();
+                if (!room) return acc;
+                acc[nodeName] = {
+                  room,
+                  label: "?",
+                  text: String(step.text || ""),
+                  descrizioni: [[String(step.text || "")]],
+                };
+                return acc;
+              }, {})
+            : {},
+        },
+      });
+    } catch (err) {
+      console.error("Errore public guided visit:", err.message);
+      res.status(500).json({ error: "errore recupero visita guidata" });
+    }
+  });
+
+  app.post("/guided-visits/:id/join", async (req, res) => {
+    try {
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const displayName = String(req.body?.displayName || "").trim();
+      if (!displayName) return res.status(400).json({ error: "nome studente obbligatorio" });
+      const token = crypto.randomBytes(24).toString("hex");
+      const participant = {
+        id: crypto.randomBytes(12).toString("hex"),
+        token,
+        displayName,
+        status: "waiting",
+        joinedAt: new Date(),
+        answers: [],
+        grade: null,
+      };
+
+      const updated = await withUsersDb(async (db) => {
+        const col = db.collection(GUIDED_VISITS_COLLECTION);
+        await col.updateOne(
+          { _id: new ObjectId(visitId) },
+          { $push: { participants: participant }, $set: { updatedAt: new Date() } }
+        );
+        return col.findOne({ _id: new ObjectId(visitId) });
+      });
+      if (!updated) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.status(201).json({ participantToken: token, participantId: participant.id, status: participant.status });
+    } catch (err) {
+      console.error("Errore join guided visit:", err.message);
+      res.status(500).json({ error: "errore ingresso visita guidata" });
+    }
+  });
+
+  app.get("/guided-visits/:id/teacher-state", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.json({
+        visit: {
+          id: String(visit._id),
+          museo: visit.museo,
+          nome: visit.nome,
+          steps: visit.steps || [],
+          currentStepIndex: visit.currentStepIndex || 0,
+          navigationStarted: !!visit.navigationStarted,
+          participants: Array.isArray(visit.participants) ? visit.participants.map((p) => ({
+            id: p.id, displayName: p.displayName, status: p.status, grade: p.grade ?? null, joinedAt: p.joinedAt,
+          })) : [],
+          quiz: visit.quiz || { title: "", questions: [], timeLimitSec: 120 },
+          quizState: visit.quizState || { status: "idle", startedAt: null, endsAt: null, timeLimitSec: 120 },
+        },
+      });
+    } catch (err) {
+      console.error("Errore teacher state guided visit:", err.message);
+      res.status(500).json({ error: "errore stato visita guidata" });
+    }
+  });
+
+  app.post("/guided-visits/:id/participants/:participantId/accept", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      const participantId = String(req.params.participantId || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      await withUsersDb(async (db) => {
+        const col = db.collection(GUIDED_VISITS_COLLECTION);
+        const visit = await col.findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) });
+        if (!visit) return;
+        const steps = Array.isArray(visit.steps) ? visit.steps : [];
+        const firstObjectStep = steps.find((s) => s.type === "object" && s.objectName);
+        const firstObjectName = String(firstObjectStep?.objectName || "").trim();
+        const firstStepIndex = Math.max(0, steps.findIndex((s) => s.type === "object" && String(s.objectName || "").trim() === firstObjectName));
+        const setData = { "participants.$.status": "accepted", updatedAt: new Date() };
+        if (!visit.navigationStarted && firstObjectName) {
+          setData.navigationStarted = true;
+          setData.currentStepIndex = firstStepIndex;
+          setData.navigationNode = firstObjectName;
+        }
+        await col.updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id), "participants.id": participantId },
+          { $set: setData }
+        );
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Errore accept participant:", err.message);
+      res.status(500).json({ error: "errore accettazione studente" });
+    }
+  });
+
+  app.post("/guided-visits/:id/participants/accept-all", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const visit = await withUsersDb(async (db) => {
+        const col = db.collection(GUIDED_VISITS_COLLECTION);
+        const current = await col.findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) });
+        if (!current) return null;
+        const participants = Array.isArray(current.participants) ? current.participants : [];
+        const nextParticipants = participants.map((p) => (p.status === "waiting" ? { ...p, status: "accepted" } : p));
+        const steps = Array.isArray(current.steps) ? current.steps : [];
+        const firstObjectStep = steps.find((s) => s.type === "object" && s.objectName);
+        const firstObjectName = String(firstObjectStep?.objectName || "").trim();
+        const firstStepIndex = Math.max(0, steps.findIndex((s) => s.type === "object" && String(s.objectName || "").trim() === firstObjectName));
+        const setData = { participants: nextParticipants, updatedAt: new Date() };
+        if (!current.navigationStarted && firstObjectName && nextParticipants.some((p) => p.status === "accepted")) {
+          setData.navigationStarted = true;
+          setData.currentStepIndex = firstStepIndex;
+          setData.navigationNode = firstObjectName;
+        }
+        await col.updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          { $set: setData }
+        );
+        return true;
+      });
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Errore accept all participants:", err.message);
+      res.status(500).json({ error: "errore accettazione studenti" });
+    }
+  });
+
+  app.post("/guided-visits/:id/participants/:participantId/remove", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      const participantId = String(req.params.participantId || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      await withUsersDb(async (db) => {
+        await db.collection(GUIDED_VISITS_COLLECTION).updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id), "participants.id": participantId },
+          { $set: { "participants.$.status": "removed", updatedAt: new Date() } }
+        );
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Errore remove participant:", err.message);
+      res.status(500).json({ error: "errore rimozione studente" });
+    }
+  });
+
+  app.post("/guided-visits/:id/navigation", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const stepIndex = Math.max(0, Number(req.body?.stepIndex) || 0);
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const steps = Array.isArray(visit.steps) ? visit.steps : [];
+      if (stepIndex >= steps.length) return res.status(400).json({ error: "stepIndex non valido" });
+      await withUsersDb(async (db) => {
+        await db.collection(GUIDED_VISITS_COLLECTION).updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          {
+            $set: {
+              currentStepIndex: stepIndex,
+              navigationNode:
+                String(steps?.[stepIndex]?.type || "") === "text"
+                  ? `__text__${stepIndex + 1}`
+                  : String((steps[stepIndex] && steps[stepIndex].objectName) || ""),
+              navigationStarted: true,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      });
+      res.json({ ok: true, stepIndex });
+    } catch (err) {
+      console.error("Errore navigation guided visit:", err.message);
+      res.status(500).json({ error: "errore aggiornamento navigazione" });
+    }
+  });
+
+  app.post("/guided-visits/:id/navigation/by-object", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      const objectName = String(req.body?.objectName || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      if (!objectName) return res.status(400).json({ error: "objectName obbligatorio" });
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const steps = Array.isArray(visit.steps) ? visit.steps : [];
+      const stepIndex = steps.findIndex((s) => s.type === "object" && String(s.objectName || "").trim() === objectName);
+      if (stepIndex < 0) return res.status(404).json({ error: "oggetto non trovato nella visita" });
+      await withUsersDb(async (db) => {
+        await db.collection(GUIDED_VISITS_COLLECTION).updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          {
+            $set: {
+              currentStepIndex: stepIndex,
+              navigationNode: objectName,
+              navigationStarted: true,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      });
+      res.json({ ok: true, stepIndex });
+    } catch (err) {
+      console.error("Errore navigation by object guided visit:", err.message);
+      res.status(500).json({ error: "errore aggiornamento navigazione oggetto" });
+    }
+  });
+
+  app.post("/guided-visits/:id/navigation/by-node", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      const nodeName = String(req.body?.nodeName || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      if (!nodeName) return res.status(400).json({ error: "nodeName obbligatorio" });
+      const allowedSpecial = ["IN", "OUT", "SHOP", "WC"];
+      const upperNode = nodeName.toUpperCase();
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const steps = Array.isArray(visit.steps) ? visit.steps : [];
+      const objectSteps = steps.filter((s) => s.type === "object" && s.objectName);
+      const objectNames = objectSteps.map((s) => String(s.objectName || "").trim()).filter(Boolean);
+      const isSpecial = allowedSpecial.includes(upperNode);
+      const isKnownObject = objectNames.includes(nodeName);
+      if (!isSpecial && !isKnownObject) return res.status(404).json({ error: "nodo non presente nella visita" });
+      const stepIndex = isKnownObject
+        ? steps.findIndex((s) => s.type === "object" && String(s.objectName || "").trim() === nodeName)
+        : Math.max(0, steps.length - 1);
+      await withUsersDb(async (db) => {
+        await db.collection(GUIDED_VISITS_COLLECTION).updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          {
+            $set: {
+              currentStepIndex: stepIndex,
+              navigationNode: isSpecial ? upperNode : nodeName,
+              navigationStarted: true,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      });
+      res.json({ ok: true, stepIndex, navigationNode: isSpecial ? upperNode : nodeName });
+    } catch (err) {
+      console.error("Errore navigation by node guided visit:", err.message);
+      res.status(500).json({ error: "errore aggiornamento navigazione nodo" });
+    }
+  });
+
+  app.post("/guided-visits/:id/quiz/start", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const now = Date.now();
+      const customSec = Number(req.body?.timeLimitSec);
+      const sec = Math.max(10, Number.isFinite(customSec) ? customSec : 0);
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const q = visit.quiz || {};
+      const defaultSec = Math.max(10, Number(q.timeLimitSec) || 120);
+      const finalSec = Number.isFinite(customSec) ? sec : defaultSec;
+      await withUsersDb(async (db) => {
+        await db.collection(GUIDED_VISITS_COLLECTION).updateOne(
+          { _id: new ObjectId(visitId), teacherId: String(session.user._id) },
+          {
+            $set: {
+              quizState: {
+                status: "running",
+                startedAt: new Date(now),
+                endsAt: new Date(now + finalSec * 1000),
+                timeLimitSec: finalSec,
+              },
+              updatedAt: new Date(),
+            },
+          }
+        );
+      });
+      res.json({ ok: true, timeLimitSec: finalSec });
+    } catch (err) {
+      console.error("Errore start quiz guided visit:", err.message);
+      res.status(500).json({ error: "errore avvio quiz" });
+    }
+  });
+
+  app.get("/guided-visits/:id/student-state", async (req, res) => {
+    try {
+      const visitId = String(req.params.id || "").trim();
+      const participantToken = String(req.query?.participantToken || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      if (!participantToken) return res.status(400).json({ error: "participantToken obbligatorio" });
+      const visit = await withUsersDb(async (db) => db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId) }));
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const participants = Array.isArray(visit.participants) ? visit.participants : [];
+      const participant = participants.find((p) => p.token === participantToken);
+      if (!participant) return res.status(404).json({ error: "partecipante non trovato" });
+
+      const steps = Array.isArray(visit.steps) ? visit.steps : [];
+      const currentStepIndex = Math.max(0, Math.min(Number(visit.currentStepIndex) || 0, Math.max(steps.length - 1, 0)));
+      const currentStep = steps[currentStepIndex] || null;
+      const objectSteps = steps.filter((s) => s.type === "object" && s.objectName);
+      const textSteps = steps.filter((s) => s.type === "text" && s.room && s.text);
+      const percorso = ["IN", ...objectSteps.map((s) => s.objectName), "OUT"];
+      const flowNodes = steps
+        .map((s, idx) => (s.type === "object" && s.objectName ? String(s.objectName) : (s.type === "text" ? `__text__${idx + 1}` : "")))
+        .filter(Boolean);
+      const virtualObjects = {};
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        if (s?.type !== "text") continue;
+        const nodeName = `__text__${i + 1}`;
+        const text = String(s.text || "").trim();
+        const label = String(s.label || "").trim();
+        virtualObjects[nodeName] = {
+          room: String(s.room || "").trim(),
+          label: label || "?",
+          descrizioni: Array.from({ length: 4 }, () => [text, text, text]),
+        };
+      }
+      const customDescriptions = objectSteps.reduce((acc, s) => {
+        const key = String(s.objectName || "").trim();
+        if (!key) return acc;
+        acc[key] = String(s.customDescription || "").trim();
+        return acc;
+      }, {});
+      const quizState = visit.quizState || { status: "idle", startedAt: null, endsAt: null, timeLimitSec: 120 };
+      const objectStepsOrdered = steps.filter((s) => s.type === "object" && s.objectName);
+      const objectNamesOrdered = objectStepsOrdered.map((s) => String(s.objectName || "").trim()).filter(Boolean);
+      const objectCountUntilCurrent = steps.slice(0, currentStepIndex + 1).filter((s) => s.type === "object" && s.objectName).length;
+      const currentObjectPos = Math.max(0, Math.min(objectCountUntilCurrent - 1, Math.max(objectNamesOrdered.length - 1, 0)));
+      const navigationNode = String(visit.navigationNode || "").trim();
+      const isSpecialNode = ["IN", "OUT", "SHOP", "WC"].includes(navigationNode.toUpperCase());
+      const specialNode = navigationNode.toUpperCase();
+      let currentObjectName = objectNamesOrdered[currentObjectPos] || null;
+      let previousObjectName = currentObjectPos <= 0 ? "IN" : objectNamesOrdered[currentObjectPos - 1] || "IN";
+      let nextObjectName = objectNamesOrdered[currentObjectPos + 1] || null;
+      let currentRoom = "";
+      if (isSpecialNode && specialNode === "OUT") {
+        previousObjectName = objectNamesOrdered.length > 0 ? objectNamesOrdered[objectNamesOrdered.length - 1] : "IN";
+        currentObjectName = "OUT";
+        nextObjectName = null;
+      } else if (!isSpecialNode && navigationNode && objectNamesOrdered.includes(navigationNode)) {
+        const pos = objectNamesOrdered.indexOf(navigationNode);
+        currentObjectName = objectNamesOrdered[pos];
+        previousObjectName = pos <= 0 ? "IN" : objectNamesOrdered[pos - 1] || "IN";
+        nextObjectName = objectNamesOrdered[pos + 1] || null;
+      } else if (navigationNode && virtualObjects[navigationNode]) {
+        const idx = flowNodes.indexOf(navigationNode);
+        const prevNode = idx > 0 ? flowNodes[idx - 1] : "IN";
+        const nextNode = idx >= 0 && idx < flowNodes.length - 1 ? flowNodes[idx + 1] : null;
+        currentObjectName = navigationNode;
+        previousObjectName = prevNode || "IN";
+        nextObjectName = nextNode || null;
+        currentRoom = String(virtualObjects[navigationNode]?.room || "");
+      }
+
+      res.json({
+        status: participant.status,
+        navigationStarted: !!visit.navigationStarted,
+        currentStepIndex,
+        currentStep,
+        currentObjectName,
+        previousObjectName,
+        nextObjectName,
+        currentRoom,
+        percorso,
+        flowNodes,
+        customDescriptions,
+        virtualObjects,
+        textSteps: textSteps.map((s) => ({ id: s.id, room: s.room, text: s.text })),
+        museo: visit.museo,
+        quiz: visit.quiz || { title: "", questions: [], timeLimitSec: 120 },
+        quizState,
+        grade: participant.grade ?? null,
+      });
+    } catch (err) {
+      console.error("Errore student state guided visit:", err.message);
+      res.status(500).json({ error: "errore stato studente" });
+    }
+  });
+
+  app.post("/guided-visits/:id/quiz/submit", async (req, res) => {
+    try {
+      const visitId = String(req.params.id || "").trim();
+      const participantToken = String(req.body?.participantToken || "").trim();
+      const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      if (!participantToken) return res.status(400).json({ error: "participantToken obbligatorio" });
+
+      const result = await withUsersDb(async (db) => {
+        const col = db.collection(GUIDED_VISITS_COLLECTION);
+        const visit = await col.findOne({ _id: new ObjectId(visitId) });
+        if (!visit) return { error: "not_found" };
+        const participants = Array.isArray(visit.participants) ? visit.participants : [];
+        const idx = participants.findIndex((p) => p.token === participantToken);
+        if (idx < 0) return { error: "participant_not_found" };
+        const participant = participants[idx];
+        if (participant.status !== "accepted") return { error: "participant_not_accepted" };
+        if (participant.quizSubmittedAt) return { error: "already_submitted" };
+        const questions = Array.isArray(visit.quiz?.questions) ? visit.quiz.questions : [];
+        const cleanAnswers = answers.map((a) => Number(a));
+        let score = 0;
+        for (let i = 0; i < questions.length; i++) {
+          if (Number(questions[i]?.correctIndex) === cleanAnswers[i]) score += 1;
+        }
+        const grade = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
+        participants[idx] = {
+          ...participants[idx],
+          answers: cleanAnswers,
+          grade,
+          quizSubmittedAt: new Date(),
+        };
+        await col.updateOne({ _id: new ObjectId(visitId) }, { $set: { participants, updatedAt: new Date() } });
+        return { grade, score, total: questions.length };
+      });
+      if (result.error === "not_found") return res.status(404).json({ error: "visita guidata non trovata" });
+      if (result.error === "participant_not_found") return res.status(404).json({ error: "partecipante non trovato" });
+      if (result.error === "participant_not_accepted") return res.status(403).json({ error: "partecipante non autorizzato" });
+      if (result.error === "already_submitted") return res.status(409).json({ error: "quiz gia inviato da questo studente" });
+      res.json(result);
+    } catch (err) {
+      console.error("Errore submit quiz guided visit:", err.message);
+      res.status(500).json({ error: "errore invio quiz" });
+    }
+  });
+
+  app.delete("/guided-visits/:id", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const result = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).deleteOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!result.deletedCount) return res.status(404).json({ error: "visita guidata non trovata" });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Errore delete guided visit:", err.message);
+      res.status(500).json({ error: "errore eliminazione visita guidata" });
+    }
+  });
+
+  app.get("/guided-visits/:id/results", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isProfessor(session.user)) return res.status(403).json({ error: "solo i professori possono accedere" });
+      const visitId = String(req.params.id || "").trim();
+      if (!ObjectId.isValid(visitId)) return res.status(400).json({ error: "id visita non valido" });
+      const visit = await withUsersDb(async (db) =>
+        db.collection(GUIDED_VISITS_COLLECTION).findOne({ _id: new ObjectId(visitId), teacherId: String(session.user._id) })
+      );
+      if (!visit) return res.status(404).json({ error: "visita guidata non trovata" });
+      const participants = Array.isArray(visit.participants) ? visit.participants : [];
+      res.json({
+        results: participants
+          .filter((p) => p.status === "accepted" || p.status === "removed")
+          .map((p) => ({ id: p.id, displayName: p.displayName, status: p.status, grade: p.grade ?? null, quizSubmittedAt: p.quizSubmittedAt || null })),
+      });
+    } catch (err) {
+      console.error("Errore risultati guided visit:", err.message);
+      res.status(500).json({ error: "errore recupero risultati" });
     }
   });
 
