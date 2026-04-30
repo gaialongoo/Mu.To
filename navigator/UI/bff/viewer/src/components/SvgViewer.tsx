@@ -2191,12 +2191,21 @@ function ObjectOverlay({
   onClose: () => void;
   showNav: boolean;
 }) {
+  const QUICK_QUESTIONS = [
+    "Qual e il significato storico di quest'opera?",
+    "Quali dettagli dovrei osservare meglio?",
+    "Come si collega alle mie preferenze?",
+    "Riassumimela in modo semplice.",
+  ];
   const [descrizione, setDescrizione] = useState<string | null>(null);
   const [autore, setAutore] = useState<string>("");
   const [correnteArtistica, setCorrenteArtistica] = useState<string>("");
   const [anno, setAnno] = useState<string>("");
   const [immagini, setImmagini]       = useState<{ tipo: string; url: string }[]>([]);
   const [slideIdx, setSlideIdx]       = useState(0);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
     ? session.guidedFlowNodes
     : (Array.isArray(session?.percorso) ? session.percorso : []);
@@ -2258,6 +2267,12 @@ function ObjectOverlay({
       })
       .catch(() => setImmagini([]));
   }, [nome, session, virtualObject]);
+
+  useEffect(() => {
+    setChatMessages([]);
+    setChatInput("");
+    setChatLoading(false);
+  }, [nome]);
 
   useEffect(() => {
     const percorso = session.percorso;
@@ -2443,6 +2458,38 @@ function ObjectOverlay({
     setSlideIdx(i => (i + 1) % immagini.length);
   };
 
+  const sendObjectQuestion = async (rawQuestion: string) => {
+    const question = String(rawQuestion || "").trim();
+    if (!question || chatLoading) return;
+    setChatLoading(true);
+    setChatMessages((prev) => [...prev, { role: "user", text: question }]);
+    try {
+      const r = await fetch(`${API_BASE}/ai/object-chat`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          museo: session.museo,
+          oggetto: nome,
+          question,
+          livello: session.livello || "",
+          durata: session.durata || "",
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d?.error || "Richiesta AI fallita");
+      const answer = String(d?.answer || "").trim() || "Non ho una risposta disponibile adesso.";
+      setChatMessages((prev) => [...prev, { role: "assistant", text: answer }]);
+    } catch (err: any) {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: `Errore: ${err?.message || "impossibile ottenere la risposta."}` },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   return (
     <div
       onClick={onClose}
@@ -2557,6 +2604,106 @@ function ObjectOverlay({
             ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
             : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>Caricamento…</p>
           }
+
+          <div style={{ marginTop: 18, borderTop: "1px solid #eee", paddingTop: 14 }}>
+            <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#333" }}>
+              Chat rapida con AI
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              {QUICK_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={chatLoading}
+                  onClick={() => sendObjectQuestion(q)}
+                  style={{
+                    border: "1px solid #d0d0d0",
+                    background: "#f7f7f7",
+                    color: "#333",
+                    borderRadius: 16,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    cursor: chatLoading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+
+            <div
+              style={{
+                maxHeight: 150,
+                overflowY: "auto",
+                border: "1px solid #ececec",
+                borderRadius: 8,
+                padding: 8,
+                background: "#fcfcfc",
+                marginBottom: 8,
+              }}
+            >
+              {chatMessages.length < 1 && (
+                <p style={{ margin: 0, color: "#9a9a9a", fontSize: 12 }}>
+                  Seleziona una domanda rapida oppure scrivine una personalizzata.
+                </p>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <p
+                  key={`${msg.role}-${idx}`}
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    color: msg.role === "user" ? "#185FA5" : "#444",
+                  }}
+                >
+                  <strong>{msg.role === "user" ? "Tu:" : "AI:"}</strong> {msg.text}
+                </p>
+              ))}
+              {chatLoading && <p style={{ margin: 0, fontSize: 12, color: "#999" }}>AI sta scrivendo...</p>}
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const value = chatInput.trim();
+                if (!value) return;
+                setChatInput("");
+                sendObjectQuestion(value);
+              }}
+              style={{ display: "flex", gap: 6 }}
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Scrivi una domanda..."
+                style={{
+                  flex: 1,
+                  border: "1px solid #d8d8d8",
+                  borderRadius: 8,
+                  padding: "8px 9px",
+                  fontSize: 12,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={chatLoading || !chatInput.trim()}
+                style={{
+                  border: "none",
+                  borderRadius: 8,
+                  background: "#185FA5",
+                  color: "#fff",
+                  padding: "8px 11px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer",
+                }}
+              >
+                Invia
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* ── Navigazione percorso ── */}

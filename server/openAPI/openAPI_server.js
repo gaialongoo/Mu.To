@@ -21,6 +21,14 @@ const API_KEY   = process.env.API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 const PORT      = process.env.API_PORT || 3000;
 const HOST      = process.env.API_HOST || "0.0.0.0";
+const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
+const AI_API_KEY = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || "";
+const AI_MODEL = process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_ALLOW_NO_AUTH = String(process.env.AI_ALLOW_NO_AUTH || "").trim().toLowerCase() === "true";
+const AI_BASE_URL = String(
+  process.env.AI_BASE_URL ||
+  (AI_PROVIDER === "openai" ? "https://api.openai.com/v1" : "")
+).trim().replace(/\/+$/, "");
 
 if (!API_KEY)   { console.error("❌ API_KEY mancante nel .env");   process.exit(1); }
 if (!MONGO_URI) { console.error("❌ MONGO_URI mancante nel .env"); process.exit(1); }
@@ -218,6 +226,96 @@ function sanitizeGuidedVisitInput(body = {}) {
     .filter((step) => (step.type === "object" ? !!step.objectName : !!step.text));
   const quiz = sanitizeQuiz(body?.quiz || {});
   return { museo, nome, steps, quiz };
+}
+
+function buildFallbackObjectAnswer({ question, oggetto, museo, userPrefs }) {
+  const descrizione = String(oggetto?.descrizioneBreve || "").trim();
+  const autore = String(oggetto?.autore || "").trim();
+  const anno = String(oggetto?.anno || "").trim();
+  const corrente = String(oggetto?.correnteArtistica || "").trim();
+  const interessi = Array.isArray(userPrefs?.interessi) ? userPrefs.interessi.filter(Boolean) : [];
+  const livello = String(userPrefs?.livello || "").trim();
+  const durata = String(userPrefs?.durata || "").trim();
+  const interesseHint = interessi.length > 0 ? `Interessi utente: ${interessi.join(", ")}.` : "";
+  const preferenceHint = [livello ? `Livello: ${livello}.` : "", durata ? `Durata: ${durata}.` : ""].filter(Boolean).join(" ");
+
+  return [
+    `Al momento sto rispondendo in modalita locale (chiave AI non configurata).`,
+    `Domanda: "${question}"`,
+    `Opera: ${oggetto?.nome || "N/D"} - Museo: ${museo?.nome || "N/D"}.`,
+    autore ? `Autore: ${autore}.` : "",
+    anno ? `Anno: ${anno}.` : "",
+    corrente ? `Corrente: ${corrente}.` : "",
+    descrizione ? `Contesto: ${descrizione}` : "",
+    interesseHint,
+    preferenceHint,
+  ].filter(Boolean).join(" ");
+}
+
+function resolveAiAuthHeader() {
+  const bearer = process.env.AI_AUTH_BEARER || "";
+  if (bearer.trim()) return `Bearer ${bearer.trim()}`;
+  if (AI_API_KEY) return `Bearer ${AI_API_KEY}`;
+  return "";
+}
+
+async function askObjectAI({ question, museo, oggetto, userPrefs }) {
+  const cleanQuestion = String(question || "").trim();
+  if (!cleanQuestion) throw new Error("Domanda vuota");
+
+  const authHeader = resolveAiAuthHeader();
+  const allowNoAuth = AI_ALLOW_NO_AUTH || AI_PROVIDER === "ollama";
+  if (!AI_BASE_URL || (!authHeader && !allowNoAuth)) {
+    return buildFallbackObjectAnswer({ question: cleanQuestion, museo, oggetto, userPrefs });
+  }
+
+  const systemPrompt = [
+    "Sei una guida museale digitale.",
+    "Rispondi in italiano in massimo 120 parole, tono chiaro e coinvolgente.",
+    "Usa SOLO i dati forniti; se mancano dettagli dichiaralo brevemente senza inventare.",
+    "Adatta la risposta alle preferenze utente (interessi, livello, durata).",
+  ].join(" ");
+
+  const payload = {
+    model: AI_MODEL,
+    temperature: 0.5,
+    messages: [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: JSON.stringify({
+          question: cleanQuestion,
+          museo: {
+            nome: museo?.nome || "",
+            citta: museo?.citta || "",
+          },
+          oggetto,
+          preferenzeUtente: userPrefs || {},
+        }),
+      },
+    ],
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (authHeader) headers.Authorization = authHeader;
+
+  const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`AI upstream error (${response.status}): ${errText || "unknown"}`);
+  }
+
+  const data = await response.json();
+  const answer = String(data?.choices?.[0]?.message?.content || "").trim();
+  if (!answer) throw new Error("Risposta AI vuota");
+  return answer;
 }
 
 async function withUsersDb(run) {
@@ -659,6 +757,60 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore update profilo:", err.message);
       res.status(500).json({ error: "errore aggiornamento profilo" });
+    }
+  });
+
+  // ==========================================================
+  // ROUTE — OBJECT AI CHAT
+  // ==========================================================
+  app.post("/ai/object-chat", async (req, res) => {
+    try {
+      const nomeMuseo = String(req.body?.museo || "").trim();
+      const nomeOggetto = String(req.body?.oggetto || "").trim();
+      const question = String(req.body?.question || "").trim();
+      if (!nomeMuseo || !nomeOggetto || !question) {
+        return res.status(400).json({ error: "museo, oggetto e question sono obbligatori" });
+      }
+
+      const museo = sistema.get_museo(nomeMuseo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const oggettoDoc = museo.get_oggetto(nomeOggetto);
+      if (!oggettoDoc) return res.status(404).json({ error: "Oggetto non trovato" });
+
+      const session = await getSessionUser(req);
+      const userPrefs = session?.user
+        ? {
+            interessi: Array.isArray(session.user.interessi) ? session.user.interessi : [],
+            livello: String(session.user.livello || "").trim(),
+            durata: String(session.user.durata || "").trim(),
+          }
+        : {
+            interessi: [],
+            livello: String(req.body?.livello || "").trim(),
+            durata: String(req.body?.durata || "").trim(),
+          };
+
+      const descrizioneBreve = Array.isArray(oggettoDoc.descrizioni)
+        ? String(oggettoDoc.descrizioni?.[0]?.[0] || "").trim()
+        : "";
+      const aiAnswer = await askObjectAI({
+        question,
+        museo: { nome: museo.nome, citta: museo.citta },
+        oggetto: {
+          nome: oggettoDoc.nome,
+          stanza: oggettoDoc.stanza,
+          autore: String(oggettoDoc.autore || "").trim(),
+          anno: String(oggettoDoc.anno || "").trim(),
+          correnteArtistica: String(oggettoDoc.correnteArtistica || "").trim(),
+          descrizioneBreve,
+        },
+        userPrefs,
+      });
+
+      res.json({ answer: aiAnswer, source: AI_API_KEY ? "openai" : "fallback" });
+    } catch (err) {
+      console.error("Errore object chat AI:", err.message);
+      res.status(500).json({ error: "errore chat IA oggetto" });
     }
   });
 
