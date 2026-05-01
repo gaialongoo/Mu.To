@@ -27,8 +27,14 @@ const AI_MODEL = process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-min
 const AI_ALLOW_NO_AUTH = String(process.env.AI_ALLOW_NO_AUTH || "").trim().toLowerCase() === "true";
 const AI_BASE_URL = String(
   process.env.AI_BASE_URL ||
-  (AI_PROVIDER === "openai" ? "https://api.openai.com/v1" : "")
+  (AI_PROVIDER === "openai"
+    ? "https://api.openai.com/v1"
+    : AI_PROVIDER === "groq"
+      ? "https://api.groq.com/openai/v1"
+      : "")
 ).trim().replace(/\/+$/, "");
+/** Base URL opzionale (es. https://miodominio.it) per prefissare path immagini nel contesto IA */
+const PUBLIC_API_BASE = String(process.env.PUBLIC_API_BASE || process.env.API_PUBLIC_URL || "").trim().replace(/\/+$/, "");
 
 if (!API_KEY)   { console.error("❌ API_KEY mancante nel .env");   process.exit(1); }
 if (!MONGO_URI) { console.error("❌ MONGO_URI mancante nel .env"); process.exit(1); }
@@ -60,7 +66,15 @@ const ALLOWED_INTERESTS = [
   "moda_costumi",
 ];
 const ALLOWED_LEVELS = ["bambino", "studente", "esperto", "avanzato"];
-const ALLOWED_DURATIONS = ["corto", "medio", "lungo"];
+const ALLOWED_DURATIONS = ["corto", "medio", "lungo", "esteso"];
+/** Lingua UI navigatore / traduzione risposte AI (default it) */
+const ALLOWED_NAV_LANGS = ["it", "en", "fr"];
+
+function normalizeNavLang(value) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "it";
+  return ALLOWED_NAV_LANGS.includes(s) ? s : "it";
+}
 
 function normalizePrezzo(value) {
   const parsed = Number(value);
@@ -151,7 +165,8 @@ function normalizeUserInput(body = {}) {
     .filter((it) => ALLOWED_INTERESTS.includes(it));
   const livello = String(body.livello || "").trim().toLowerCase();
   const durata = String(body.durata || "").trim().toLowerCase();
-  return { nome, cognome, email, password, eta, interessi, livello, durata };
+  const navLang = normalizeNavLang(body.navLang ?? body.nav_lang);
+  return { nome, cognome, email, password, eta, interessi, livello, durata, navLang };
 }
 
 function userPublicView(user) {
@@ -164,6 +179,7 @@ function userPublicView(user) {
     interessi: user.interessi || [],
     livello: user.livello || "",
     durata: user.durata || "",
+    navLang: normalizeNavLang(user.navLang),
     ruolo: user.ruolo,
     percorsiAcquistati: user.percorsiAcquistati || [],
     createdAt: user.createdAt,
@@ -228,8 +244,262 @@ function sanitizeGuidedVisitInput(body = {}) {
   return { museo, nome, steps, quiz };
 }
 
+function levelToIndexForDescriptions(livello) {
+  const key = String(livello || "").trim().toLowerCase();
+  if (key === "bambino") return 0;
+  if (key === "studente") return 1;
+  if (key === "esperto") return 2;
+  if (key === "avanzato") return 3;
+  return 1;
+}
+
+function durationToIndexForDescriptions(durata) {
+  const key = String(durata || "").trim().toLowerCase();
+  if (key === "corto") return 0;
+  if (key === "medio") return 1;
+  if (key === "lungo") return 2;
+  if (key === "esteso") return 3;
+  return 1;
+}
+
+const LEVEL_LABELS = ["bambino", "studente", "esperto", "avanzato"];
+const DURATION_LABELS = ["corto", "medio", "lungo"];
+
+/** Secondi di lettura ad alta voce dal profilo utente: corto→3, medio→6, lungo→9, esteso→15 */
+function targetReadingSecondsFromDurata(durata) {
+  const key = String(durata || "").trim().toLowerCase();
+  if (key === "corto") return 3;
+  if (key === "medio") return 6;
+  if (key === "lungo") return 9;
+  if (key === "esteso") return 15;
+  return 6;
+}
+
+function normalizeQuestionKey(raw) {
+  return String(raw || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/** Moltiplicatore sui secondi “durata profilo”: esperto/avanzato richiedono risposte molto più sostenute. */
+function moltiplicatoreSecondiPerLivello(livello) {
+  const k = String(livello || "").trim().toLowerCase();
+  if (k === "bambino") return 0.95;
+  if (k === "studente") return 1;
+  if (k === "esperto") return 2.15;
+  if (k === "avanzato") return 2.65;
+  return 1;
+}
+
+function approximateWordBudget(seconds, livello) {
+  const k = String(livello || "").trim().toLowerCase();
+  const parolePerSec =
+    k === "bambino" ? 2.1 : k === "studente" ? 2.55 : k === "esperto" ? 3.25 : k === "avanzato" ? 3.6 : 2.55;
+  const minimo =
+    k === "bambino" ? 10 : k === "studente" ? 15 : k === "esperto" ? 38 : k === "avanzato" ? 48 : 15;
+  return Math.max(minimo, Math.round(Number(seconds) * parolePerSec));
+}
+
+/** Domande su significato, storia, contesto: servono più parole anche senza “dimmi di più”. */
+function isDomandaAnalitica(raw) {
+  const q = normalizeQuestionKey(raw);
+  if (q.length < 4) return false;
+  return (
+    /\b(significat|storic|storia|contest|contestual|perche|perché|per che|motiv|implicaz|rilevanz|rappresent|simbol|iconograf|funerar|ritual|funzion)\b/.test(
+      q
+    ) || /\bcos[a']? (significa|rappresent)\b/.test(q)
+  );
+}
+
+/** Domande che chiedono più dettaglio: si alza il budget (sempre solo dati nel contesto). */
+function isApprofondimentoRichiesto(raw) {
+  const q = normalizeQuestionKey(raw);
+  if (q.length < 2) return false;
+  return (
+    /\b(di piu|ancora di piu|piu in generale|piu dettagli|piu lungo|non basta)\b/.test(q) ||
+    /\b(approfond|elabora|espandi|dettagli|spiegami meglio|racconta di piu|dimmi di piu|dimmi altro|ancora|continua|vai oltre)\b/.test(q) ||
+    /dimmi (ancora|altro|di piu)\b/.test(q) ||
+    /\b(cosa c[eè] di piu|che altro)\b/.test(q)
+  );
+}
+
+function pickOurDescription(descrizioni, userPrefs) {
+  if (!Array.isArray(descrizioni) || descrizioni.length === 0) return "";
+  const preferredLevel = levelToIndexForDescriptions(userPrefs?.livello);
+  const preferredDuration = durationToIndexForDescriptions(userPrefs?.durata);
+  const levelGroupRaw = descrizioni[preferredLevel] ?? descrizioni[Math.min(preferredLevel, descrizioni.length - 1)];
+  if (!Array.isArray(levelGroupRaw) || levelGroupRaw.length === 0) return "";
+  const durIdx = Math.min(preferredDuration, levelGroupRaw.length - 1);
+  const text = levelGroupRaw[durIdx];
+  if (typeof text === "string" && text.trim().length > 0) return text.trim();
+
+  for (const candidate of levelGroupRaw) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate.trim();
+  }
+  for (const group of descrizioni) {
+    if (!Array.isArray(group)) continue;
+    for (const candidate of group) {
+      if (typeof candidate === "string" && candidate.trim().length > 0) return candidate.trim();
+    }
+  }
+  return "";
+}
+
+function descrizioniMatrixForAI(descrizioni) {
+  if (!Array.isArray(descrizioni)) return [];
+  const out = [];
+  for (let li = 0; li < descrizioni.length; li++) {
+    const group = descrizioni[li];
+    if (!Array.isArray(group)) continue;
+    const livello = LEVEL_LABELS[li] || `livello_${li}`;
+    for (let di = 0; di < group.length; di++) {
+      const testo = typeof group[di] === "string" ? group[di].trim() : "";
+      if (!testo) continue;
+      out.push({
+        livello,
+        durata: DURATION_LABELS[di] || `col_${di}`,
+        testo,
+      });
+    }
+  }
+  return out;
+}
+
+/** Matrice descrizioni da mostrare in base a navLang (fallback italiano). */
+function descrizioniMatrixForNavLang(oggetto, navLangRaw) {
+  const navLang = normalizeNavLang(navLangRaw);
+  const it = Array.isArray(oggetto?.descrizioni) ? oggetto.descrizioni : [];
+  if (navLang === "it") return it;
+  const alt = oggetto?.descrizioniI18n?.[navLang];
+  if (Array.isArray(alt) && alt.length > 0) return alt;
+  return it;
+}
+
+function alignDescrizioniMatrixToSource(translated, source) {
+  const out = [];
+  const nRows = Array.isArray(source) && source.length > 0 ? source.length : 4;
+  for (let i = 0; i < nRows; i++) {
+    const srcRow = Array.isArray(source?.[i]) ? source[i] : [];
+    const nCols = srcRow.length > 0 ? srcRow.length : 3;
+    const trRow = Array.isArray(translated?.[i]) ? translated[i] : [];
+    const row = [];
+    for (let j = 0; j < nCols; j++) {
+      const s = typeof srcRow[j] === "string" ? srcRow[j] : "";
+      const t = typeof trRow[j] === "string" ? trRow[j] : "";
+      row.push(String(s).trim() === "" ? "" : (t || s));
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+async function aiCompleteJsonObject({ system, user, maxTokens = 3500, temperature = 0.2 }) {
+  if (!aiUpstreamReady()) throw new Error("AI non configurata");
+
+  const authHeader = resolveAiAuthHeader();
+  const payload = {
+    model: AI_MODEL,
+    temperature,
+    max_tokens: maxTokens,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (AI_PROVIDER === "openai") {
+    payload.response_format = { type: "json_object" };
+  }
+
+  const headers = { "Content-Type": "application/json" };
+  if (authHeader) headers.Authorization = authHeader;
+
+  const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`AI upstream error (${response.status}): ${errText || "unknown"}`);
+  }
+
+  const data = await response.json();
+  const raw = String(data?.choices?.[0]?.message?.content || "").trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error("Risposta AI non è JSON valido");
+  }
+}
+
+async function aiTranslateDescrizioniMatrixFromIt(matrixIt, targetLang) {
+  const langName = targetLang === "en" ? "English" : "French";
+  const system = [
+    `You translate museum exhibit description matrices from Italian to ${langName}.`,
+    "Rules: Keep the exact same JSON shape: a key \"matrix\" whose value is an array of rows; each row is an array of strings.",
+    "The input matrix dimensions must match the output. Preserve empty strings (do not invent text for empty cells).",
+    "Translate only non-empty Italian cells. Keep well-known artist/work names recognizable.",
+    'Output only JSON: {"matrix":[["row0col0",...], ...]}.',
+  ].join(" ");
+  const user = `Italian matrix:\n${JSON.stringify(matrixIt)}`;
+  const out = await aiCompleteJsonObject({ system, user, maxTokens: 3800, temperature: 0.15 });
+  const m = out?.matrix;
+  if (!Array.isArray(m)) throw new Error('Risposta AI senza "matrix"');
+  return alignDescrizioniMatrixToSource(m, matrixIt);
+}
+
+async function aiTranslateLayoutLabels({ stanzeNomi, percorsiNomi }) {
+  const system = [
+    "You translate Italian museum UI labels to English and French.",
+    'Return JSON only: {"stanze":{"<italian_name>":{"en":"...","fr":"..."}},"percorsi":{"<italian_name>":{"en":"...","fr":"..."}}}.',
+    "Keys in stanze and percorsi MUST be exactly the Italian strings from the input lists (same spelling).",
+    "If a name is exactly one of: out, shop, wc, home — set en and fr to the same lowercase string as the key (do not translate).",
+    "Short natural museum-style labels; no long explanations.",
+  ].join(" ");
+  const user = JSON.stringify({ stanze: stanzeNomi, percorsi: percorsiNomi });
+  const out = await aiCompleteJsonObject({ system, user, maxTokens: 2000, temperature: 0.2 });
+  const stanze = out?.stanze && typeof out.stanze === "object" ? out.stanze : {};
+  const percorsi = out?.percorsi && typeof out.percorsi === "object" ? out.percorsi : {};
+  return { stanze, percorsi };
+}
+
+async function listOggettoImmagineMetas(nomeMuseo, nomeOggetto) {
+  const client = new MongoClient(MONGO_URI);
+  try {
+    await client.connect();
+    const col = client.db("musei").collection("oggetti_immagini");
+    const docs = await col
+      .find({ museo: nomeMuseo, oggetto: nomeOggetto }, { projection: { tipo: 1 } })
+      .toArray();
+    docs.sort((a, b) => {
+      if (a.tipo === "preview") return -1;
+      if (b.tipo === "preview") return 1;
+      const na = parseInt(a.tipo, 10);
+      const nb = parseInt(b.tipo, 10);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return String(a.tipo).localeCompare(String(b.tipo));
+    });
+    return docs.map((d) => {
+      const path = `/musei/${encodeURIComponent(nomeMuseo)}/oggetti/${encodeURIComponent(nomeOggetto)}/immagini/${d.tipo}`;
+      return {
+        tipo: d.tipo,
+        urlPath: path,
+        url: PUBLIC_API_BASE ? `${PUBLIC_API_BASE}${path}` : path,
+      };
+    });
+  } catch {
+    return [];
+  } finally {
+    await client.close();
+  }
+}
+
 function buildFallbackObjectAnswer({ question, oggetto, museo, userPrefs }) {
-  const descrizione = String(oggetto?.descrizioneBreve || "").trim();
+  const descrizione = String(oggetto?.descrizionePreferita || oggetto?.descrizioneBreve || "").trim();
   const autore = String(oggetto?.autore || "").trim();
   const anno = String(oggetto?.anno || "").trim();
   const corrente = String(oggetto?.correnteArtistica || "").trim();
@@ -259,40 +529,172 @@ function resolveAiAuthHeader() {
   return "";
 }
 
-async function askObjectAI({ question, museo, oggetto, userPrefs }) {
+function aiAllowNoAuth() {
+  return AI_ALLOW_NO_AUTH || AI_PROVIDER === "ollama";
+}
+
+function aiUpstreamReady() {
+  return Boolean(AI_BASE_URL && (resolveAiAuthHeader() || aiAllowNoAuth()));
+}
+
+async function askObjectAI({ question, museo, oggetto, userPrefs, immaginiOggetto }) {
   const cleanQuestion = String(question || "").trim();
   if (!cleanQuestion) throw new Error("Domanda vuota");
 
-  const authHeader = resolveAiAuthHeader();
-  const allowNoAuth = AI_ALLOW_NO_AUTH || AI_PROVIDER === "ollama";
-  if (!AI_BASE_URL || (!authHeader && !allowNoAuth)) {
+  if (!aiUpstreamReady()) {
     return buildFallbackObjectAnswer({ question: cleanQuestion, museo, oggetto, userPrefs });
   }
 
-  const systemPrompt = [
-    "Sei una guida museale digitale.",
-    "Rispondi in italiano in massimo 120 parole, tono chiaro e coinvolgente.",
-    "Usa SOLO i dati forniti; se mancano dettagli dichiaralo brevemente senza inventare.",
-    "Adatta la risposta alle preferenze utente (interessi, livello, durata).",
+  const authHeader = resolveAiAuthHeader();
+
+  const livello = String(userPrefs?.livello || "").trim().toLowerCase();
+  const durata = String(userPrefs?.durata || "").trim().toLowerCase();
+  const navLang = normalizeNavLang(userPrefs?.navLang);
+  const secondiSoloDurata = targetReadingSecondsFromDurata(durata);
+  const vuoleApprofondire = isApprofondimentoRichiesto(cleanQuestion);
+  const domandaAnalitica = isDomandaAnalitica(cleanQuestion);
+
+  let targetSec = Math.round(secondiSoloDurata * moltiplicatoreSecondiPerLivello(livello));
+  targetSec = Math.max(targetSec, secondiSoloDurata);
+  if (domandaAnalitica) targetSec = Math.round(targetSec * 1.35);
+  if (vuoleApprofondire) targetSec = Math.round(targetSec * 1.85);
+  targetSec = Math.min(Math.max(targetSec, 4), 52);
+
+  const wordBudget = approximateWordBudget(targetSec, livello);
+  const parolePerSecondo =
+    targetSec > 0 ? (wordBudget / targetSec).toFixed(1) : "2.5";
+
+  const nomeOggetto = String(oggetto?.nome || "").trim() || "N/D";
+  const nomeMuseo = String(museo?.nome || "").trim() || "N/D";
+  const cittaMuseo = String(museo?.citta || "").trim();
+  const stanzaOggetto = String(oggetto?.stanza || "").trim() || "N/D";
+  const livelloPerIstruzione = livello || "studente";
+
+  const righeQualita = [
+    "Qualità della risposta: non ripetere pedissequamente una sola frase del contesto (es. copiare solo nostraDescrizionePerProfilo). Se in CONTESTO_DATI ci sono più voci utili (descrizioniMatriceMuseo, textBody, textTitle, autore, anno, corrente), integra almeno due informazioni distinte quando disponibili, con formulazione da guida.",
+    "Se lo spettatore chiede più dettagli o «ancora», non rispondere con la stessa stringa: sintetizza elementi aggiuntivi presenti nel JSON o spiega meglio ciò che c’è già, con parole nuove.",
+  ];
+
+  const righeEsperto =
+    livello === "esperto" || livello === "avanzato"
+      ? [
+          "Livello esperto/avanzato: la risposta deve essere articolata (più frasi collegate), con lessico appropriato. Per domande su significato storico o contesto, struttura almeno: (1) cos’è l’oggetto secondo i dati; (2) cosa si può ricavare su funzione o ambito culturale usando solo parole e concetti presenti o implicati chiaramente nel testo (es. «funerario» → sfera dei rituali per i defunti), senza aggiungere date o fatti non scritti nel CONTESTO_DATI.",
+          "Se il CONTESTO_DATI è povero, dilo chiaramente («i materiali non specificano…») e non riempire con conoscenza generica esterna.",
+        ]
+      : [];
+
+  const linguaRisposta =
+    navLang === "it"
+      ? [
+          "Rispondi in italiano, in tono da guida chiara e coinvolgente, ma senza inventare: usa solo i dati nel CONTESTO_DATI e nella domanda.",
+        ]
+      : navLang === "en"
+        ? [
+            "IMPORTANT: the CONTESTO_DATI JSON below is in Italian (museum source texts).",
+            "You must answer entirely in English, as a professional museum guide: accurately translate and adapt the Italian context for the visitor. Do not invent facts not supported by the data.",
+            "Keep proper names of works, artists, and places recognizable (you may add a short Italian original in parentheses once if helpful).",
+          ]
+        : [
+            "IMPORTANT : le JSON CONTESTO_DATI ci-dessous est en italien (textes source du musée).",
+            "Vous devez répondre entièrement en français, comme un guide de musée professionnel : traduisez et adaptez fidèlement le contexte italien. N’inventez pas de faits absents des données.",
+            "Conservez les noms propres d’œuvres, d’artistes et de lieux reconnaissables (vous pouvez ajouter une courte forme italienne entre parenthèses si utile).",
+          ];
+
+  const messaggioAssoluto = [
+    "ISTRUZIONE ASSOLUTA — segui questo incarico per prima cosa:",
+    `Spiega come una guida museale l’oggetto «${nomeOggetto}», che si trova nel museo «${nomeMuseo}»${cittaMuseo ? ` di «${cittaMuseo}»` : ""}, nella stanza «${stanzaOggetto}»,`,
+    `per un visitatore con livello «${livelloPerIstruzione}».`,
+    `Lunghezza obiettivo: circa ${targetSec} secondi di lettura ad alta voce (~${parolePerSecondo} parole/s, fino a ~${wordBudget} parole), calibrata su durata profilo, livello «${livelloPerIstruzione}»${domandaAnalitica ? ", domanda analitica" : ""}${vuoleApprofondire ? ", richiesta di approfondimento" : ""}. Solo dati del CONTESTO_DATI.`,
+    ...linguaRisposta,
+    ...righeQualita,
+    "Non puoi vedere le immagini: non descrivere dettagli visivi assenti dal testo.",
+    "Se qualcosa non è nei materiali, dilo in una frase breve.",
+    ...righeEsperto,
   ].join(" ");
+
+  const livelloIstruzioni = [
+    "Dettaglio per livello (sempre ancorato ai dati):",
+    "- bambino: frasi brevissime, parole semplici.",
+    "- studente: chiaro, ordinato, una o due frasi ben costruite.",
+    "- esperto: più frasi, termini d’arte e storici corretti se coerenti con i dati; nessuna risposta monoriga se il budget parole lo consente.",
+    "- avanzato: discorso compatto ma stratificato (aspetti collegati), solo se supportato dai dati.",
+  ].join(" ");
+
+  const systemPrompt = [messaggioAssoluto, "", livelloIstruzioni].join(" ");
+
+  const contestoDati = {
+    museo: {
+      nome: museo?.nome || "",
+      citta: museo?.citta || "",
+    },
+    stanza: oggetto?.stanza || "",
+    oggetto: {
+      nome: oggetto?.nome || "",
+      autore: oggetto?.autore || "",
+      anno: oggetto?.anno || "",
+      correnteArtistica: oggetto?.correnteArtistica || "",
+      textTitle: oggetto?.textTitle || "",
+      textBody: oggetto?.textBody || "",
+    },
+    nostraDescrizionePerProfilo: oggetto?.descrizionePreferita || "",
+    descrizioniMatriceMuseo: Array.isArray(oggetto?.descrizioniMatrice) ? oggetto.descrizioniMatrice : [],
+    immaginiOggetto: Array.isArray(immaginiOggetto) ? immaginiOggetto : [],
+    preferenzeUtente: {
+      livello: livello || "studente",
+      durata: durata || "medio",
+      linguaRispostaNavigazione: navLang,
+      interessi: Array.isArray(userPrefs?.interessi) ? userPrefs.interessi.filter(Boolean) : [],
+    },
+    impostazioniLetturaDalProfilo: {
+      difficolta: livello || "studente",
+      durataScelta: durata || "medio",
+      secondiSoloDurataProfilo: secondiSoloDurata,
+      moltiplicatoreLivello: moltiplicatoreSecondiPerLivello(livello),
+      lunghezzaLetturaSecondiEffettivi: targetSec,
+      approfondimentoRichiesto: vuoleApprofondire,
+      domandaAnalitica,
+      nota: "I secondi effettivi combinano durata profilo, livello (esperto/avanzato allunga), tipo di domanda e richiesta di approfondimento.",
+    },
+    metaLunghezza: {
+      secondiLetturaTarget: targetSec,
+      paroleIndicativeMax: wordBudget,
+      parolePerSecondoIndicative: Number(parolePerSecondo),
+    },
+  };
+
+  const userContent = [
+    messaggioAssoluto,
+    "",
+    "DOMANDA DELLO SPETTATORE:",
+    cleanQuestion,
+    "",
+    "La risposta va formulata rispettando tutti i vincoli dell’ISTRUZIONE ASSOLUTA sopra (lunghezza, livello, solo dati del contesto, tono guida, niente ripetizione vuota della sola riga breve).",
+    "",
+    "CONTESTO_DATI (JSON):",
+    JSON.stringify(contestoDati),
+  ].join("\n");
+
+  const maxTokens = Math.min(
+    1100,
+    Math.max(
+      260,
+      Math.ceil(wordBudget * 3) +
+        (vuoleApprofondire ? 140 : 0) +
+        (domandaAnalitica ? 100 : 0) +
+        (livello === "esperto" || livello === "avanzato" ? 120 : 0)
+    )
+  );
 
   const payload = {
     model: AI_MODEL,
-    temperature: 0.5,
+    temperature:
+      vuoleApprofondire || domandaAnalitica || livello === "esperto" || livello === "avanzato"
+        ? 0.52
+        : 0.42,
+    max_tokens: maxTokens,
     messages: [
       { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: JSON.stringify({
-          question: cleanQuestion,
-          museo: {
-            nome: museo?.nome || "",
-            citta: museo?.citta || "",
-          },
-          oggetto,
-          preferenzeUtente: userPrefs || {},
-        }),
-      },
+      { role: "user", content: userContent },
     ],
   };
 
@@ -565,6 +967,7 @@ async function startServer(cliOptions) {
         interessi: input.interessi,
         livello: input.livello || "",
         durata: input.durata || "",
+        navLang: input.navLang,
         eta: input.eta,
         ruolo,
         percorsiAcquistati: [],
@@ -747,6 +1150,7 @@ async function startServer(cliOptions) {
               interessi: input.interessi,
               livello: input.livello || "",
               durata: input.durata || "",
+              navLang: input.navLang,
               updatedAt: new Date(),
             },
           }
@@ -757,6 +1161,27 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore update profilo:", err.message);
       res.status(500).json({ error: "errore aggiornamento profilo" });
+    }
+  });
+
+  /** Aggiornamento leggero: solo lingua navigatore (it / en / fr) */
+  app.patch("/users/me/nav-lang", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const navLang = normalizeNavLang(req.body?.navLang ?? req.body?.nav_lang);
+      const userId = new ObjectId(String(session.user._id));
+      const updated = await withUsersDb(async (db) => {
+        await db.collection(USERS_COLLECTION).updateOne(
+          { _id: userId },
+          { $set: { navLang, updatedAt: new Date() } }
+        );
+        return db.collection(USERS_COLLECTION).findOne({ _id: userId });
+      });
+      res.json({ user: userPublicView(updated) });
+    } catch (err) {
+      console.error("Errore nav-lang:", err.message);
+      res.status(500).json({ error: "errore aggiornamento lingua" });
     }
   });
 
@@ -783,31 +1208,39 @@ async function startServer(cliOptions) {
             interessi: Array.isArray(session.user.interessi) ? session.user.interessi : [],
             livello: String(session.user.livello || "").trim(),
             durata: String(session.user.durata || "").trim(),
+            navLang: normalizeNavLang(session.user.navLang),
           }
         : {
             interessi: [],
             livello: String(req.body?.livello || "").trim(),
             durata: String(req.body?.durata || "").trim(),
+            navLang: normalizeNavLang(req.body?.navLang ?? req.body?.nav_lang),
           };
 
-      const descrizioneBreve = Array.isArray(oggettoDoc.descrizioni)
-        ? String(oggettoDoc.descrizioni?.[0]?.[0] || "").trim()
-        : "";
+      const descrizionePreferita = pickOurDescription(oggettoDoc.descrizioni, userPrefs);
+      const descrizioniMatrice = descrizioniMatrixForAI(oggettoDoc.descrizioni);
+      const immaginiOggetto = await listOggettoImmagineMetas(nomeMuseo, nomeOggetto);
+
       const aiAnswer = await askObjectAI({
         question,
         museo: { nome: museo.nome, citta: museo.citta },
         oggetto: {
           nome: oggettoDoc.nome,
-          stanza: oggettoDoc.stanza,
+          stanza: String(oggettoDoc.stanza || "").trim(),
           autore: String(oggettoDoc.autore || "").trim(),
           anno: String(oggettoDoc.anno || "").trim(),
           correnteArtistica: String(oggettoDoc.correnteArtistica || "").trim(),
-          descrizioneBreve,
+          textTitle: String(oggettoDoc.textTitle || "").trim(),
+          textBody: String(oggettoDoc.textBody || "").trim(),
+          descrizionePreferita,
+          descrizioneBreve: descrizionePreferita,
+          descrizioniMatrice,
         },
         userPrefs,
+        immaginiOggetto,
       });
 
-      res.json({ answer: aiAnswer, source: AI_API_KEY ? "openai" : "fallback" });
+      res.json({ answer: aiAnswer, source: aiUpstreamReady() ? AI_PROVIDER : "fallback" });
     } catch (err) {
       console.error("Errore object chat AI:", err.message);
       res.status(500).json({ error: "errore chat IA oggetto" });
@@ -1490,12 +1923,19 @@ async function startServer(cliOptions) {
     const museo = sistema.get_museo(req.params.nome_museo);
     if (!museo) return res.status(404).json({ error: "Museo non trovato" });
 
+    const layoutDoc = layoutStore[req.params.nome_museo] || {};
+    const labelI18n =
+      layoutDoc.labelI18n && typeof layoutDoc.labelI18n === "object"
+        ? layoutDoc.labelI18n
+        : { stanze: {}, percorsi: {} };
+
     console.log(`Restituisco dati museo '${museo.nome}'`);
     res.json({
       nome: museo.nome,
       citta: museo.citta,
       oggetti: Array.from(museo.oggetti.values()),
       percorsi: museo.percorsi || [],
+      labelI18n,
     });
   });
 
@@ -1785,6 +2225,10 @@ async function startServer(cliOptions) {
       oggetto.connessi.forEach(c => museo.collega_oggetti(oggetto.nome, c));
     }
     if (descrizioni) oggetto.descrizioni = descrizioni;
+    if (Object.prototype.hasOwnProperty.call(req.body, "descrizioniI18n")) {
+      if (req.body.descrizioniI18n == null) delete oggetto.descrizioniI18n;
+      else if (typeof req.body.descrizioniI18n === "object") oggetto.descrizioniI18n = req.body.descrizioniI18n;
+    }
     if (objectType != null) oggetto.objectType = String(objectType || "").trim() || "normal";
     if (textTitle != null) oggetto.textTitle = String(textTitle || "").trim();
     if (textBody != null) oggetto.textBody = String(textBody || "").trim();
@@ -1803,6 +2247,75 @@ async function startServer(cliOptions) {
     }
 
     res.json({ message: `Oggetto '${oggetto.nome}' aggiornato` });
+  });
+
+  app.post("/musei/:nome_museo/oggetti/:oggetto/translate-descriptions", async (req, res) => {
+    try {
+      const museo = sistema.get_museo(req.params.nome_museo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const og = museo.get_oggetto(req.params.oggetto);
+      if (!og) return res.status(404).json({ error: "Oggetto non trovato" });
+      const matrixIt = Array.isArray(og.descrizioni) ? og.descrizioni : [];
+      const descrizioniI18n = {
+        ...(og.descrizioniI18n && typeof og.descrizioniI18n === "object" ? og.descrizioniI18n : {}),
+      };
+      for (const lang of ["en", "fr"]) {
+        descrizioniI18n[lang] = await aiTranslateDescrizioniMatrixFromIt(matrixIt, lang);
+      }
+      og.descrizioniI18n = descrizioniI18n;
+      sistema.salvaSuFile(FILE_JSON);
+      try {
+        await upsertMuseo({
+          nome: museo.nome,
+          citta: museo.citta,
+          oggetti: Array.from(museo.oggetti.values()),
+          percorsi: museo.percorsi || [],
+        });
+      } catch (err) {
+        console.error("Errore MongoDB translate-descriptions:", err.message);
+      }
+      res.json({ descrizioniI18n });
+    } catch (err) {
+      console.error("translate-descriptions:", err.message);
+      res.status(500).json({ error: err.message || "errore traduzione" });
+    }
+  });
+
+  app.post("/musei/:nome_museo/layout/translate-labels", async (req, res) => {
+    try {
+      const nomeM = req.params.nome_museo;
+      const museo = sistema.get_museo(nomeM);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const layoutDoc = layoutStore[nomeM] || {};
+      const rooms = layoutDoc.rooms && typeof layoutDoc.rooms === "object" ? layoutDoc.rooms : {};
+      const stanzeNomi = Object.keys(rooms);
+      const percorsiNomi = (museo.percorsi || []).map((p) => p.nome).filter(Boolean);
+      const merged = await aiTranslateLayoutLabels({ stanzeNomi, percorsiNomi });
+      const prev = layoutDoc.labelI18n && typeof layoutDoc.labelI18n === "object" ? layoutDoc.labelI18n : {};
+      const labelI18n = {
+        stanze: { ...(prev.stanze || {}), ...merged.stanze },
+        percorsi: { ...(prev.percorsi || {}), ...merged.percorsi },
+      };
+
+      const client = new MongoClient(MONGO_URI);
+      try {
+        await client.connect();
+        await client.db(DB_NAME).collection(LAYOUT_COLLECTION).updateOne(
+          { _id: nomeM },
+          { $set: { labelI18n } },
+          { upsert: true }
+        );
+      } finally {
+        await client.close();
+      }
+
+      layoutStore[nomeM] = { ...(layoutStore[nomeM] || {}), labelI18n };
+      saveLayoutStore(LAYOUT_FILE, layoutStore);
+      res.json({ labelI18n });
+    } catch (err) {
+      console.error("translate-labels:", err.message);
+      res.status(500).json({ error: err.message || "errore traduzione etichette" });
+    }
   });
 
   // ==========================================================

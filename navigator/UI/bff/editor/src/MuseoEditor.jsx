@@ -149,7 +149,8 @@ const OBJ_TEXT        = "#000000";
 const OBJ_SEL_FILL    = "#1a6fa8";
 const OBJ_PICK_STROKE = "#27ae60";
 
-const MUSEO_VUOTO = { nome: "", stanze: [], oggetti: [], percorsi: [], corridoi: [] };
+const EMPTY_LABEL_I18N = { stanze: {}, percorsi: {} };
+const MUSEO_VUOTO = { nome: "", stanze: [], oggetti: [], percorsi: [], corridoi: [], labelI18n: { ...EMPTY_LABEL_I18N } };
 const DOOR_SIDES = ["N", "E", "S", "W"];
 
 function corridoioKey(a, b) {
@@ -932,6 +933,8 @@ export default function MuseoEditor() {
   const [loadingMuseo, setLoadingMuseo] = useState(null);
   const [descTab, setDescTab]           = useState(0);
   const [savingAll, setSavingAll]       = useState(false);
+  const [aiTranslatingDesc, setAiTranslatingDesc] = useState(false);
+  const [aiTranslatingLabels, setAiTranslatingLabels] = useState(false);
   const [addObjectKind, setAddObjectKind] = useState("normal");
   const [deletingMuseo, setDeletingMuseo] = useState(false);
   const [toast, setToast]               = useState(null);
@@ -1056,6 +1059,10 @@ export default function MuseoEditor() {
               bgTipo: "preview",
             }))
           : [];
+      const labelI18n =
+        layout?.labelI18n && typeof layout.labelI18n === "object"
+          ? { stanze: { ...(layout.labelI18n.stanze || {}) }, percorsi: { ...(layout.labelI18n.percorsi || {}) } }
+          : { ...EMPTY_LABEL_I18N };
       setMuseo({
         nome: data.nome, stanze,
         oggetti: (data.oggetti??[]).map(o=>({
@@ -1072,6 +1079,7 @@ export default function MuseoEditor() {
         })),
         percorsi: percorsiData?.percorsi ?? data.percorsi ?? [],
         corridoi: normalizeCorridoi(stanze, layout?.corridoi || []),
+        labelI18n,
       });
       setSelected(null); setScreen("editor");
     } catch(e) { alert(`Errore caricamento: ${e.message}`); }
@@ -1083,10 +1091,10 @@ export default function MuseoEditor() {
     if (!nome) return;
     try {
       await apiFetch("/musei", { method:"POST", body:JSON.stringify({ nome, citta }) });
-      setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[] });
+      setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[], labelI18n: { ...EMPTY_LABEL_I18N } });
       setSelected(null); setScreen("editor");
     } catch(e) {
-      if (e.message.includes("400")) { setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[] }); setScreen("editor"); }
+      if (e.message.includes("400")) { setMuseo({ nome, stanze:[], oggetti:[], percorsi:[], corridoi:[], labelI18n: { ...EMPTY_LABEL_I18N } }); setScreen("editor"); }
       else alert(`Errore creazione: ${e.message}`);
     }
   };
@@ -1100,7 +1108,8 @@ export default function MuseoEditor() {
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
         { method:"PUT", body:JSON.stringify({
             rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
-            corridoi
+            corridoi,
+            labelI18n: museo.labelI18n && typeof museo.labelI18n === "object" ? museo.labelI18n : { ...EMPTY_LABEL_I18N },
           })
         });
       await Promise.all(museo.oggetti.map(o =>
@@ -1108,6 +1117,7 @@ export default function MuseoEditor() {
           { method:"PUT", body:JSON.stringify({
               stanza: o.stanza, pos: o.pos, connessi: o.connessi, visibile: o.visibile,
               descrizioni: o.descrizioni ?? Array.from({length:4},()=>Array(3).fill("")),
+              descrizioniI18n: o.descrizioniI18n ?? null,
               objectType: o.objectType || "normal",
               textTitle: o.textTitle || "",
               textBody: o.textBody || "",
@@ -1122,6 +1132,51 @@ export default function MuseoEditor() {
       showToast("✓ Tutto salvato!");
     } catch(e) { showToast(`✗ ${e.message}`, false); }
     finally { setSavingAll(false); }
+  };
+
+  const translateOggettoDescrizioniAi = async () => {
+    if (selected?.type !== "oggetto" || !selected?.nome || !museo.nome) return;
+    setAiTranslatingDesc(true);
+    try {
+      const data = await apiFetch(
+        `/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(selected.nome)}/translate-descriptions`,
+        { method: "POST", body: "{}" }
+      );
+      setMuseo((m) => ({
+        ...m,
+        oggetti: m.oggetti.map((o) =>
+          o.nome === selected.nome ? { ...o, descrizioniI18n: data.descrizioniI18n } : o
+        ),
+      }));
+      showToast("✓ Traduzioni EN/FR salvate sul server");
+    } catch (e) {
+      showToast(`✗ ${e.message}`, false);
+    } finally {
+      setAiTranslatingDesc(false);
+    }
+  };
+
+  const translateLayoutLabelsAi = async () => {
+    if (!museo.nome) return;
+    setAiTranslatingLabels(true);
+    try {
+      const data = await apiFetch(
+        `/musei/${encodeURIComponent(museo.nome)}/layout/translate-labels`,
+        { method: "POST", body: "{}" }
+      );
+      setMuseo((m) => ({
+        ...m,
+        labelI18n:
+          data.labelI18n && typeof data.labelI18n === "object"
+            ? data.labelI18n
+            : { ...EMPTY_LABEL_I18N },
+      }));
+      showToast("✓ Etichette tradotte (layout aggiornato)");
+    } catch (e) {
+      showToast(`✗ ${e.message}`, false);
+    } finally {
+      setAiTranslatingLabels(false);
+    }
   };
 
   const updMuseoNome = async (nuovoNomeMuseo) => {
@@ -1210,7 +1265,7 @@ export default function MuseoEditor() {
       if (o.nome !== nomeOggetto) return o;
       const desc = Array.from({length:4},(_,i)=>Array.from({length:3},(_,j)=>o.descrizioni?.[i]?.[j]??""));
       desc[livello][lunghezza] = testo;
-      return { ...o, descrizioni: desc };
+      return { ...o, descrizioni: desc, descrizioniI18n: undefined };
     })}));
   };
 
@@ -1232,10 +1287,20 @@ export default function MuseoEditor() {
             b: c.b === vecchio ? patch.nome : c.b,
           }))
         : corridoiBase;
+      let labelI18nNext = m.labelI18n && typeof m.labelI18n === "object" ? m.labelI18n : { ...EMPTY_LABEL_I18N };
+      if (patch.nome) {
+        const stanzeMap = { ...(labelI18nNext.stanze || {}) };
+        if (stanzeMap[vecchio]) {
+          stanzeMap[patch.nome] = stanzeMap[vecchio];
+          delete stanzeMap[vecchio];
+        }
+        labelI18nNext = { ...labelI18nNext, stanze: stanzeMap };
+      }
       return {...m,
         stanze,
         oggetti: patch.nome ? m.oggetti.map(o=>o.stanza===vecchio?{...o,stanza:patch.nome}:o) : m.oggetti,
         corridoi: normalizeCorridoi(stanze, corridoi),
+        labelI18n: labelI18nNext,
       };
     });
     if (patch.nome) setSelected(s=>s?.nome===vecchio?{...s,nome:patch.nome}:s);
@@ -1250,13 +1315,21 @@ export default function MuseoEditor() {
             x: c.x, y: c.y, w: c.w, h: c.h, aDoor: c.aDoor, bDoor: c.bDoor,
           }))
         );
+        const baseLi = museo.labelI18n && typeof museo.labelI18n === "object" ? museo.labelI18n : { ...EMPTY_LABEL_I18N };
+        const stanzeMap = { ...(baseLi.stanze || {}) };
+        if (stanzeMap[vecchio]) {
+          stanzeMap[patch.nome] = stanzeMap[vecchio];
+          delete stanzeMap[vecchio];
+        }
+        const labelI18n = { ...baseLi, stanze: stanzeMap };
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({
           rooms: Object.fromEntries(nuove.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
-          corridoi
+          corridoi,
+          labelI18n,
         })});
         await Promise.all(museo.oggetti.filter(o=>o.stanza===vecchio).map(o=>
           apiFetch(`/musei/${encodeURIComponent(museo.nome)}/oggetti/${encodeURIComponent(o.nome)}`,
-            {method:"PUT",body:JSON.stringify({...o,stanza:patch.nome, pos: o.pos})})
+            {method:"PUT",body:JSON.stringify({...o,stanza:patch.nome, pos: o.pos, descrizioniI18n: o.descrizioniI18n ?? null})})
         ));
         showToast(`✓ Stanza rinominata in "${patch.nome}"`);
       } catch(err) { showToast(`⚠ Rename solo locale (${err.message})`, false); }
@@ -2554,7 +2627,27 @@ export default function MuseoEditor() {
 
             <Card title="DESCRIZIONI" color="#8e44ad">
               <div style={{fontSize:10,color:"#8e44ad",background:"rgba(142,68,173,0.14)",border:`1px solid ${THEME.border}`,borderRadius:4,padding:"5px 8px",marginBottom:10}}>
-                💾 Le descrizioni vengono salvate con "Salva su API"
+                Testi in italiano (sorgente). «Traduci EN/FR» chiama l’IA e salva sul server; altre modifiche richiedono ancora «Salva su API».
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:12}}>
+                <button
+                  type="button"
+                  disabled={aiTranslatingDesc}
+                  onClick={translateOggettoDescrizioniAi}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: "1px solid #8e44ad",
+                    background: "rgba(142,68,173,0.12)",
+                    color: "#c39bd3",
+                    fontSize: 11,
+                    cursor: aiTranslatingDesc ? "default" : "pointer",
+                    opacity: aiTranslatingDesc ? 0.65 : 1,
+                  }}
+                >
+                  {aiTranslatingDesc ? "⏳ Traduzione IA…" : "🌐 Traduci descrizioni EN/FR (IA)"}
+                </button>
               </div>
               <div style={{display:"flex",gap:4,marginBottom:12}}>
                 {["🧒","📖","🎓","🔬"].map((icon,i)=>(
@@ -2689,6 +2782,26 @@ export default function MuseoEditor() {
               </div>
             </div>
           )}
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <button
+              type="button"
+              disabled={aiTranslatingLabels || !museo.nome}
+              onClick={translateLayoutLabelsAi}
+              style={{
+                flex: 1,
+                padding: "9px 10px",
+                borderRadius: 7,
+                border: `1px solid ${THEME.border}`,
+                background: THEME.surface,
+                color: THEME.textDim,
+                fontSize: 11,
+                cursor: aiTranslatingLabels || !museo.nome ? "default" : "pointer",
+                opacity: aiTranslatingLabels ? 0.65 : 1,
+              }}
+            >
+              {aiTranslatingLabels ? "⏳ Traduco etichette…" : "🌐 Traduci nomi stanze e percorsi (IA)"}
+            </button>
+          </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={saveMuseoToApi} disabled={savingAll||deletingMuseo}
               style={{flex:1,padding:"10px",borderRadius:7,border:"none",

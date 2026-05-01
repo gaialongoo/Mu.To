@@ -1,7 +1,7 @@
 import React from "react";
 import { previewUrl } from "../api";
 
-export default function ItemCard({ oggetto, museo, onView, delay = 0 }) {
+export default function ItemCard({ oggetto, museo, onView, delay = 0, displayStanza }) {
   const nD = Array.isArray(oggetto.descrizioni) ? oggetto.descrizioni.length : 0;
   const nC = Array.isArray(oggetto.connessi) ? oggetto.connessi.length : 0;
 
@@ -78,7 +78,7 @@ export default function ItemCard({ oggetto, museo, onView, delay = 0 }) {
               letterSpacing: "0.14em",
               textTransform: "uppercase",
               fontFamily: "var(--font-head)",
-            }}>{oggetto.stanza}</span>
+            }}>{displayStanza || oggetto.stanza}</span>
           )}
           {(oggetto.connessi || []).slice(0, 2).map((c) => (
             <span key={c} style={{

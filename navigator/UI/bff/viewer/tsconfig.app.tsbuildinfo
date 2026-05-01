@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/components/SvgViewer.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/SvgViewer.tsx","./src/i18n/NavLangContext.tsx","./src/i18n/viewerLocales.ts"],"version":"5.9.3"}

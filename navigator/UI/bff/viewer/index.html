@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" id="htmlRoot">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -138,6 +138,48 @@
       color: var(--text);
     }
     .nav-links .auth-btn:hover::after { right: 0; }
+
+    .nav-lang-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .nav-lang-item label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin: 0;
+      cursor: pointer;
+    }
+    .nav-lang-item span[data-i18n="langLabel"] {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .nav-lang-select {
+      font-family: inherit;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      padding: 0.35rem 0.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      max-width: 8.5rem;
+    }
+    .mobile-lang-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .mobile-lang-row .nav-lang-select {
+      min-width: 12rem;
+    }
 
     /* hamburger */
     .hamburger {
@@ -1260,8 +1302,8 @@
   <nav class="navbar" id="navbar">
     <a href="#" class="nav-logo">Art<em>Around</em></a>
     <ul class="nav-links">
-      <li><a href="#about">Esplora</a></li>
-      <li><a href="#project">Info</a></li>
+      <li><a href="#about" data-i18n="navExplore">Esplora</a></li>
+      <li><a href="#project" data-i18n="navInfo">Info</a></li>
       <li><button class="auth-btn" id="navAuthBtn" type="button">Login</button></li>
     </ul>
     <button class="hamburger" id="hamburger" aria-label="Menu">
@@ -1275,8 +1317,8 @@
       <span></span>
       <span></span>
     </button>
-    <a href="#about" onclick="closeMobile()">Esplora</a>
-    <a href="#project" onclick="closeMobile()">Info</a>
+    <a href="#about" onclick="closeMobile()" data-i18n="navExplore">Esplora</a>
+    <a href="#project" onclick="closeMobile()" data-i18n="navInfo">Info</a>
     <button class="auth-btn" id="mobileAuthBtn" type="button">Login</button>
   </div>
 
@@ -1289,14 +1331,14 @@
     <div class="hero-arc"></div>
 
     <div class="hero-content">
-      <p class="hero-eyebrow">Esplora l'arte attorno a te</p>
+      <p class="hero-eyebrow" data-i18n="heroEyebrow">Esplora l'arte attorno a te</p>
       <h1 class="hero-title">Art <em>Around</em></h1>
-      <p class="hero-sub">Percorsi personalizzati · Marketplace</p>
+      <p class="hero-sub" data-i18n="heroSub">Percorsi personalizzati · Marketplace</p>
       <div class="hero-divider"><div class="hero-divider-diamond"></div></div>
     </div>
 
     <div class="scroll-hint" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
-      <span>Scorri</span>
+      <span data-i18n="scrollHint">Scorri</span>
       <div class="scroll-arrow">
         <i></i><i></i>
         <div class="chevron-down"></div>
@@ -1307,27 +1349,27 @@
   <!-- ── ABOUT / CTA ──────────────────────────── -->
   <section class="section-about" id="about">
     <div class="reveal">
-      <p class="about-label">Il progetto</p>
-      <h2 class="about-heading">
+      <p class="about-label" data-i18n="aboutLabel">Il progetto</p>
+      <h2 class="about-heading" data-i18n="aboutHeadingHtml" data-i18n-html="1">
         L'arte dei musei,<br><strong>a portata di mano</strong>
       </h2>
-      <p class="about-body">
+      <p class="about-body" data-i18n="aboutBody">
         ArtAround ti guida all'interno dei musei con percorsi tematici curati e ti offre un marketplace dedicato alle opere d'arte. Scegli il tuo museo, il tuo percorso, la tua esperienza.
       </p>
     </div>
 
     <div class="cta-box reveal reveal-delay-2" id="cta-box">
-      <p class="cta-label">Inizia da qui</p>
-      <h3 class="cta-heading">Scegli il tuo museo<br>e inizia ad esplorare</h3>
-      <p class="cta-desc">Seleziona un museo per accedere ai percorsi di navigazione guidata o al marketplace delle opere.</p>
+      <p class="cta-label" data-i18n="ctaLabel">Inizia da qui</p>
+      <h3 class="cta-heading" data-i18n="ctaHeadingHtml" data-i18n-html="1">Scegli il tuo museo<br>e inizia ad esplorare</h3>
+      <p class="cta-desc" data-i18n="ctaDesc">Seleziona un museo per accedere ai percorsi di navigazione guidata o al marketplace delle opere.</p>
 
       <div class="museum-select-wrapper">
-        <p class="select-label">Museo</p>
+        <p class="select-label" data-i18n="museumLabel">Museo</p>
         <div class="select-group">
           <select class="museum-select" id="museo" disabled>
-            <option value="">— Caricamento… —</option>
+            <option value="" id="museoPlaceholderOpt">— Caricamento… —</option>
           </select>
-          <button class="btn-primary" id="ctaBtn" onclick="handlemuseo()" disabled>
+          <button class="btn-primary" id="ctaBtn" onclick="handlemuseo()" disabled data-i18n="ctaGo">
             Vai →
           </button>
         </div>
@@ -1341,28 +1383,28 @@
       <div class="project-image-col">
         <div class="project-image-placeholder">
           <div class="placeholder-icon">🖼</div>
-          <p class="placeholder-text">Preview image</p>
+          <p class="placeholder-text" data-i18n="projectPlaceholder">Preview image</p>
         </div>
       </div>
       <div class="project-text-col">
         <div class="project-badge">
           <span class="project-badge-dot"></span>
-          Il progetto nel dettaglio
+          <span data-i18n="projectBadge">Il progetto nel dettaglio</span>
         </div>
-        <h2 class="project-title">
+        <h2 class="project-title" data-i18n="projectTitleHtml" data-i18n-html="1">
           Una nuova esperienza<br><em>dentro il museo</em>
         </h2>
-        <p class="project-desc">
+        <p class="project-desc" data-i18n="projectDesc1Html" data-i18n-html="1">
           ArtAround nasce dall'idea di trasformare la visita museale in un percorso personalizzato e interattivo. Attraverso la modalità <strong style="color:var(--text)">Navigator</strong>, l'utente segue itinerari tematici curati dai curatori del museo — dalla pittura rinascimentale alla scultura contemporanea.
         </p>
-        <p class="project-desc">
+        <p class="project-desc" data-i18n="projectDesc2Html" data-i18n-html="1">
           Il <strong style="color:var(--text)">Marketplace</strong> integrato permette di scoprire, esplorare e acquistare riproduzioni e opere direttamente collegate alle collezioni visitate, creando un ponte tra esperienza fisica e digitale.
         </p>
         <div class="project-features">
-          <div class="project-feature"><div class="project-feature-dot"></div>Percorsi tematici curati dai musei partner</div>
-          <div class="project-feature"><div class="project-feature-dot"></div>Marketplace integrato con opere originali e riproduzioni</div>
-          <div class="project-feature"><div class="project-feature-dot"></div>Navigazione guidata con mappe interattive del museo</div>
-          <div class="project-feature"><div class="project-feature-dot"></div>Disponibile su web e mobile, sempre con te</div>
+          <div class="project-feature"><div class="project-feature-dot"></div><span data-i18n="projectFeat1">Percorsi tematici curati dai musei partner</span></div>
+          <div class="project-feature"><div class="project-feature-dot"></div><span data-i18n="projectFeat2">Marketplace integrato con opere originali e riproduzioni</span></div>
+          <div class="project-feature"><div class="project-feature-dot"></div><span data-i18n="projectFeat3">Navigazione guidata con mappe interattive del museo</span></div>
+          <div class="project-feature"><div class="project-feature-dot"></div><span data-i18n="projectFeat4">Disponibile su web e mobile, sempre con te</span></div>
         </div>
       </div>
     </div>
@@ -1371,7 +1413,7 @@
   <!-- ── FOOTER ──────────────────────────────── -->
   <footer>
     <span class="footer-logo">ArtAround</span>
-    <p class="footer-copy">© 2025 ArtAround · Tutti i diritti riservati</p>
+    <p class="footer-copy" data-i18n="footerCopy">© 2025 ArtAround · Tutti i diritti riservati</p>
   </footer>
   </div>
 
@@ -1380,40 +1422,40 @@
     <div class="overlay-panel">
       <button class="overlay-close" onclick="closeOverlay()">✕</button>
       <p class="overlay-museum-name" id="overlayMuseumName">Museo selezionato</p>
-      <h3 class="overlay-title">Come vuoi esplorare?</h3>
+      <h3 class="overlay-title" data-i18n="overlayHowExplore">Come vuoi esplorare?</h3>
 
       <div class="choice-grid">
         <div class="choice-card" id="cardMarketplace" onclick="selectMode('marketplace')">
           <div class="choice-icon">🛒</div>
-          <p class="choice-name">Marketplace</p>
-          <p class="choice-desc">Scopri e acquista opere legate al museo</p>
+          <p class="choice-name" data-i18n="choiceMarketplace">Marketplace</p>
+          <p class="choice-desc" data-i18n="choiceMarketplaceDesc">Scopri e acquista opere legate al museo</p>
         </div>
         <div class="choice-card" id="cardNavigator" onclick="selectMode('navigator')">
           <div class="choice-icon">🗺</div>
-          <p class="choice-name">Navigator</p>
-          <p class="choice-desc">Segui un percorso guidato tra le opere</p>
+          <p class="choice-name" data-i18n="choiceNavigator">Navigator</p>
+          <p class="choice-desc" data-i18n="choiceNavigatorDesc">Segui un percorso guidato tra le opere</p>
         </div>
       </div>
 
       <!-- Navigator sub-step: percorsi caricati via GET /api/musei/{nome}/percorsi -->
       <div class="nav-step" id="navStep">
-        <p class="nav-step-label">Scegli il percorso</p>
+        <p class="nav-step-label" data-i18n="routeStepLabel">Scegli il percorso</p>
 
         <div class="route-loading" id="routeLoading">
           <div class="route-spinner"></div>
-          Caricamento percorsi…
+          <span data-i18n="routeLoading">Caricamento percorsi…</span>
         </div>
 
         <div class="route-error" id="routeError"></div>
 
         <select class="route-select" id="percorso" disabled>
-          <option value="">— Seleziona un percorso —</option>
+          <option value="" id="percorsoPlaceholderOpt">— Seleziona un percorso —</option>
         </select>
       </div>
 
       <div class="overlay-actions">
-        <button class="btn-secondary" onclick="closeOverlay()">Annulla</button>
-        <button class="btn-primary" id="apri" onclick="confirmChoice()" disabled>
+        <button class="btn-secondary" onclick="closeOverlay()" data-i18n="btnCancel">Annulla</button>
+        <button class="btn-primary" id="apri" onclick="confirmChoice()" disabled data-i18n="btnConfirm">
           Conferma →
         </button>
       </div>
@@ -1423,55 +1465,55 @@
   <div class="overlay" id="authOverlay">
     <div class="overlay-panel">
       <button class="overlay-close" onclick="closeAuthOverlay()">✕</button>
-      <p class="overlay-museum-name">Account</p>
-      <h3 class="overlay-title">Login</h3>
+      <p class="overlay-museum-name" data-i18n="authAccount">Account</p>
+      <h3 class="overlay-title" id="authOverlayTitle">Login</h3>
 
       <div class="auth-switch">
-        <button id="authModeLogin" type="button" onclick="setAuthMode('login')">Login</button>
-        <button id="authModeRegister" type="button" onclick="setAuthMode('register')">Registrati</button>
+        <button id="authModeLogin" type="button" onclick="setAuthMode('login')" data-i18n="authTabLogin">Login</button>
+        <button id="authModeRegister" type="button" onclick="setAuthMode('register')" data-i18n="authTabRegister">Registrati</button>
       </div>
 
       <form class="auth-form" id="loginForm">
-        <input id="loginEmail" type="email" placeholder="Email" required />
-        <input id="loginPassword" type="password" placeholder="Password" required />
-        <button class="btn-primary" type="submit">Accedi</button>
+        <input id="loginEmail" type="email" data-i18n-placeholder="phEmail" placeholder="Email" required />
+        <input id="loginPassword" type="password" data-i18n-placeholder="phPassword" placeholder="Password" required />
+        <button class="btn-primary" type="submit" data-i18n="btnLogin">Accedi</button>
       </form>
 
       <form class="auth-form auth-hidden" id="registerForm">
         <div class="auth-grid">
-          <input id="regNome" type="text" placeholder="Nome" required />
-          <input id="regCognome" type="text" placeholder="Cognome" required />
+          <input id="regNome" type="text" data-i18n-placeholder="phFirstName" placeholder="Nome" required />
+          <input id="regCognome" type="text" data-i18n-placeholder="phLastName" placeholder="Cognome" required />
         </div>
         <div class="auth-grid">
-          <input id="regEmail" type="email" placeholder="Email" required />
-          <input id="regPassword" type="password" placeholder="Password (min 8)" required />
+          <input id="regEmail" type="email" data-i18n-placeholder="phEmail" placeholder="Email" required />
+          <input id="regPassword" type="password" data-i18n-placeholder="phPasswordMin" placeholder="Password (min 8)" required />
         </div>
         <div class="auth-grid" style="grid-template-columns:1fr 1fr 1fr;">
-          <input id="regEta" type="number" min="1" max="120" placeholder="Età" required />
+          <input id="regEta" type="number" min="1" max="120" data-i18n-placeholder="phAge" placeholder="Età" required />
           <select id="regLivello">
-            <option value="">Livello</option>
-            <option value="bambino">Bambino</option>
-            <option value="studente">Studente</option>
-            <option value="esperto">Esperto</option>
-            <option value="avanzato">Avanzato</option>
+            <option value="" data-i18n="lvlPlaceholder">Livello</option>
+            <option value="bambino" data-i18n="lvlChild">Bambino</option>
+            <option value="studente" data-i18n="lvlStudent">Studente</option>
+            <option value="esperto" data-i18n="lvlExpert">Esperto</option>
+            <option value="avanzato" data-i18n="lvlAdvanced">Avanzato</option>
           </select>
           <select id="regDurata">
-            <option value="">Durata</option>
-            <option value="corto">Corto</option>
-            <option value="medio">Medio</option>
-            <option value="lungo">Lungo</option>
+            <option value="" data-i18n="durPlaceholder">Durata</option>
+            <option value="corto" data-i18n="durShort">Corto</option>
+            <option value="medio" data-i18n="durMed">Medio</option>
+            <option value="lungo" data-i18n="durLong">Lungo</option>
           </select>
         </div>
         <div class="auth-code-field">
           <label class="auth-code-label">
-            <span class="auth-code-title">Codice professore</span>
-            <span class="auth-code-optional">(facoltativo)</span>
+            <span class="auth-code-title" data-i18n="profCodeTitle">Codice professore</span>
+            <span class="auth-code-optional" data-i18n="profCodeOpt">(facoltativo)</span>
           </label>
-          <input id="regCodiceRuolo" type="text" placeholder="Inserisci codice se sei un insegnante" />
+          <input id="regCodiceRuolo" type="text" data-i18n-placeholder="phTeacherCode" placeholder="Inserisci codice se sei un insegnante" />
         </div>
-        <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
+        <p class="auth-interest-title" data-i18n="authInterestTitle">Interessi (selezionane almeno 1)</p>
         <div class="auth-interests" id="interestList"></div>
-        <button class="btn-primary" type="submit">Crea account</button>
+        <button class="btn-primary" type="submit" data-i18n="btnCreateAccount">Crea account</button>
       </form>
 
       <form class="auth-form auth-hidden" id="profileForm">
@@ -1513,39 +1555,47 @@
   <div class="overlay" id="profileOverlay">
     <div class="overlay-panel">
       <button class="overlay-close" onclick="closeProfileOverlay()">✕</button>
-      <p class="overlay-museum-name">Account</p>
-      <h3 class="overlay-title">Profilo</h3>
+      <p class="overlay-museum-name" data-i18n="authAccount">Account</p>
+      <h3 class="overlay-title" data-i18n="profileTitle">Profilo</h3>
       <form class="auth-form" id="profileStandaloneForm">
         <div class="auth-grid">
-          <input id="profileStandaloneNome" type="text" placeholder="Nome" />
-          <input id="profileStandaloneCognome" type="text" placeholder="Cognome" />
+          <input id="profileStandaloneNome" type="text" data-i18n-placeholder="phFirstName" placeholder="Nome" />
+          <input id="profileStandaloneCognome" type="text" data-i18n-placeholder="phLastName" placeholder="Cognome" />
         </div>
         <div class="auth-grid">
-          <input id="profileStandaloneEmail" type="email" placeholder="Email" disabled />
-          <input id="profileStandaloneEta" type="number" min="1" max="120" placeholder="Eta" />
+          <input id="profileStandaloneEmail" type="email" data-i18n-placeholder="phEmail" placeholder="Email" disabled />
+          <input id="profileStandaloneEta" type="number" min="1" max="120" data-i18n-placeholder="phAgeShort" placeholder="Eta" />
         </div>
         <div class="auth-grid">
-          <input id="profileStandaloneRuolo" type="text" placeholder="Ruolo" disabled />
+          <input id="profileStandaloneRuolo" type="text" data-i18n-placeholder="phRole" placeholder="Ruolo" disabled />
         </div>
         <div class="auth-grid">
           <select id="profileStandaloneLivello">
-            <option value="">Livello</option>
-            <option value="bambino">Bambino</option>
-            <option value="studente">Studente</option>
-            <option value="esperto">Esperto</option>
-            <option value="avanzato">Avanzato</option>
+            <option value="" data-i18n="lvlPlaceholder">Livello</option>
+            <option value="bambino" data-i18n="lvlChild">Bambino</option>
+            <option value="studente" data-i18n="lvlStudent">Studente</option>
+            <option value="esperto" data-i18n="lvlExpert">Esperto</option>
+            <option value="avanzato" data-i18n="lvlAdvanced">Avanzato</option>
           </select>
           <select id="profileStandaloneDurata">
-            <option value="">Durata spiegazioni</option>
-            <option value="corto">Corto</option>
-            <option value="medio">Medio</option>
-            <option value="lungo">Lungo</option>
+            <option value="" data-i18n="durExplPlaceholder">Durata spiegazioni</option>
+            <option value="corto" data-i18n="durShort">Corto</option>
+            <option value="medio" data-i18n="durMed">Medio</option>
+            <option value="lungo" data-i18n="durLong">Lungo</option>
+          </select>
+        </div>
+        <div class="auth-grid">
+          <label for="profileStandaloneNavLang" class="auth-interest-title" style="margin:0;text-align:left;" data-i18n="langLabel">Lingua navigazione</label>
+          <select id="profileStandaloneNavLang">
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
           </select>
         </div>
         <p class="auth-interest-title">Interessi (selezionane almeno 1)</p>
         <div class="auth-interests" id="profileStandaloneInterestList"></div>
-        <button class="btn-primary" type="submit">Salva profilo</button>
-        <button class="btn-secondary" type="button" onclick="logoutUser()">Logout</button>
+        <button class="btn-primary" type="submit" data-i18n="btnSaveProfile">Salva profilo</button>
+        <button class="btn-secondary" type="button" onclick="logoutUser()" data-i18n="btnLogout">Logout</button>
         <p class="auth-status" id="profileStatus"></p>
       </form>
     </div>
@@ -1556,16 +1606,177 @@
 
 <script>
   const API = '/api';
-  const AUTH_INTERESTS = [
-    ["storia", "Storia"],
-    ["storia_arte", "Storia dell'arte"],
-    ["vita_artista", "Vita artista"],
-    ["tecniche_materiali", "Tecniche e materiali"],
-    ["estetica", "Estetica"],
-    ["sensorialita", "Sensorialita"],
-    ["filosofia_significato", "Filosofia e significato"],
-    ["moda_costumi", "Moda e costumi"],
+  function normalizeNavLang(v) {
+    return v === "en" || v === "fr" || v === "it" ? v : "it";
+  }
+
+  function getHomeLang() {
+    try {
+      return normalizeNavLang(localStorage.getItem("mu_nav_lang"));
+    } catch {
+      return "it";
+    }
+  }
+
+  const AUTH_INTEREST_DEF = [
+    ["storia", "intStoria"],
+    ["storia_arte", "intStoriaArte"],
+    ["vita_artista", "intVitaArtista"],
+    ["tecniche_materiali", "intTecniche"],
+    ["estetica", "intEstetica"],
+    ["sensorialita", "intSensorialita"],
+    ["filosofia_significato", "intFilosofia"],
+    ["moda_costumi", "intModa"],
   ];
+
+  const HOME_I18N = {
+    it: {
+      langLabel: "Lingua",
+      navExplore: "Esplora", navInfo: "Info", navLogin: "Login", navProfile: "Profilo",
+      heroEyebrow: "Esplora l'arte attorno a te", heroSub: "Percorsi personalizzati · Marketplace", scrollHint: "Scorri",
+      aboutLabel: "Il progetto",
+      aboutHeadingHtml: "L'arte dei musei,<br><strong>a portata di mano</strong>",
+      aboutBody: "ArtAround ti guida all'interno dei musei con percorsi tematici curati e ti offre un marketplace dedicato alle opere d'arte. Scegli il tuo museo, il tuo percorso, la tua esperienza.",
+      ctaLabel: "Inizia da qui", ctaHeadingHtml: "Scegli il tuo museo<br>e inizia ad esplorare",
+      ctaDesc: "Seleziona un museo per accedere ai percorsi di navigazione guidata o al marketplace delle opere.",
+      museumLabel: "Museo", museumLoading: "— Caricamento… —", museumPick: "— Seleziona un museo —", museumLoadError: "Errore nel caricamento",
+      ctaGo: "Vai →", projectPlaceholder: "Anteprima",
+      projectBadge: "Il progetto nel dettaglio",
+      projectTitleHtml: "Una nuova esperienza<br><em>dentro il museo</em>",
+      projectDesc1Html: "ArtAround nasce dall'idea di trasformare la visita museale in un percorso personalizzato e interattivo. Attraverso la modalità <strong style=\"color:var(--text)\">Navigator</strong>, l'utente segue itinerari tematici curati dai curatori del museo — dalla pittura rinascimentale alla scultura contemporanea.",
+      projectDesc2Html: "Il <strong style=\"color:var(--text)\">Marketplace</strong> integrato permette di scoprire, esplorare e acquistare riproduzioni e opere direttamente collegate alle collezioni visitate, creando un ponte tra esperienza fisica e digitale.",
+      projectFeat1: "Percorsi tematici curati dai musei partner", projectFeat2: "Marketplace integrato con opere originali e riproduzioni",
+      projectFeat3: "Navigazione guidata con mappe interattive del museo", projectFeat4: "Disponibile su web e mobile, sempre con te",
+      footerCopy: "© 2025 ArtAround · Tutti i diritti riservati",
+      overlayHowExplore: "Come vuoi esplorare?", choiceMarketplace: "Marketplace",
+      choiceMarketplaceDesc: "Scopri e acquista opere legate al museo", choiceNavigator: "Navigator",
+      choiceNavigatorDesc: "Segui un percorso guidato tra le opere", routeStepLabel: "Scegli il percorso", routeLoading: "Caricamento percorsi…",
+      routeSelectPlaceholder: "— Seleziona un percorso —", btnCancel: "Annulla", btnConfirm: "Conferma →",
+      routeErrNoMuseum: "Nessun museo selezionato.", routeErrNoPaths: "Non hai ancora percorsi disponibili per questo museo.",
+      routeErrLoad: "Impossibile caricare i percorsi acquistati. Riprova.", alertPickMuseumRoute: "Seleziona museo e percorso",
+      authAccount: "Account", authLoginTitle: "Login", authTabLogin: "Login", authTabRegister: "Registrati",
+      phEmail: "Email", phPassword: "Password", phPasswordMin: "Password (min 8)", phFirstName: "Nome", phLastName: "Cognome",
+      phAge: "Età", phAgeShort: "Età", phRole: "Ruolo", phTeacherCode: "Inserisci codice se sei un insegnante",
+      lvlPlaceholder: "Livello", lvlChild: "Bambino", lvlStudent: "Studente", lvlExpert: "Esperto", lvlAdvanced: "Avanzato",
+      durPlaceholder: "Durata", durExplPlaceholder: "Durata spiegazioni", durShort: "Corto", durMed: "Medio", durLong: "Lungo",
+      profCodeTitle: "Codice professore", profCodeOpt: "(facoltativo)", authInterestTitle: "Interessi (selezionane almeno 1)",
+      btnLogin: "Accedi", btnCreateAccount: "Crea account", profileTitle: "Profilo", btnSaveProfile: "Salva profilo", btnLogout: "Logout",
+      errMinInterest: "Seleziona almeno un interesse.", profileUpdated: "Profilo aggiornato.",
+      intStoria: "Storia", intStoriaArte: "Storia dell'arte", intVitaArtista: "Vita artista", intTecniche: "Tecniche e materiali",
+      intEstetica: "Estetica", intSensorialita: "Sensorialita", intFilosofia: "Filosofia e significato", intModa: "Moda e costumi",
+    },
+    en: {
+      langLabel: "Language",
+      navExplore: "Explore", navInfo: "About", navLogin: "Login", navProfile: "Profile",
+      heroEyebrow: "Explore art around you", heroSub: "Personal routes · Marketplace", scrollHint: "Scroll",
+      aboutLabel: "The project",
+      aboutHeadingHtml: "Museum art,<br><strong>within reach</strong>",
+      aboutBody: "ArtAround guides you inside museums with curated thematic routes and a marketplace for artworks. Pick your museum, your route, your experience.",
+      ctaLabel: "Start here", ctaHeadingHtml: "Choose your museum<br>and start exploring",
+      ctaDesc: "Select a museum to access guided navigation routes or the artwork marketplace.",
+      museumLabel: "Museum", museumLoading: "— Loading… —", museumPick: "— Choose a museum —", museumLoadError: "Loading error",
+      ctaGo: "Go →", projectPlaceholder: "Preview",
+      projectBadge: "The project in detail",
+      projectTitleHtml: "A new experience<br><em>inside the museum</em>",
+      projectDesc1Html: "ArtAround turns your visit into a personalised, interactive journey. With <strong style=\"color:var(--text)\">Navigator</strong>, you follow thematic routes curated by museum staff — from Renaissance painting to contemporary sculpture.",
+      projectDesc2Html: "The integrated <strong style=\"color:var(--text)\">Marketplace</strong> lets you discover, explore and buy reproductions and works linked to the collections you visit, bridging physical and digital experience.",
+      projectFeat1: "Thematic routes curated by partner museums", projectFeat2: "Marketplace with original works and reproductions",
+      projectFeat3: "Guided navigation with interactive museum maps", projectFeat4: "On web and mobile, always with you",
+      footerCopy: "© 2025 ArtAround · All rights reserved",
+      overlayHowExplore: "How do you want to explore?", choiceMarketplace: "Marketplace",
+      choiceMarketplaceDesc: "Discover and buy works linked to the museum", choiceNavigator: "Navigator",
+      choiceNavigatorDesc: "Follow a guided route among the artworks", routeStepLabel: "Choose a route", routeLoading: "Loading routes…",
+      routeSelectPlaceholder: "— Select a route —", btnCancel: "Cancel", btnConfirm: "Confirm →",
+      routeErrNoMuseum: "No museum selected.", routeErrNoPaths: "You have no available routes for this museum yet.",
+      routeErrLoad: "Could not load purchased routes. Try again.", alertPickMuseumRoute: "Select museum and route",
+      authAccount: "Account", authLoginTitle: "Login", authTabLogin: "Login", authTabRegister: "Register",
+      phEmail: "Email", phPassword: "Password", phPasswordMin: "Password (min 8)", phFirstName: "First name", phLastName: "Last name",
+      phAge: "Age", phAgeShort: "Age", phRole: "Role", phTeacherCode: "Enter code if you are a teacher",
+      lvlPlaceholder: "Level", lvlChild: "Child", lvlStudent: "Student", lvlExpert: "Expert", lvlAdvanced: "Advanced",
+      durPlaceholder: "Length", durExplPlaceholder: "Explanation length", durShort: "Short", durMed: "Medium", durLong: "Long",
+      profCodeTitle: "Teacher code", profCodeOpt: "(optional)", authInterestTitle: "Interests (pick at least 1)",
+      btnLogin: "Sign in", btnCreateAccount: "Create account", profileTitle: "Profile", btnSaveProfile: "Save profile", btnLogout: "Log out",
+      errMinInterest: "Select at least one interest.", profileUpdated: "Profile updated.",
+      intStoria: "History", intStoriaArte: "Art history", intVitaArtista: "Artist's life", intTecniche: "Techniques and materials",
+      intEstetica: "Aesthetics", intSensorialita: "Sensory", intFilosofia: "Philosophy and meaning", intModa: "Fashion and costume",
+    },
+    fr: {
+      langLabel: "Langue",
+      navExplore: "Explorer", navInfo: "Infos", navLogin: "Connexion", navProfile: "Profil",
+      heroEyebrow: "Explorez l'art autour de vous", heroSub: "Parcours personnalisés · Marketplace", scrollHint: "Défiler",
+      aboutLabel: "Le projet",
+      aboutHeadingHtml: "L'art des musées,<br><strong>à portée de main</strong>",
+      aboutBody: "ArtAround vous guide dans les musées avec des parcours thématiques et une marketplace dédiée aux œuvres. Choisissez votre musée, votre parcours, votre expérience.",
+      ctaLabel: "Commencez ici", ctaHeadingHtml: "Choisissez votre musée<br>et explorez",
+      ctaDesc: "Sélectionnez un musée pour accéder aux parcours guidés ou à la marketplace des œuvres.",
+      museumLabel: "Musée", museumLoading: "— Chargement… —", museumPick: "— Choisir un musée —", museumLoadError: "Erreur de chargement",
+      ctaGo: "Aller →", projectPlaceholder: "Aperçu",
+      projectBadge: "Le projet en détail",
+      projectTitleHtml: "Une nouvelle expérience<br><em>dans le musée</em>",
+      projectDesc1Html: "ArtAround transforme la visite en parcours personnalisé et interactif. Avec <strong style=\"color:var(--text)\">Navigator</strong>, vous suivez des itinéraires thématiques conçus par les musées — de la peinture Renaissance à la sculpture contemporaine.",
+      projectDesc2Html: "La <strong style=\"color:var(--text)\">Marketplace</strong> intégrée permet de découvrir et d'acheter reproductions et œuvres liées aux collections visitées, entre expérience physique et numérique.",
+      projectFeat1: "Parcours thématiques des musées partenaires", projectFeat2: "Marketplace avec œuvres originales et reproductions",
+      projectFeat3: "Navigation guidée avec plans interactifs", projectFeat4: "Sur le web et mobile, toujours avec vous",
+      footerCopy: "© 2025 ArtAround · Tous droits réservés",
+      overlayHowExplore: "Comment souhaitez-vous explorer ?", choiceMarketplace: "Marketplace",
+      choiceMarketplaceDesc: "Découvrir et acheter des œuvres liées au musée", choiceNavigator: "Navigator",
+      choiceNavigatorDesc: "Suivre un parcours guidé parmi les œuvres", routeStepLabel: "Choisissez le parcours", routeLoading: "Chargement des parcours…",
+      routeSelectPlaceholder: "— Sélectionner un parcours —", btnCancel: "Annuler", btnConfirm: "Confirmer →",
+      routeErrNoMuseum: "Aucun musée sélectionné.", routeErrNoPaths: "Aucun parcours disponible pour ce musée.",
+      routeErrLoad: "Impossible de charger les parcours. Réessayez.", alertPickMuseumRoute: "Sélectionnez musée et parcours",
+      authAccount: "Compte", authLoginTitle: "Connexion", authTabLogin: "Connexion", authTabRegister: "S'inscrire",
+      phEmail: "E-mail", phPassword: "Mot de passe", phPasswordMin: "Mot de passe (min 8)", phFirstName: "Prénom", phLastName: "Nom",
+      phAge: "Âge", phAgeShort: "Âge", phRole: "Rôle", phTeacherCode: "Code si vous êtes enseignant",
+      lvlPlaceholder: "Niveau", lvlChild: "Enfant", lvlStudent: "Étudiant", lvlExpert: "Expert", lvlAdvanced: "Avancé",
+      durPlaceholder: "Durée", durExplPlaceholder: "Durée des explications", durShort: "Court", durMed: "Moyen", durLong: "Long",
+      profCodeTitle: "Code professeur", profCodeOpt: "(facultatif)", authInterestTitle: "Centres d'intérêt (au moins 1)",
+      btnLogin: "Se connecter", btnCreateAccount: "Créer un compte", profileTitle: "Profil", btnSaveProfile: "Enregistrer le profil", btnLogout: "Déconnexion",
+      errMinInterest: "Sélectionnez au moins un centre d'intérêt.", profileUpdated: "Profil mis à jour.",
+      intStoria: "Histoire", intStoriaArte: "Histoire de l'art", intVitaArtista: "Vie de l'artiste", intTecniche: "Techniques et matériaux",
+      intEstetica: "Esthétique", intSensorialita: "Sensorialité", intFilosofia: "Philosophie et sens", intModa: "Mode et costumes",
+    },
+  };
+
+  function homeT(key) {
+    const lang = getHomeLang();
+    return HOME_I18N[lang]?.[key] ?? HOME_I18N.it[key] ?? key;
+  }
+
+  let homeI18nListenersBound = false;
+  function applyHomeI18n() {
+    const lang = getHomeLang();
+    document.documentElement.lang = lang === "fr" ? "fr" : lang === "en" ? "en" : "it";
+    const L = HOME_I18N[lang] ?? HOME_I18N.it;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const k = el.getAttribute("data-i18n");
+      if (L[k] == null) return;
+      if (el.getAttribute("data-i18n-html") === "1") el.innerHTML = L[k];
+      else el.textContent = L[k];
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const k = el.getAttribute("data-i18n-placeholder");
+      if (L[k]) el.placeholder = L[k];
+    });
+    document.querySelectorAll("option[data-i18n]").forEach((el) => {
+      const k = el.getAttribute("data-i18n");
+      if (L[k]) el.textContent = L[k];
+    });
+    const mpl = document.getElementById("museoPlaceholderOpt");
+    const museoEl = document.getElementById("museo");
+    if (mpl && museoEl && museoEl.options[0] && museoEl.options[0].value === "") {
+      mpl.textContent = museoEl.disabled ? homeT("museumLoading") : homeT("museumPick");
+    }
+    const ppo = document.getElementById("percorsoPlaceholderOpt");
+    if (ppo) ppo.textContent = homeT("routeSelectPlaceholder");
+    updateAuthButtons();
+    renderInterestCheckboxes("interestList", collectCheckedInterests("interestList"));
+    renderInterestCheckboxes("profileStandaloneInterestList", collectCheckedInterests("profileStandaloneInterestList"));
+    const authTitleRefresh = document.getElementById("authOverlayTitle");
+    if (authTitleRefresh) {
+      authTitleRefresh.textContent = authMode === "register" ? homeT("authTabRegister") : homeT("authLoginTitle");
+    }
+  }
+
   let currentUser = null;
   let pendingMuseumSelection = false;
   let pendingGuidedTeacherVisitId = null;
@@ -1599,9 +1810,9 @@
     const root = document.getElementById(containerId);
     if (!root) return;
     const selectedSet = new Set(Array.isArray(selected) ? selected : []);
-    root.innerHTML = AUTH_INTERESTS.map(([value, label]) => `
+    root.innerHTML = AUTH_INTEREST_DEF.map(([value, key]) => `
       <button type="button" class="interest-chip ${selectedSet.has(value) ? "active" : ""}" data-value="${value}">
-        ${label}
+        ${homeT(key)}
       </button>
     `).join("");
     root.querySelectorAll(".interest-chip").forEach((btn) => {
@@ -1624,6 +1835,10 @@
     modeLogin.classList.toggle("active", mode === "login");
     modeRegister.classList.toggle("active", mode === "register");
     showAuthError("");
+    const authTitleEl = document.getElementById("authOverlayTitle");
+    if (authTitleEl) {
+      authTitleEl.textContent = mode === "register" ? homeT("authTabRegister") : homeT("authLoginTitle");
+    }
 
     // Reset del form di registrazione quando si passa a Registrati
     if (mode === "register") {
@@ -1650,7 +1865,7 @@
   }
 
   function updateAuthButtons() {
-    const label = currentUser ? "Profilo" : "Login";
+    const label = currentUser ? homeT("navProfile") : homeT("navLogin");
     const navBtn = document.getElementById("navAuthBtn");
     const mobileBtn = document.getElementById("mobileAuthBtn");
     if (navBtn) navBtn.textContent = label;
@@ -1697,6 +1912,7 @@
     document.getElementById("profileStandaloneRuolo").value = user?.ruolo || "";
     document.getElementById("profileStandaloneLivello").value = user?.livello || "";
     document.getElementById("profileStandaloneDurata").value = user?.durata || "";
+    document.getElementById("profileStandaloneNavLang").value = normalizeNavLang(user?.navLang);
     renderInterestCheckboxes("profileStandaloneInterestList", user?.interessi || []);
   }
 
@@ -1708,12 +1924,17 @@
       } else {
         const data = await r.json();
         currentUser = data.user || null;
+        if (currentUser) {
+          const nl = normalizeNavLang(currentUser.navLang);
+          try { localStorage.setItem("mu_nav_lang", nl); } catch (e) {}
+        }
       }
     } catch {
       currentUser = null;
     }
     updateAuthButtons();
     if (currentUser) fillProfileForm(currentUser);
+    applyHomeI18n();
   }
 
   async function logoutUser() {
@@ -1725,6 +1946,13 @@
   }
 
   async function initAuthUi() {
+    if (!homeI18nListenersBound) {
+      homeI18nListenersBound = true;
+      window.addEventListener("mu-nav-lang-changed", () => applyHomeI18n());
+      window.addEventListener("storage", (e) => {
+        if (e.key === "mu_nav_lang") applyHomeI18n();
+      });
+    }
     renderInterestCheckboxes("interestList", []);
     renderInterestCheckboxes("profileStandaloneInterestList", []);
     await refreshCurrentUser();
@@ -1744,6 +1972,21 @@
     }
     if (navAuthBtn) navAuthBtn.addEventListener("click", openLoginOrProfile);
     if (mobileAuthBtn) mobileAuthBtn.addEventListener("click", openLoginOrProfile);
+
+    const profileNavLangSel = document.getElementById("profileStandaloneNavLang");
+    if (profileNavLangSel) {
+      profileNavLangSel.addEventListener("change", function () {
+        const nl = normalizeNavLang(this.value);
+        try { localStorage.setItem("mu_nav_lang", nl); } catch (e) {}
+        window.dispatchEvent(new CustomEvent("mu-nav-lang-changed", { detail: nl }));
+        fetch(`${API}/users/me/nav-lang`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ navLang: nl }),
+        }).catch(() => {});
+      });
+    }
 
     if (authOverlay) {
       authOverlay.addEventListener("click", function (e) {
@@ -1789,7 +2032,7 @@
       showAuthError("");
       const interessi = collectCheckedInterests("interestList");
       if (interessi.length < 1) {
-        return showAuthError("Seleziona almeno un interesse.");
+        return showAuthError(homeT("errMinInterest"));
       }
       const payload = {
         nome: document.getElementById("regNome").value.trim(),
@@ -1831,7 +2074,7 @@
       showProfileStatus("");
       const interessi = collectCheckedInterests("profileStandaloneInterestList");
       if (interessi.length < 1) {
-        return showProfileStatus("Seleziona almeno un interesse.");
+        return showProfileStatus(homeT("errMinInterest"));
       }
       const payload = {
         nome: document.getElementById("profileStandaloneNome").value.trim(),
@@ -1840,6 +2083,7 @@
         livello: document.getElementById("profileStandaloneLivello").value,
         durata: document.getElementById("profileStandaloneDurata").value,
         interessi,
+        navLang: normalizeNavLang(document.getElementById("profileStandaloneNavLang").value),
       };
       const r = await fetch(`${API}/users/me`, {
         method: "PUT",
@@ -1851,7 +2095,10 @@
       if (!r.ok) return showProfileStatus(data.error || "Aggiornamento fallito");
       currentUser = data.user || null;
       fillProfileForm(currentUser);
-      showProfileStatus("Profilo aggiornato.", "success");
+      const nl = normalizeNavLang(currentUser?.navLang);
+      try { localStorage.setItem("mu_nav_lang", nl); } catch (e) {}
+      window.dispatchEvent(new CustomEvent("mu-nav-lang-changed", { detail: nl }));
+      showProfileStatus(homeT("profileUpdated"), "success");
     });
 
     const url = new URL(window.location.href);
@@ -1864,6 +2111,8 @@
     if (!currentUser && !validSession(getSession()) && new URLSearchParams(window.location.search).has("stanza")) {
       window.location.replace("/");
     }
+
+    applyHomeI18n();
   }
 
   /* ================= SESSION ================= */
@@ -2435,7 +2684,7 @@
       fetch(`${API}/musei`)
         .then(r => { if (!r.ok) throw new Error(); return r.json(); })
         .then(d => {
-          museo.innerHTML = '<option value="">— Seleziona un museo —</option>';
+          museo.innerHTML = `<option value="" id="museoPlaceholderOpt">${homeT("museumPick")}</option>`;
           d.musei.forEach(nome => {
             const o = document.createElement('option');
             o.value = nome;
@@ -2445,7 +2694,7 @@
           museo.disabled = false;
         })
         .catch(() => {
-          museo.innerHTML = '<option value="">Errore nel caricamento</option>';
+          museo.innerHTML = `<option value="">${homeT("museumLoadError")}</option>`;
         });
 
       museo.addEventListener('change', () => {
@@ -2483,7 +2732,7 @@
     document.getElementById('apri').disabled = true;
 
     const percorso = document.getElementById('percorso');
-    percorso.innerHTML = '<option value="">— Seleziona un percorso —</option>';
+    percorso.innerHTML = `<option value="" id="percorsoPlaceholderOpt">${homeT("routeSelectPlaceholder")}</option>`;
     percorso.disabled = true;
     document.getElementById('routeLoading').classList.remove('visible');
     document.getElementById('routeError').classList.remove('visible');
@@ -2540,13 +2789,13 @@
 
     loading.classList.add('visible');
     error.classList.remove('visible');
-    percorso.innerHTML = '<option value="">— Seleziona un percorso —</option>';
+    percorso.innerHTML = `<option value="" id="percorsoPlaceholderOpt">${homeT("routeSelectPlaceholder")}</option>`;
     percorso.disabled  = true;
     document.getElementById('apri').disabled = true;
 
     if (!museoNome) {
       loading.classList.remove('visible');
-      error.textContent = 'Nessun museo selezionato.';
+      error.textContent = homeT("routeErrNoMuseum");
       error.classList.add('visible');
       return;
     }
@@ -2568,7 +2817,7 @@
           });
 
         if (percorsiDisponibili.length === 0) {
-          error.textContent = 'Non hai ancora percorsi disponibili per questo museo.';
+          error.textContent = homeT("routeErrNoPaths");
           error.classList.add('visible');
           percorso.disabled = true;
           return;
@@ -2585,7 +2834,7 @@
       })
       .catch(() => {
         loading.classList.remove('visible');
-        error.textContent = 'Impossibile caricare i percorsi acquistati. Riprova.';
+        error.textContent = homeT("routeErrLoad");
         error.classList.add('visible');
       });
   }
@@ -2620,7 +2869,7 @@
     if (selectedMode === 'navigator') {
       const percorsoNome = document.getElementById('percorso').value;
       if (!museoNome || !percorsoNome) {
-        alert("Seleziona museo e percorso");
+        alert(homeT("alertPickMuseumRoute"));
         return;
       }
 

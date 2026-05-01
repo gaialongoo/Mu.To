@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getStoredNavLang, useNavLang } from "../i18n/NavLangContext";
 
 declare global {
   interface Window {
@@ -142,6 +143,16 @@ type NavigatorGraphCache = {
 /* ===================== COMPONENT ===================== */
 
 export default function SvgViewer() {
+  const { t, lang } = useNavLang();
+
+  useEffect(() => {
+    const clearPrefs = () => {
+      cachedUserPreferences = null;
+    };
+    window.addEventListener("mu-nav-lang-changed", clearPrefs);
+    return () => window.removeEventListener("mu-nav-lang-changed", clearPrefs);
+  }, []);
+
   const [session, setSession] = useState<Session | null>(null);
   const [availableQuickRooms, setAvailableQuickRooms] = useState({
     shop: false,
@@ -152,9 +163,20 @@ export default function SvgViewer() {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
+    document.documentElement.classList.add("navigator-map-view");
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const prevViewport = meta?.getAttribute("content") ?? "";
+    if (meta) {
+      meta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+      );
+    }
     return () => {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
+      document.documentElement.classList.remove("navigator-map-view");
+      if (meta && prevViewport) meta.setAttribute("content", prevViewport);
     };
   }, []);
 
@@ -164,6 +186,8 @@ export default function SvgViewer() {
     if (typeof window === "undefined") return false;
     return window.innerWidth <= MOBILE_BREAKPOINT;
   });
+  const freeExploreRef = useRef(freeExplore);
+  freeExploreRef.current = freeExplore;
   const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
   const [currentStanzaParam, setCurrentStanzaParam] = useState<string | null>(null);
   const [svgLoadTick, setSvgLoadTick] = useState(0);
@@ -184,6 +208,8 @@ export default function SvgViewer() {
   const isGuidedVisit = !!session?.guidedVisitId;
 
   const lockedViewBox = useRef<string | null>(null);
+  /** Evita reload completo dell'SVG quando cambia solo la stanza (stesso file /svg/...). */
+  const lastLoadedSvgUrlRef = useRef<string | null>(null);
   const setRoomConfirmRef = useRef(setRoomConfirm);
   setRoomConfirmRef.current = setRoomConfirm;
 
@@ -200,11 +226,17 @@ export default function SvgViewer() {
 
   useEffect(() => {
     if (!session) return;
+    lastLoadedSvgUrlRef.current = null;
+    const url = computeSvgUrl(session);
     loadSvg(
-      computeSvgUrl(session),
+      url,
       session,
       () => setExitConfirmOpen(true),
-      () => setSvgLoadTick(t => t + 1)
+      () => {
+        lastLoadedSvgUrlRef.current = url;
+        setSvgLoadTick(t => t + 1);
+      },
+      !freeExploreRef.current
     );
   }, [session]);
 
@@ -216,7 +248,7 @@ export default function SvgViewer() {
       const svg = host?.querySelector<SVGSVGElement>("svg");
       if (!svg) return;
       fitSvgToViewport(svg);
-      renderNavigation(svg);
+      renderNavigation(svg, true);
     };
 
     window.addEventListener("resize", onResize);
@@ -224,17 +256,32 @@ export default function SvgViewer() {
   }, [session, freeExplore]);
 
   useEffect(() => {
+    if (!session?.museo) return;
     const host = document.getElementById("svg-host");
     const svg = host?.querySelector<SVGSVGElement>("svg");
     if (!svg) return;
-    const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))
-      .map((el) => normalize(el.textContent ?? ""));
+    ensureCanonicalStanzaLabels(svg);
+    const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label")).map((el) =>
+      normalize(stanzaLabelCanonical(el))
+    );
     setAvailableQuickRooms({
       shop: labels.includes("shop"),
       wc: labels.includes("wc"),
       out: labels.includes("out"),
     });
-  }, [svgLoadTick]);
+    let cancelled = false;
+    fetch(`${API_BASE}/musei/${encodeURIComponent(session.museo)}/layout`)
+      .then((r) => r.json())
+      .then((layout) => {
+        if (cancelled) return;
+        applyStanzaLabelDisplay(svg, layout?.labelI18n, lang);
+        renderNavigation(svg, !freeExplore);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.museo, svgLoadTick, lang, freeExplore]);
 
   // HOME: blocca zoom/pan e disabilita la modalità esplora.
   useEffect(() => {
@@ -270,18 +317,48 @@ export default function SvgViewer() {
       const stanzaParamChanged =
         currentStanzaParam != null &&
         (rawStanzaParam ?? "") !== currentStanzaParam;
+
+      const nextUrl = computeSvgUrl(session);
+      const host = document.getElementById("svg-host");
+      const svg = host?.querySelector<SVGSVGElement>("svg");
+      const sameSvgAsset =
+        svg != null &&
+        lastLoadedSvgUrlRef.current != null &&
+        nextUrl === lastLoadedSvgUrlRef.current;
+
+      if (sameSvgAsset) {
+        if (isHome || stanzaChanged || stanzaParamChanged) {
+          renderNavigation(svg, !freeExplore);
+        }
+        return;
+      }
+
       if (!freeExplore || isHome || stanzaChanged || stanzaParamChanged) {
         loadSvg(
-          computeSvgUrl(session),
+          nextUrl,
           session,
           () => setExitConfirmOpen(true),
-          () => setSvgLoadTick(t => t + 1)
+          () => {
+            lastLoadedSvgUrlRef.current = nextUrl;
+            setSvgLoadTick(t => t + 1);
+          },
+          !freeExploreRef.current
         );
       }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [session, freeExplore, currentStanzaLabel, currentStanzaParam]);
+
+  /** In free non disegniamo frecce; tornando in lock vanno ridisegnate sullo stesso SVG. Solo al toggle (il primo load è loadSvg). */
+  useEffect(() => {
+    if (!session) return;
+    const host = document.getElementById("svg-host");
+    const svg = host?.querySelector<SVGSVGElement>("svg");
+    if (!svg) return;
+    renderNavigation(svg, !freeExplore);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- evitare render sul vecchio SVG al cambio session/museo
+  }, [freeExplore]);
 
   useEffect(() => {
     const sync = () => {
@@ -404,8 +481,11 @@ export default function SvgViewer() {
     const svg = host?.querySelector<SVGSVGElement>("svg");
     if (!svg) return;
 
+    const objectOverlayBlocksMapGestures = () => focusedObject != null;
+
     const blockWheel = (e: WheelEvent) => e.preventDefault();
     const blockPinch = (e: TouchEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (e.touches.length >= 2) e.preventDefault();
     };
 
@@ -472,6 +552,7 @@ export default function SvgViewer() {
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (isPinching) return;
       if (isInteractiveTarget(e.target)) return;
       dragging = true;
@@ -482,6 +563,7 @@ export default function SvgViewer() {
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (!dragging || isPinching) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -500,6 +582,7 @@ export default function SvgViewer() {
     };
 
     const onPointerUp = () => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (!dragging || isPinching) return;
       dragging = false;
       svg.style.cursor = "grab";
@@ -518,6 +601,7 @@ export default function SvgViewer() {
     };
 
     const onWheel = (e: WheelEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       e.preventDefault();
       const { x, y, w, h } = getVB();
       const factor = e.deltaY > 0 ? 1.12 : 0.89;
@@ -531,6 +615,7 @@ export default function SvgViewer() {
     };
 
     const onTouchStart = (e: TouchEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (e.touches.length === 2) {
         isPinching = true;
         dragging = false;
@@ -542,6 +627,7 @@ export default function SvgViewer() {
     };
 
     const onTouchEnd = (e: TouchEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (e.touches.length < 2) {
         isPinching = false;
         lastPinchDist = 0;
@@ -549,6 +635,7 @@ export default function SvgViewer() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      if (objectOverlayBlocksMapGestures()) return;
       if (e.touches.length !== 2) return;
       e.preventDefault();
       const dist = Math.hypot(
@@ -595,7 +682,7 @@ export default function SvgViewer() {
       window.removeEventListener("touchmove", onTouchMove);
       svg.style.cursor = "";
     };
-  }, [freeExplore, session, currentStanzaLabel, svgLoadTick]);
+  }, [freeExplore, session, currentStanzaLabel, svgLoadTick, focusedObject]);
 
   const handleRoomConfirm = (label: string) => {
     setRoomConfirm(null);
@@ -615,7 +702,7 @@ export default function SvgViewer() {
   const handleExitConfirm = () => {
     if (isGuidedStudent && guidedQuizRequired && !guidedQuizSubmitted) {
       setExitConfirmOpen(false);
-      alert("Devi completare e inviare il quiz prima di uscire dalla visita.");
+      alert(t("quizBlockExit"));
       return;
     }
     clearSessionCookies();
@@ -700,12 +787,12 @@ export default function SvgViewer() {
         }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Invio quiz fallito");
-      alert(`Quiz inviato. Voto: ${d.grade}/100`);
+      if (!r.ok) throw new Error(d.error || t("quizSubmitFail"));
+      alert(`${t("quizScoreIntro")}${d.grade}/100`);
       setGuidedQuizSubmitted(true);
       setGuidedQuizState(null);
     } catch (err: any) {
-      alert(err?.message || "Invio quiz fallito");
+      alert(err?.message || t("quizSubmitFail"));
     } finally {
       setGuidedQuizSubmitting(false);
     }
@@ -737,19 +824,34 @@ export default function SvgViewer() {
   };
   const teacherStartQuiz = async () => {
     if (!session?.guidedVisitId) return;
-    const secRaw = prompt("Tempo quiz in secondi:", String(teacherVisitState?.quiz?.timeLimitSec || 120));
+    const secRaw = prompt(t("quizPromptSeconds"), String(teacherVisitState?.quiz?.timeLimitSec || 120));
     const sec = Number(secRaw);
     await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/quiz/start`, Number.isFinite(sec) ? { timeLimitSec: sec } : {});
   };
 
-  if (!session) return <div style={{ padding: 20 }}>Caricamento…</div>;
+  if (!session) return <div style={{ padding: 20 }}>{t("loading")}</div>;
+
+  const objectDetailOverlayOpen = focusedObject != null;
+  const blockMapChromeWhileObjectOpen = objectDetailOverlayOpen
+    ? { pointerEvents: "none" as const }
+    : {};
 
   return (
-    <>
+    <div
+      className="svg-viewer-root"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+      }}
+    >
       {!isGuidedVisit && (
         <button
           onClick={() => setExitConfirmOpen(true)}
-          title="Esci dal percorso"
+          title={t("exitTitle")}
           style={{
             position: "fixed",
             top: 16,
@@ -767,9 +869,10 @@ export default function SvgViewer() {
             boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
+            ...blockMapChromeWhileObjectOpen,
           }}
         >
-          EXIT
+          {t("exit")}
         </button>
       )}
 
@@ -791,9 +894,10 @@ export default function SvgViewer() {
             padding: "8px 12px",
             cursor: "pointer",
             boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+            ...blockMapChromeWhileObjectOpen,
           }}
         >
-          DASHBOARD CLASSE
+          {t("dashboardClass")}
         </button>
       )}
 
@@ -804,10 +908,10 @@ export default function SvgViewer() {
         }}
         title={
           normalize(currentStanzaLabel ?? "") === "home"
-            ? "Zoom disabilitato in HOME"
+            ? t("zoomDisabledHome")
             : freeExplore
-              ? "Blocca vista"
-              : "Attiva modalità libera"
+              ? t("lockView")
+              : t("freeExplore")
         }
         style={{
           position: "fixed",
@@ -830,6 +934,7 @@ export default function SvgViewer() {
           transition: "background 0.2s ease, transform 0.15s ease",
           userSelect: "none",
           padding: 0,
+          ...blockMapChromeWhileObjectOpen,
         }}
         onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
         onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
@@ -860,8 +965,8 @@ export default function SvgViewer() {
             userSelect: "none",
           }}
         >
-          Trascina per spostarti<br />
-          Pizzica per zoomare
+          {t("dragHint")}<br />
+          {t("pinchHint")}
         </div>
       )}
 
@@ -879,6 +984,7 @@ export default function SvgViewer() {
             borderRadius: 10,
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
+            ...blockMapChromeWhileObjectOpen,
           }}
         >
           {[
@@ -929,9 +1035,10 @@ export default function SvgViewer() {
             cursor: "pointer",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
+            ...blockMapChromeWhileObjectOpen,
           }}
         >
-          RIPRENDI PERCORSO
+          {t("resumePath")}
         </button>
       )}
 
@@ -939,12 +1046,15 @@ export default function SvgViewer() {
         id="svg-host"
         style={{
           width: "100%",
-          height: "100vh",
+          flex: 1,
+          minHeight: 0,
+          height: "100%",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           overflow: "hidden",
           touchAction: "none",
+          pointerEvents: objectDetailOverlayOpen ? "none" : "auto",
         }}
       />
 
@@ -973,7 +1083,7 @@ export default function SvgViewer() {
             }}
           >
             <p style={{ margin: "0 0 6px", fontSize: 13, color: "#666" }}>
-              Vuoi spostarti in
+              {t("roomConfirmIntro")}
             </p>
             <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
               {roomConfirm}
@@ -987,7 +1097,7 @@ export default function SvgViewer() {
                   fontSize: 14, cursor: "pointer",
                 }}
               >
-                Vai
+                {t("roomGo")}
               </button>
               <button
                 onClick={() => setRoomConfirm(null)}
@@ -997,7 +1107,7 @@ export default function SvgViewer() {
                   fontWeight: 600, fontSize: 14, cursor: "pointer",
                 }}
               >
-                Annulla
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -1029,10 +1139,10 @@ export default function SvgViewer() {
             }}
           >
             <p style={{ margin: "0 0 8px", fontSize: 13, color: "#666" }}>
-              Sei sicuro di uscire dalla navigazione attuale?
+              {t("exitConfirmTitle")}
             </p>
             <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
-              Perderai tutti i progressi del percorso in corso.
+              {t("exitConfirmBody")}
             </h3>
             <div style={{ display: "flex", gap: 10 }}>
               <button
@@ -1043,7 +1153,7 @@ export default function SvgViewer() {
                   fontSize: 14, cursor: "pointer",
                 }}
               >
-                SI
+                {t("exitYes")}
               </button>
               <button
                 onClick={() => setExitConfirmOpen(false)}
@@ -1053,7 +1163,7 @@ export default function SvgViewer() {
                   fontWeight: 600, fontSize: 14, cursor: "pointer",
                 }}
               >
-                Annulla
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -1079,7 +1189,7 @@ export default function SvgViewer() {
             style={{ width: "min(920px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", color: "#111", borderRadius: 14, padding: "16px 18px" }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>Dashboard classe</h3>
+              <h3 style={{ margin: 0 }}>{t("teacherDashboardTitle")}</h3>
               <button onClick={() => setTeacherPanelOpen(false)} style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer" }}>×</button>
             </div>
             <p style={{ marginTop: 0, color: "#555", marginBottom: 12 }}>
@@ -1088,19 +1198,19 @@ export default function SvgViewer() {
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
               <button onClick={() => teacherAcceptAll().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#f8f8f8", cursor: "pointer" }}>
-                Accetta tutti
+                {t("teacherAcceptAll")}
               </button>
               <button onClick={() => teacherStartQuiz().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #185FA5", background: "#185FA5", color: "#fff", cursor: "pointer" }}>
-                Avvia quiz
+                {t("teacherStartQuiz")}
               </button>
               <button onClick={() => setTeacherShowResults((v) => !v)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
-                {teacherShowResults ? "Nascondi risultati" : "Vedi risultati"}
+                {teacherShowResults ? t("teacherHideResults") : t("teacherShowResults")}
               </button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
-                <strong>Persone da accettare/rifiutare</strong>
+                <strong>{t("teacherWaiting")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
                     .filter((p: any) => p.status === "waiting")
@@ -1108,22 +1218,22 @@ export default function SvgViewer() {
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{p.displayName}</span>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => teacherAccept(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #2f8f4e", background: "#e9fff0", borderRadius: 6, cursor: "pointer" }}>Accetta</button>
-                          <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>Rifiuta</button>
+                          <button onClick={() => teacherAccept(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #2f8f4e", background: "#e9fff0", borderRadius: 6, cursor: "pointer" }}>{t("teacherAccept")}</button>
+                          <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>{t("teacherReject")}</button>
                         </div>
                       </div>
                     ))}
                 </div>
               </div>
               <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
-                <strong>Persone dentro (accettate)</strong>
+                <strong>{t("teacherInside")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
                     .filter((p: any) => p.status === "accepted")
                     .map((p: any, idx: number) => (
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{idx + 1}. {p.displayName}</span>
-                        <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>Rimuovi</button>
+                        <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>{t("teacherRemove")}</button>
                       </div>
                     ))}
                 </div>
@@ -1132,10 +1242,10 @@ export default function SvgViewer() {
 
             {teacherShowResults && (
               <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
-                <strong>Risultati quiz</strong>
+                <strong>{t("teacherQuizResults")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {teacherQuizResults.length < 1
-                    ? <span style={{ color: "#666" }}>Nessun risultato disponibile.</span>
+                    ? <span style={{ color: "#666" }}>{t("teacherNoResults")}</span>
                     : teacherQuizResults
                         .slice()
                         .sort((a, b) => (Number(b.grade) || -1) - (Number(a.grade) || -1))
@@ -1167,9 +1277,9 @@ export default function SvgViewer() {
           }}
         >
           <div style={{ width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", borderRadius: 14, padding: "18px 20px" }}>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>{guidedQuizState.quiz.title || "Quiz finale"}</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>{guidedQuizState.quiz.title || t("quizFinalTitle")}</h3>
             <p style={{ marginTop: 0, color: "#666", fontSize: 13 }}>
-              Tempo massimo: {guidedQuizState.quizState?.timeLimitSec || guidedQuizState.quiz?.timeLimitSec || 120} secondi
+              {t("quizMaxTime")} {guidedQuizState.quizState?.timeLimitSec || guidedQuizState.quiz?.timeLimitSec || 120} {t("quizSeconds")}
             </p>
             {(Array.isArray(guidedQuizState.quiz.questions) ? guidedQuizState.quiz.questions : []).map((q: any, qIdx: number) => (
               <div key={q.id || `q-${qIdx}`} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, marginBottom: 10 }}>
@@ -1198,7 +1308,7 @@ export default function SvgViewer() {
               disabled={guidedQuizSubmitting}
               style={{ padding: "10px 14px", borderRadius: 8, border: "none", background: "#185FA5", color: "#fff", cursor: "pointer" }}
             >
-              {guidedQuizSubmitting ? "Invio..." : "Invia quiz"}
+              {guidedQuizSubmitting ? t("quizSending") : t("quizSend")}
             </button>
           </div>
         </div>
@@ -1210,10 +1320,52 @@ export default function SvgViewer() {
           session={session}
           onClose={closeObjectFocus}
           showNav={!isGuidedStudent}
+          domDataObjectType={readDomDataObjectType(focusedObject)}
         />
       )}
-    </>
+    </div>
   );
+}
+
+/* ===================== ROOM LABEL I18N (display only; IDs restano in italiano) ===================== */
+
+function stanzaLabelCanonical(el: SVGTextElement): string {
+  const id = el.getAttribute("data-stanza-id");
+  if (id != null && id !== "") return id.trim();
+  return (el.textContent ?? "").trim();
+}
+
+function ensureCanonicalStanzaLabels(svg: SVGSVGElement) {
+  for (const el of Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))) {
+    if (!el.getAttribute("data-stanza-id")) {
+      const raw = (el.textContent ?? "").trim();
+      if (raw) el.setAttribute("data-stanza-id", raw);
+    }
+  }
+}
+
+function applyStanzaLabelDisplay(svg: SVGSVGElement, labelI18n: unknown, navLang: string) {
+  const stanze =
+    labelI18n &&
+    typeof labelI18n === "object" &&
+    labelI18n !== null &&
+    "stanze" in labelI18n &&
+    typeof (labelI18n as { stanze?: unknown }).stanze === "object"
+      ? (labelI18n as { stanze: Record<string, { en?: string; fr?: string }> }).stanze
+      : null;
+  for (const el of Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))) {
+    const canon = stanzaLabelCanonical(el);
+    if (!canon) continue;
+    if (navLang === "it" || !stanze) {
+      el.textContent = canon;
+      continue;
+    }
+    const entry = stanze[canon];
+    const raw =
+      navLang === "en" ? entry?.en : navLang === "fr" ? entry?.fr : undefined;
+    const tr = typeof raw === "string" ? raw.trim() : "";
+    el.textContent = tr || canon;
+  }
 }
 
 /* ===================== ROOM LABEL FINDER ===================== */
@@ -1225,7 +1377,7 @@ function findRoomLabel(svg: SVGSVGElement, rect: SVGRectElement): string | null 
       sibling.tagName === "text" &&
       (sibling.getAttribute("class") ?? "").includes("stanza-label")
     ) {
-      return sibling.textContent?.trim() ?? null;
+      return stanzaLabelCanonical(sibling as SVGTextElement) || null;
     }
     if (
       sibling.tagName === "rect" &&
@@ -1242,7 +1394,7 @@ function findRoomLabel(svg: SVGSVGElement, rect: SVGRectElement): string | null 
     const tx = +(t.getAttribute("x") ?? 0);
     const ty = +(t.getAttribute("y") ?? 0);
     const d = Math.hypot(tx - cx, ty - cy);
-    if (d < bestDist) { bestDist = d; best = t.textContent?.trim() ?? null; }
+    if (d < bestDist) { bestDist = d; best = stanzaLabelCanonical(t) || null; }
   }
   if (best) return best;
 
@@ -1255,7 +1407,8 @@ function loadSvg(
   url: string,
   session: Session,
   onExitRequested: () => void,
-  onLoaded?: () => void
+  onLoaded?: () => void,
+  showDirectionArrows = true
 ) {
   const host = document.getElementById("svg-host");
   if (!host) return;
@@ -1265,6 +1418,7 @@ function loadSvg(
       host.innerHTML = svgText;
       const svg = host.querySelector<SVGSVGElement>("svg");
       if (!svg) return;
+      ensureCanonicalStanzaLabels(svg);
       svg.style.transform = "";
       fitSvgToViewport(svg);
       svg.setAttribute("overflow", "visible");
@@ -1274,7 +1428,7 @@ function loadSvg(
       navLayer.setAttribute("id", "nav-layer");
       svg.appendChild(navLayer);
 
-      renderNavigation(svg);
+      renderNavigation(svg, showDirectionArrows);
       bindObjectClicks(svg, session);
       renderGuidedTextMarkers(svg, session);
       mountExitInOutRoom(svg, onExitRequested);
@@ -1300,7 +1454,7 @@ function renderGuidedTextMarkers(svg: SVGSVGElement, session: Session) {
 
   const roomCenterByLabel = new Map<string, { x: number; y: number }>();
   for (const labelEl of labels) {
-    const name = normalize(labelEl.textContent || "");
+    const name = normalize(stanzaLabelCanonical(labelEl));
     if (!name || !byRoom.has(name)) continue;
     const tx = Number(labelEl.getAttribute("x") || 0);
     const ty = Number(labelEl.getAttribute("y") || 0);
@@ -1373,9 +1527,34 @@ function fitSvgToViewport(svg: SVGSVGElement) {
   svg.style.display = "block";
 }
 
+/** Tipo oggetto dall'SVG (item testo = "text", mostra "?"): serve a nascondere la chat subito */
+function readDomDataObjectType(nome: string): string | null {
+  const svg = document.getElementById("svg-host")?.querySelector<SVGSVGElement>("svg");
+  if (!svg || !nome) return null;
+  for (const el of svg.querySelectorAll<SVGCircleElement>("circle.oggetto[data-object-name]")) {
+    if (el.getAttribute("data-object-name") === nome) {
+      const t = (el.getAttribute("data-object-type") || "").trim().toLowerCase();
+      return t || null;
+    }
+  }
+  for (const el of svg.querySelectorAll<SVGTextElement>("text.oggetto-label[data-object-name]")) {
+    if (el.getAttribute("data-object-name") === nome) {
+      const t = (el.getAttribute("data-object-type") || "").trim().toLowerCase();
+      return t || null;
+    }
+  }
+  for (const el of svg.querySelectorAll<SVGImageElement>("image[data-nome]")) {
+    if (el.getAttribute("data-nome") === nome) {
+      const t = (el.getAttribute("data-object-type") || "").trim().toLowerCase();
+      if (t) return t;
+    }
+  }
+  return null;
+}
+
 function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
   const outLabel = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"))
-    .find(label => normalize(label.textContent ?? "") === "out");
+    .find(label => normalize(stanzaLabelCanonical(label)) === "out");
 
   if (!outLabel) return;
 
@@ -1394,6 +1573,17 @@ function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
   exitGroup.setAttribute("class", "exit-room-cta");
   exitGroup.style.cursor = "pointer";
 
+  // Area tap più ampia del solo glifo (mobile)
+  const hitW = 120;
+  const hitH = 48;
+  const hitRect = document.createElementNS(ns, "rect");
+  hitRect.setAttribute("x", String(centerX - hitW / 2));
+  hitRect.setAttribute("y", String(centerY - hitH / 2));
+  hitRect.setAttribute("width", String(hitW));
+  hitRect.setAttribute("height", String(hitH));
+  hitRect.setAttribute("fill", "transparent");
+  hitRect.setAttribute("pointer-events", "all");
+
   const exitText = document.createElementNS(ns, "text");
   exitText.setAttribute("x", String(centerX));
   exitText.setAttribute("y", String(centerY + 1));
@@ -1405,17 +1595,19 @@ function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
   exitText.setAttribute("stroke-width", "1.1");
   exitText.textContent = "EXIT";
 
-  exitGroup.appendChild(exitText);
-  exitGroup.addEventListener("click", (e) => {
+  const triggerExit = (e: Event) => {
     e.stopPropagation();
     onExitRequested();
-  });
+  };
+  exitGroup.appendChild(hitRect);
+  exitGroup.appendChild(exitText);
+  exitGroup.addEventListener("click", triggerExit);
   svg.appendChild(exitGroup);
 }
 
 /* ===================== NAVIGATION ===================== */
 
-function renderNavigation(svg: SVGSVGElement) {
+function renderNavigation(svg: SVGSVGElement, showDirectionArrows = true) {
   const navLayer = svg.querySelector("#nav-layer") as SVGGElement;
   if (!navLayer) return;
   navLayer.innerHTML = "";
@@ -1444,6 +1636,8 @@ function renderNavigation(svg: SVGSVGElement) {
   const zoomProfile = computeNavigatorZoomProfile(rooms, corridors, graphCache);
   zoomToRect(svg, current.rect, current.label, zoomProfile);
 
+  if (!showDirectionArrows) return;
+
   const links = computeNavigatorLinks(current, rooms, corridors, graphCache);
   for (const l of links) drawArrowText(navLayer, l);
 }
@@ -1464,7 +1658,7 @@ function extractRooms(svg: SVGSVGElement): Room[] {
   const labels = Array.from(svg.querySelectorAll<SVGTextElement>("text.stanza-label"));
 
   for (const labelEl of labels) {
-    const label = labelEl.textContent?.trim();
+    const label = stanzaLabelCanonical(labelEl);
     if (!label) continue;
 
     const tx = Number(labelEl.getAttribute("x") ?? 0);
@@ -1732,8 +1926,8 @@ const previewRequestCache = new Map<string, Promise<boolean>>();
 // Cache stanza per oggetto: evita roundtrip ripetuti su Next/Prev.
 const objectRoomCache = new Map<string, string>();
 const objectRoomRequestCache = new Map<string, Promise<string>>();
-let cachedUserPreferences: { livello?: string; durata?: string } | null = null;
-let userPreferencesInFlight: Promise<{ livello?: string; durata?: string } | null> | null = null;
+let cachedUserPreferences: { livello?: string; durata?: string; navLang?: string } | null = null;
+let userPreferencesInFlight: Promise<{ livello?: string; durata?: string; navLang?: string } | null> | null = null;
 
 function previewCacheKey(museo: string, nome: string): string {
   return `${museo}__${nome}`;
@@ -1790,6 +1984,7 @@ function durationToIndex(durata?: string): number {
   if (key === "corto") return 0;
   if (key === "medio") return 1;
   if (key === "lungo") return 2;
+  if (key === "esteso") return 3;
   return 1;
 }
 
@@ -1805,7 +2000,8 @@ function pickDescriptionByPreferences(
   const levelGroupRaw = descrizioni[preferredLevel] ?? descrizioni[Math.min(preferredLevel, descrizioni.length - 1)];
   if (!Array.isArray(levelGroupRaw) || levelGroupRaw.length === 0) return null;
 
-  const text = levelGroupRaw[preferredDuration] ?? levelGroupRaw[Math.min(preferredDuration, levelGroupRaw.length - 1)];
+  const durIdx = Math.min(preferredDuration, levelGroupRaw.length - 1);
+  const text = levelGroupRaw[durIdx];
   if (typeof text === "string" && text.trim().length > 0) return text;
 
   for (const candidate of levelGroupRaw) {
@@ -1823,15 +2019,28 @@ function pickDescriptionByPreferences(
   return null;
 }
 
-async function getUserPreferences(): Promise<{ livello?: string; durata?: string } | null> {
+function pickDescrizioniMatrixForLang(
+  d: { descrizioni?: unknown; descrizioniI18n?: Record<string, unknown> } | null | undefined,
+  navLang: string
+): unknown {
+  const lang = navLang === "en" || navLang === "fr" ? navLang : "it";
+  const it = d?.descrizioni;
+  if (lang === "it") return it;
+  const alt = d?.descrizioniI18n?.[lang];
+  if (Array.isArray(alt) && alt.length > 0) return alt;
+  return it;
+}
+
+async function getUserPreferences(): Promise<{ livello?: string; durata?: string; navLang?: string } | null> {
   const session = getSession();
+  const navLangLocal = getStoredNavLang();
   const livelloFromSession = typeof session?.livello === "string" ? session.livello : "";
   const durataFromSession = typeof session?.durata === "string" ? session.durata : "";
   if (livelloFromSession || durataFromSession) {
-    return { livello: livelloFromSession, durata: durataFromSession };
+    return { livello: livelloFromSession, durata: durataFromSession, navLang: navLangLocal };
   }
 
-  if (cachedUserPreferences) return cachedUserPreferences;
+  if (cachedUserPreferences) return { ...cachedUserPreferences, navLang: navLangLocal };
   if (userPreferencesInFlight) return userPreferencesInFlight;
 
   userPreferencesInFlight = fetch(`${API_BASE}/users/me`, { credentials: "include" })
@@ -1839,9 +2048,19 @@ async function getUserPreferences(): Promise<{ livello?: string; durata?: string
       if (!res.ok) return null;
       const data = await res.json().catch(() => ({}));
       const user = data?.user || {};
+      const nl =
+        user.navLang === "en" || user.navLang === "fr" || user.navLang === "it"
+          ? user.navLang
+          : getStoredNavLang();
+      try {
+        localStorage.setItem("mu_nav_lang", nl);
+      } catch {
+        /* ignore */
+      }
       const prefs = {
         livello: typeof user.livello === "string" ? user.livello : "",
         durata: typeof user.durata === "string" ? user.durata : "",
+        navLang: nl,
       };
       cachedUserPreferences = prefs;
       return prefs;
@@ -1906,6 +2125,7 @@ function replaceCircleWithImage(
     imgEl.setAttribute("clip-path", `url(#${clipId})`);
     imgEl.setAttribute("preserveAspectRatio", "xMidYMid slice");
     imgEl.setAttribute("data-nome", nome);
+    imgEl.setAttribute("data-object-type", String(objectType || "normal"));
     imgEl.style.cursor = "pointer";
     imgEl.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2185,18 +2405,23 @@ function ObjectOverlay({
   session,
   onClose,
   showNav,
+  domDataObjectType,
 }: {
   nome: string;
   session: Session;
   onClose: () => void;
   showNav: boolean;
+  domDataObjectType: string | null;
 }) {
-  const QUICK_QUESTIONS = [
-    "Qual e il significato storico di quest'opera?",
-    "Quali dettagli dovrei osservare meglio?",
-    "Come si collega alle mie preferenze?",
-    "Riassumimela in modo semplice.",
+  const { t, lang } = useNavLang();
+  const QUICK_QUESTIONS_INITIAL = [
+    t("qWhat"),
+    t("qMore"),
+    t("qExplain"),
+    t("qAuthor"),
+    t("qHistory"),
   ];
+  const QUICK_FOLLOW_UP_ONLY = t("qMore");
   const [descrizione, setDescrizione] = useState<string | null>(null);
   const [autore, setAutore] = useState<string>("");
   const [correnteArtistica, setCorrenteArtistica] = useState<string>("");
@@ -2206,24 +2431,41 @@ function ObjectOverlay({
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [fetchedObjectType, setFetchedObjectType] = useState<string | null>(null);
   const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
     ? session.guidedFlowNodes
     : (Array.isArray(session?.percorso) ? session.percorso : []);
   const pathIndex = percorso.indexOf(nome);
   const isObjectInPath = pathIndex !== -1;
   const virtualObject = session?.guidedVirtualObjects?.[nome];
+  /** Tappe testo guidate: id `__text__…` anche se il cookie non espone più guidedVirtualObjects */
+  const isGuidedVirtualTextItem =
+    String(nome || "").startsWith("__text__") || !!virtualObject;
+  /** Item solo testo nel museo (etichetta "?", `data-object-type="text"` nell’SVG) */
+  const isMuseumTextOnlyItem =
+    String(domDataObjectType || "").toLowerCase() === "text" ||
+    String(fetchedObjectType || "").toLowerCase() === "text";
+  const showObjectChat = !isGuidedVirtualTextItem && !isMuseumTextOnlyItem;
   const objectTitle = virtualObject
-    ? String(virtualObject.label || "").trim() || "Item testo"
+    ? String(virtualObject.label || "").trim() || t("itemTextFallback")
     : nome;
 
   useEffect(() => {
     setSlideIdx(0);
+    setFetchedObjectType(null);
     if (virtualObject) {
       setAutore("");
       setCorrenteArtistica("");
       setAnno("");
       getUserPreferences()
-        .then((prefs) => setDescrizione(pickDescriptionByPreferences(virtualObject.descrizioni, prefs)))
+        .then((prefs) =>
+          setDescrizione(
+            pickDescriptionByPreferences(
+              pickDescrizioniMatrixForLang({ descrizioni: virtualObject.descrizioni }, lang),
+              prefs
+            )
+          )
+        )
         .catch(() => setDescrizione(null));
       setImmagini([]);
       return;
@@ -2237,6 +2479,7 @@ function ObjectOverlay({
       getUserPreferences(),
     ])
       .then(([d, prefs]) => {
+        setFetchedObjectType(String(d?.objectType || "normal").trim().toLowerCase() || "normal");
         setAutore(String(d?.autore || "").trim());
         setCorrenteArtistica(String(d?.correnteArtistica || "").trim());
         setAnno(String(d?.anno || "").trim());
@@ -2244,10 +2487,14 @@ function ObjectOverlay({
           setDescrizione(guidedText);
           return;
         }
-        const best = pickDescriptionByPreferences(d?.descrizioni, prefs);
+        const best = pickDescriptionByPreferences(
+          pickDescrizioniMatrixForLang(d, lang),
+          prefs
+        );
         setDescrizione(best);
       })
       .catch(() => {
+        setFetchedObjectType(null);
         setAutore("");
         setCorrenteArtistica("");
         setAnno("");
@@ -2266,7 +2513,7 @@ function ObjectOverlay({
         setImmagini(lista);
       })
       .catch(() => setImmagini([]));
-  }, [nome, session, virtualObject]);
+  }, [nome, session, virtualObject, lang]);
 
   useEffect(() => {
     setChatMessages([]);
@@ -2459,10 +2706,17 @@ function ObjectOverlay({
   };
 
   const sendObjectQuestion = async (rawQuestion: string) => {
+    if (!showObjectChat) return;
     const question = String(rawQuestion || "").trim();
     if (!question || chatLoading) return;
     setChatLoading(true);
     setChatMessages((prev) => [...prev, { role: "user", text: question }]);
+    let prefs: { livello?: string; durata?: string } | null = null;
+    try {
+      prefs = await getUserPreferences();
+    } catch {
+      prefs = null;
+    }
     try {
       const r = await fetch(`${API_BASE}/ai/object-chat`, {
         method: "POST",
@@ -2472,18 +2726,19 @@ function ObjectOverlay({
           museo: session.museo,
           oggetto: nome,
           question,
-          livello: session.livello || "",
-          durata: session.durata || "",
+          livello: prefs?.livello || session.livello || "",
+          durata: prefs?.durata || session.durata || "",
+          navLang: lang,
         }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d?.error || "Richiesta AI fallita");
-      const answer = String(d?.answer || "").trim() || "Non ho una risposta disponibile adesso.";
+      if (!r.ok) throw new Error(d?.error || t("aiRequestFail"));
+      const answer = String(d?.answer || "").trim() || t("aiNoAnswer");
       setChatMessages((prev) => [...prev, { role: "assistant", text: answer }]);
     } catch (err: any) {
       setChatMessages((prev) => [
         ...prev,
-        { role: "assistant", text: `Errore: ${err?.message || "impossibile ottenere la risposta."}` },
+        { role: "assistant", text: `${t("aiErrorPrefix")} ${err?.message || t("aiUnknownError")}` },
       ]);
     } finally {
       setChatLoading(false);
@@ -2498,11 +2753,14 @@ function ObjectOverlay({
         background: "rgba(0,0,0,0.75)",
         zIndex: 9999,
         display: "flex", alignItems: "center", justifyContent: "center",
+        overscrollBehavior: "contain",
+        touchAction: "none",
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
+          position: "relative",
           background: "#fff",
           borderRadius: 14,
           minWidth: 300,
@@ -2514,8 +2772,41 @@ function ObjectOverlay({
           minHeight: 0,
           overflow: "hidden",
           boxShadow: "0 12px 48px rgba(0,0,0,0.35)",
+          overscrollBehavior: "contain",
+          touchAction: "pan-y",
         }}
       >
+        <button
+          type="button"
+          aria-label={t("closeSheet")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 20,
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            border: "none",
+            padding: 0,
+            background: "rgba(255,255,255,0.97)",
+            color: "#c72020",
+            fontSize: 18,
+            lineHeight: 1,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 6px rgba(0,0,0,0.2)",
+          }}
+        >
+          ×
+        </button>
         {/* ── Slider immagini ── */}
         {immagini.length > 0 && (
           <div style={{ position: "relative", background: "#111", flexShrink: 0 }}>
@@ -2593,74 +2884,135 @@ function ObjectOverlay({
         )}
 
         {/* ── Testo ── */}
-        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <div
+          style={{
+            padding: "20px 24px",
+            overflowY: "auto",
+            flex: 1,
+            minHeight: 0,
+            touchAction: "pan-y",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
+          }}
+        >
           <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{objectTitle}</h2>
-          <div style={{ marginBottom: 10, display: "grid", gap: 2 }}>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Autore:</strong> {autore || "N/D"}</p>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Anno:</strong> {anno || "N/D"}</p>
-            {correnteArtistica && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>Corrente:</strong> {correnteArtistica}</p>}
-          </div>
+          {showObjectChat && (
+            <div style={{ marginBottom: 10, display: "grid", gap: 2 }}>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("author")}</strong> {autore || t("nd")}</p>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("year")}</strong> {anno || t("nd")}</p>
+              {correnteArtistica && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("movement")}</strong> {correnteArtistica}</p>}
+            </div>
+          )}
           {descrizione
             ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
-            : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>Caricamento…</p>
+            : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>{t("loadingDesc")}</p>
           }
 
-          <div style={{ marginTop: 18, borderTop: "1px solid #eee", paddingTop: 14 }}>
-            <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#333" }}>
-              Chat rapida con AI
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-              {QUICK_QUESTIONS.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  disabled={chatLoading}
-                  onClick={() => sendObjectQuestion(q)}
-                  style={{
-                    border: "1px solid #d0d0d0",
-                    background: "#f7f7f7",
-                    color: "#333",
-                    borderRadius: 16,
-                    padding: "5px 10px",
-                    fontSize: 11,
-                    cursor: chatLoading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
+          {showObjectChat && (
+          <div
+            style={{
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: "1px solid #e8ecf1",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "#1a2b3c", textTransform: "uppercase" }}>
+                {t("aiQuestions")}
+              </p>
+              <span style={{ fontSize: 10, color: "#7a8794" }}>{t("aiQuestionsHint")}</span>
             </div>
+
+            {!chatLoading && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                {(chatMessages.length === 0 ? QUICK_QUESTIONS_INITIAL : [QUICK_FOLLOW_UP_ONLY]).map((q, qi) => (
+                  <button
+                    key={`${q}-${qi}`}
+                    type="button"
+                    disabled={chatLoading}
+                    onClick={() => sendObjectQuestion(q)}
+                    style={{
+                      border: "1px solid #c5d8ed",
+                      background: "linear-gradient(180deg, #fff 0%, #f5f9fd 100%)",
+                      color: "#1a4d7a",
+                      borderRadius: 999,
+                      padding: "7px 12px",
+                      fontSize: 11,
+                      lineHeight: 1.35,
+                      textAlign: "left",
+                      cursor: chatLoading ? "not-allowed" : "pointer",
+                      boxShadow: "0 1px 2px rgba(24,95,165,0.06)",
+                      transition: "border-color 0.15s, box-shadow 0.15s",
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div
               style={{
-                maxHeight: 150,
+                maxHeight: 200,
                 overflowY: "auto",
-                border: "1px solid #ececec",
-                borderRadius: 8,
-                padding: 8,
-                background: "#fcfcfc",
-                marginBottom: 8,
+                borderRadius: 12,
+                padding: 10,
+                background: "#eef2f7",
+                border: "1px solid #dce4ee",
+                marginBottom: 10,
+                touchAction: "pan-y",
+                WebkitOverflowScrolling: "touch",
+                overscrollBehavior: "contain",
               }}
             >
-              {chatMessages.length < 1 && (
-                <p style={{ margin: 0, color: "#9a9a9a", fontSize: 12 }}>
-                  Seleziona una domanda rapida oppure scrivine una personalizzata.
+              {chatMessages.length === 0 && !chatLoading && (
+                <p style={{ margin: 0, color: "#6b7c8c", fontSize: 12, lineHeight: 1.45 }}>
+                  {t("aiHelpInitial")}
+                </p>
+              )}
+              {chatMessages.length > 0 && !chatLoading && (
+                <p style={{ margin: "0 0 8px", color: "#6b7c8c", fontSize: 11, lineHeight: 1.4 }}>
+                  {t("aiHelpFollow")}
                 </p>
               )}
               {chatMessages.map((msg, idx) => (
-                <p
+                <div
                   key={`${msg.role}-${idx}`}
                   style={{
-                    margin: "0 0 6px",
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                    color: msg.role === "user" ? "#185FA5" : "#444",
+                    display: "flex",
+                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                    marginBottom: 8,
                   }}
                 >
-                  <strong>{msg.role === "user" ? "Tu:" : "AI:"}</strong> {msg.text}
-                </p>
+                  <div
+                    style={{
+                      maxWidth: "92%",
+                      padding: "8px 11px",
+                      borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      background: msg.role === "user" ? "#185FA5" : "#fff",
+                      color: msg.role === "user" ? "#fff" : "#2c3e50",
+                      boxShadow: msg.role === "user" ? "0 2px 8px rgba(24,95,165,0.25)" : "0 1px 3px rgba(0,0,0,0.06)",
+                      border: msg.role === "user" ? "none" : "1px solid #e4eaf2",
+                    }}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
               ))}
-              {chatLoading && <p style={{ margin: 0, fontSize: 12, color: "#999" }}>AI sta scrivendo...</p>}
+              {chatLoading && (
+                <p style={{ margin: 0, fontSize: 11, color: "#185FA5", fontStyle: "italic" }}>
+                  {t("aiThinking")}
+                </p>
+              )}
             </div>
 
             <form
@@ -2671,19 +3023,27 @@ function ObjectOverlay({
                 setChatInput("");
                 sendObjectQuestion(value);
               }}
-              style={{ display: "flex", gap: 6 }}
+              style={{ display: "flex", gap: 8, alignItems: "stretch" }}
             >
               <input
                 type="text"
+                inputMode="text"
+                enterKeyHint="send"
+                autoComplete="off"
+                autoCorrect="off"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Scrivi una domanda..."
+                placeholder={t("questionPlaceholder")}
                 style={{
                   flex: 1,
-                  border: "1px solid #d8d8d8",
-                  borderRadius: 8,
-                  padding: "8px 9px",
-                  fontSize: 12,
+                  border: "1px solid #cfd8e3",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 16,
+                  lineHeight: 1.35,
+                  outline: "none",
+                  background: "#fff",
+                  touchAction: "manipulation",
                 }}
               />
               <button
@@ -2691,19 +3051,21 @@ function ObjectOverlay({
                 disabled={chatLoading || !chatInput.trim()}
                 style={{
                   border: "none",
-                  borderRadius: 8,
-                  background: "#185FA5",
+                  borderRadius: 10,
+                  background: chatLoading || !chatInput.trim() ? "#9db4cc" : "#185FA5",
                   color: "#fff",
-                  padding: "8px 11px",
-                  fontSize: 12,
+                  padding: "0 16px",
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
                 }}
               >
-                Invia
+                {t("send")}
               </button>
             </form>
           </div>
+          )}
         </div>
 
         {/* ── Navigazione percorso ── */}
@@ -2720,7 +3082,7 @@ function ObjectOverlay({
                 border: "1.5px solid #ccc", background: "transparent",
                 fontWeight: 600, fontSize: 14, cursor: "pointer",
               }}
-            >← Precedente</button>
+            >{t("prev")}</button>
             <button
               onClick={handleNext}
               style={{
@@ -2728,7 +3090,7 @@ function ObjectOverlay({
                 border: "none", background: "#185FA5", color: "#fff",
                 fontWeight: 600, fontSize: 14, cursor: "pointer",
               }}
-            >Successivo →</button>
+            >{t("next")}</button>
           </div>
         )}
       </div>

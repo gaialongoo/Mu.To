@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api, enc, setApiKey, clearApiKey } from "./api";
+import { readStoredNavLang, writeStoredNavLang, MP_LANG_OPTIONS, mpT, normalizeNavLang } from "./mpLocales";
 import Toast from "./components/Toast";
 import ApiKeyModal from "./components/ApiKeyModal";
 import ItemCard from "./components/ItemCard";
 
 const PAGE_SIZE = 9;
+
+function displayI18nMapLookup(map, key, navLang) {
+  if (!key) return "";
+  if (navLang === "it") return key;
+  const entry = map?.[key];
+  if (!entry || typeof entry !== "object") return key;
+  const t = entry[navLang];
+  return typeof t === "string" && t.trim() ? t.trim() : key;
+}
 
 // ─── Arc deco background ────────────────────────────────────────────────────
 function ArcDeco() {
@@ -75,9 +85,9 @@ function Pagination({ total, current, onChange }) {
   );
 }
 
-function formatPrezzo(prezzo) {
+function formatPrezzo(prezzo, mp) {
   const amount = Number(prezzo);
-  if (!Number.isFinite(amount) || amount <= 0) return "Incluso";
+  if (!Number.isFinite(amount) || amount <= 0) return mp("included");
   return `${amount.toFixed(2).replace(".", ",")} EUR`;
 }
 
@@ -201,10 +211,11 @@ function extractDefaultDescription(oggetto) {
 }
 
 // ─── Visit card ──────────────────────────────────────────────────────────────
-function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
+function VisitCard({ percorso, canView, onView, onBuy, buying, delay, mp, displayNome }) {
   const prezzo = Number(percorso.prezzo || 0);
   const included = prezzo <= 0;
   const disabled = !included && !canView && buying;
+  const title = displayNome || percorso.nome;
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
@@ -213,10 +224,10 @@ function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
     }}>
       <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div style={{ padding: "20px 22px 14px" }}>
-        <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{percorso.nome}</div>
+        <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)" }}>{(percorso.oggetti || []).length} opere</div>
-          <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--gold)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo)}</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)" }}>{(percorso.oggetti || []).length} {mp("worksCount")}</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--gold)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo, mp)}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {(percorso.oggetti || []).slice(0, 3).map((n) => (
@@ -246,7 +257,7 @@ function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
             opacity: canView ? 1 : 0.7,
           }}
           >
-            Visualizza
+            {mp("view")}
           </button>
           {!included && !canView && (
             <button
@@ -267,7 +278,7 @@ function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
                 opacity: disabled ? 0.7 : 1,
               }}
             >
-              {buying ? "Acquisto..." : "Acquista"}
+              {buying ? mp("buying") : mp("buy")}
             </button>
           )}
         </div>
@@ -278,8 +289,6 @@ function VisitCard({ percorso, canView, onView, onBuy, buying, delay }) {
 
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
-  const DESCRIPTION_LEVELS = ["Bambino", "Studente", "Esperto", "Avanzato"];
-  const DESCRIPTION_LENGTHS = ["Breve", "Medio", "Lungo"];
   const LEVEL_KEY_TO_INDEX = {
     bambino: 0,
     studente: 1,
@@ -290,8 +299,39 @@ export default function App() {
     corto: 0,
     medio: 1,
     lungo: 2,
+    esteso: 3,
   };
   const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  const [navLang, setNavLangState] = useState(() => readStoredNavLang());
+  const mp = useCallback((k) => mpT(navLang, k), [navLang]);
+  const setNavLang = useCallback((l) => {
+    setNavLangState(l);
+    writeStoredNavLang(l);
+    window.dispatchEvent(new CustomEvent("mu-nav-lang-changed", { detail: l }));
+    fetch("/api/users/me/nav-lang", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ navLang: l }),
+    }).catch(() => {});
+  }, []);
+  const DESCRIPTION_LEVELS = useMemo(
+    () => [
+      mpT(navLang, "lvlChild"),
+      mpT(navLang, "lvlStudent"),
+      mpT(navLang, "lvlExpert"),
+      mpT(navLang, "lvlAdvanced"),
+    ],
+    [navLang]
+  );
+  const DESCRIPTION_LENGTHS = useMemo(
+    () => [
+      mpT(navLang, "durLabelShort"),
+      mpT(navLang, "durLabelMed"),
+      mpT(navLang, "durLabelLong"),
+    ],
+    [navLang]
+  );
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -309,6 +349,7 @@ export default function App() {
     livello: "",
     durata: "",
     interessi: [],
+    navLang: readStoredNavLang(),
   });
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);
@@ -384,6 +425,16 @@ export default function App() {
   const [teacherDashboardLink, setTeacherDashboardLink] = useState("");
   const [teacherSavedVisits, setTeacherSavedVisits] = useState([]);
   const [teacherEditingVisitId, setTeacherEditingVisitId] = useState("");
+  const [museumLabelI18n, setMuseumLabelI18n] = useState({ stanze: {}, percorsi: {} });
+
+  const displayStanzaName = useCallback(
+    (nome) => (nome ? displayI18nMapLookup(museumLabelI18n?.stanze, nome, navLang) : ""),
+    [museumLabelI18n, navLang]
+  );
+  const displayPercorsoNome = useCallback(
+    (nome) => (nome ? displayI18nMapLookup(museumLabelI18n?.percorsi, nome, navLang) : ""),
+    [museumLabelI18n, navLang]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -398,6 +449,11 @@ export default function App() {
         if (!cancelled) {
           const user = data.user || null;
           setCurrentUser(user);
+          const nl = user?.navLang;
+          if (nl === "en" || nl === "fr" || nl === "it") {
+            setNavLangState(nl);
+            writeStoredNavLang(nl);
+          }
           setProfileForm({
             nome: user?.nome || "",
             cognome: user?.cognome || "",
@@ -407,6 +463,7 @@ export default function App() {
             livello: user?.livello || "",
             durata: user?.durata || "",
             interessi: user?.interessi || [],
+            navLang: normalizeNavLang(user?.navLang),
           });
           setAuthChecked(true);
         }
@@ -429,6 +486,14 @@ export default function App() {
       const oggetti = data.oggetti || [];
       setAllOggetti(oggetti);
       setStanze([...new Set(oggetti.map((o) => o.stanza).filter(Boolean))]);
+      setMuseumLabelI18n(
+        data.labelI18n && typeof data.labelI18n === "object"
+          ? {
+              stanze: { ...(data.labelI18n.stanze || {}) },
+              percorsi: { ...(data.labelI18n.percorsi || {}) },
+            }
+          : { stanze: {}, percorsi: {} }
+      );
     } catch (e) {
       showToast("Errore caricamento museo: " + e.message, "error");
     } finally {
@@ -528,16 +593,19 @@ export default function App() {
     showToast("API Key rimossa");
   };
 
-  const PROFILE_INTERESTS = [
-    ["storia", "Storia"],
-    ["storia_arte", "Storia dell'arte"],
-    ["vita_artista", "Vita artista"],
-    ["tecniche_materiali", "Tecniche e materiali"],
-    ["estetica", "Estetica"],
-    ["sensorialita", "Sensorialita"],
-    ["filosofia_significato", "Filosofia e significato"],
-    ["moda_costumi", "Moda e costumi"],
-  ];
+  const PROFILE_INTERESTS = useMemo(
+    () => [
+      ["storia", mpT(navLang, "interestHistory")],
+      ["storia_arte", mpT(navLang, "interestArtHistory")],
+      ["vita_artista", mpT(navLang, "interestArtistLife")],
+      ["tecniche_materiali", mpT(navLang, "interestTech")],
+      ["estetica", mpT(navLang, "interestAesthetic")],
+      ["sensorialita", mpT(navLang, "interestSensorial")],
+      ["filosofia_significato", mpT(navLang, "interestPhilosophy")],
+      ["moda_costumi", mpT(navLang, "interestFashion")],
+    ],
+    [navLang]
+  );
   const isProfessor = String(currentUser?.ruolo || "").toLowerCase() === "professore";
 
   const toggleInterest = (value) => {
@@ -549,7 +617,22 @@ export default function App() {
     }));
   };
 
-  const openProfile = () => setProfileOpen(true);
+  const openProfile = () => {
+    if (currentUser) {
+      setProfileForm({
+        nome: currentUser.nome || "",
+        cognome: currentUser.cognome || "",
+        email: currentUser.email || "",
+        eta: currentUser.eta ?? "",
+        ruolo: currentUser.ruolo || "",
+        livello: currentUser.livello || "",
+        durata: currentUser.durata || "",
+        interessi: Array.isArray(currentUser.interessi) ? [...currentUser.interessi] : [],
+        navLang: normalizeNavLang(currentUser.navLang),
+      });
+    }
+    setProfileOpen(true);
+  };
   const closeProfile = () => setProfileOpen(false);
   const closeItemModal = () => {
     setSelectedItem(null);
@@ -877,6 +960,7 @@ export default function App() {
           livello: profileForm.livello,
           durata: profileForm.durata,
           interessi: profileForm.interessi,
+          navLang: normalizeNavLang(profileForm.navLang),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -886,6 +970,10 @@ export default function App() {
       }
       const user = data.user || null;
       setCurrentUser(user);
+      const nl = normalizeNavLang(user?.navLang);
+      setNavLangState(nl);
+      writeStoredNavLang(nl);
+      window.dispatchEvent(new CustomEvent("mu-nav-lang-changed", { detail: nl }));
       setProfileForm({
         nome: user?.nome || "",
         cognome: user?.cognome || "",
@@ -895,6 +983,7 @@ export default function App() {
         livello: user?.livello || "",
         durata: user?.durata || "",
         interessi: user?.interessi || [],
+        navLang: nl,
       });
       showToast("Profilo aggiornato");
       setProfileOpen(false);
@@ -950,7 +1039,15 @@ export default function App() {
   };
 
   const getPreferredDescription = (oggetto) => {
-    const descrizioni = Array.isArray(oggetto?.descrizioni) ? oggetto.descrizioni : [];
+    const descrizioni =
+      navLang !== "it" &&
+      oggetto?.descrizioniI18n?.[navLang] &&
+      Array.isArray(oggetto.descrizioniI18n[navLang]) &&
+      oggetto.descrizioniI18n[navLang].length > 0
+        ? oggetto.descrizioniI18n[navLang]
+        : Array.isArray(oggetto?.descrizioni)
+          ? oggetto.descrizioni
+          : [];
     if (descrizioni.length === 0) return null;
 
     const preferredLevelIndex = LEVEL_KEY_TO_INDEX[currentUser?.livello] ?? 1;
@@ -975,7 +1072,7 @@ export default function App() {
   if (!authChecked) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>
-        Verifica accesso...
+        {mp("authChecking")}
       </div>
     );
   }
@@ -983,8 +1080,8 @@ export default function App() {
   if (!MUSEO) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
-        <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>Nessun museo specificato. Torna alla home.</p>
-        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Torna alla home</a>
+        <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>{mp("noMuseo")}</p>
+        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("backHome")}</a>
       </div>
     );
   }
@@ -1005,25 +1102,25 @@ export default function App() {
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             </div>
-            <span style={{ color: "var(--gold)", fontWeight: 600, letterSpacing: "0.18em" }}>MARKETPLACE</span>
+            <span style={{ color: "var(--gold)", fontWeight: 600, letterSpacing: "0.18em" }}>{mp("marketplaceTitle")}</span>
           </div>
 
           {/* Center */}
           <div style={{ textAlign: "center", gridColumn: isMobile ? "1 / -1" : undefined, order: isMobile ? -1 : 0 }}>
-            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 8 : 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>Museo selezionato</p>
+            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 8 : 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>{mp("selectedMuseum")}</p>
             <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 17, fontWeight: 400, letterSpacing: isMobile ? "0.06em" : "0.1em", color: "var(--text)", overflowWrap: "anywhere" }}>{MUSEO}</p>
           </div>
 
           {/* Right */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: isMobile ? "center" : "flex-end", flexWrap: "wrap" }}>
             <button onClick={openProfile} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none", textTransform: "uppercase", cursor: "pointer" }}>
-              Profilo
+              {mp("profile")}
             </button>
-            <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>← Home</a>
+            <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("home")}</a>
             {apiKeyActive && (
               <>
-                <span style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--text-dim)" }}>🔑 Key attiva</span>
-                <button onClick={handleLogout} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Rimuovi Key</button>
+                <span style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--text-dim)" }}>{mp("keyActive")}</span>
+                <button onClick={handleLogout} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("removeKey")}</button>
               </>
             )}
           </div>
@@ -1033,20 +1130,20 @@ export default function App() {
         <nav style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12, marginBottom: isMobile ? 22 : 32 }}>
           <div style={{ display: "flex", gap: 2, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4, width: isMobile ? "100%" : "auto" }}>
             {[
-              { id: "items", label: "Oggetti" },
-              { id: "visits", label: "Percorsi" },
-            ].map((t) => (
-              <button key={t.id} onClick={() => switchSection(t.id)} style={{
+              { id: "items", labelKey: "tabItems" },
+              { id: "visits", labelKey: "tabPaths" },
+            ].map((tab) => (
+              <button key={tab.id} onClick={() => switchSection(tab.id)} style={{
                 padding: isMobile ? "11px 12px" : "12px 18px",
-                background: currentSection === t.id ? "var(--gold)" : "transparent",
+                background: currentSection === tab.id ? "var(--gold)" : "transparent",
                 border: "none", borderRadius: 5, cursor: "pointer",
                 fontFamily: "var(--font-head)", fontSize: 10, fontWeight: 500,
                 letterSpacing: "0.13em", textTransform: "uppercase",
-                color: currentSection === t.id ? "#0d0d0d" : "var(--text-dim)",
+                color: currentSection === tab.id ? "#0d0d0d" : "var(--text-dim)",
                 transition: "all 0.2s",
                 whiteSpace: "nowrap",
                 flex: isMobile ? 1 : undefined,
-              }}>{t.label}</button>
+              }}>{mp(tab.labelKey)}</button>
             ))}
           </div>
           {activeTab === "visits" && isProfessor && (
@@ -1069,7 +1166,7 @@ export default function App() {
               }}
               style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", width: isMobile ? "100%" : "auto" }}
             >
-              Crea percorso classe
+              {mp("createClassPath")}
             </button>
           )}
         </nav>
@@ -1092,19 +1189,21 @@ export default function App() {
                   setItemPage(1);
                 }
               }}
-              placeholder="Cerca oggetti..."
+              placeholder={mp("searchPlaceholder")}
               style={{ flex: 1, minWidth: isMobile ? "100%" : 200, width: isMobile ? "100%" : undefined, padding: "11px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
             />
             <select value={stanzaFilter} onChange={(e) => setStanzaFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
-              <option value="">Tutte le stanze</option>
-              {stanze.map((s) => <option key={s} value={s}>{s}</option>)}
+              <option value="">{mp("allRooms")}</option>
+              {stanze.map((s) => (
+                <option key={s} value={s}>{displayStanzaName(s)}</option>
+              ))}
             </select>
             <select value={autoreFilter} onChange={(e) => setAutoreFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
-              <option value="">Tutti gli autori</option>
+              <option value="">{mp("allAuthors")}</option>
               {autori.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
             <select value={correnteFilter} onChange={(e) => setCorrenteFilter(e.target.value)} style={{ padding: "11px 32px 11px 14px", width: isMobile ? "100%" : undefined, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
-              <option value="">Tutte le correnti</option>
+              <option value="">{mp("allMovements")}</option>
               {correntiArtistiche.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <div style={{ display: "flex", gap: 6, width: isMobile ? "100%" : undefined }}>
@@ -1113,12 +1212,12 @@ export default function App() {
                 min="1"
                 value={yearFrom}
                 onChange={(e) => setYearFrom(e.target.value)}
-                placeholder="Anno da"
+                placeholder={mp("yearFromPh")}
                 style={{ padding: "11px 14px", width: isMobile ? "100%" : 120, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
               />
               <select value={yearFromEra} onChange={(e) => setYearFromEra(e.target.value)} style={{ padding: "11px 10px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
-                <option value="ac">a.C.</option>
-                <option value="dc">d.C.</option>
+                <option value="ac">{mp("eraBC")}</option>
+                <option value="dc">{mp("eraAD")}</option>
               </select>
             </div>
             <div style={{ display: "flex", gap: 6, width: isMobile ? "100%" : undefined }}>
@@ -1127,12 +1226,12 @@ export default function App() {
                 min="1"
                 value={yearTo}
                 onChange={(e) => setYearTo(e.target.value)}
-                placeholder="Anno a"
+                placeholder={mp("yearToPh")}
                 style={{ padding: "11px 14px", width: isMobile ? "100%" : 120, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none" }}
               />
               <select value={yearToEra} onChange={(e) => setYearToEra(e.target.value)} style={{ padding: "11px 10px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: 13, outline: "none", appearance: "none" }}>
-                <option value="ac">a.C.</option>
-                <option value="dc">d.C.</option>
+                <option value="ac">{mp("eraBC")}</option>
+                <option value="dc">{mp("eraAD")}</option>
               </select>
             </div>
             <button onClick={() => {
@@ -1145,7 +1244,7 @@ export default function App() {
               setAppliedYearFromEra(yearFromEra);
               setAppliedYearToEra(yearToEra);
               setItemPage(1);
-            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Filtra</button>
+            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>{mp("filter")}</button>
             <button onClick={() => {
               setSearch("");
               setStanzaFilter("");
@@ -1164,7 +1263,7 @@ export default function App() {
               setAppliedYearFromEra("ac");
               setAppliedYearToEra("dc");
               setItemPage(1);
-            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Reset</button>
+            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>{mp("reset")}</button>
           </div>
         )}
 
@@ -1175,9 +1274,16 @@ export default function App() {
               {loadingItems
                 ? <Skeleton />
                 : pagedItems.length === 0
-                  ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>Nessun oggetto trovato</p></div>
+                  ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>{mp("noItemsFound")}</p></div>
                   : pagedItems.map((o, i) => (
-                    <ItemCard key={o.nome} oggetto={o} museo={MUSEO} onView={openItemDetails} delay={i * 0.05} />
+                    <ItemCard
+                      key={o.nome}
+                      oggetto={o}
+                      museo={MUSEO}
+                      onView={openItemDetails}
+                      delay={i * 0.05}
+                      displayStanza={o.stanza ? displayStanzaName(o.stanza) : ""}
+                    />
                   ))
               }
             </div>
@@ -1190,7 +1296,7 @@ export default function App() {
           <>
             {isProfessor && teacherSavedVisits.length > 0 && (
               <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-card)" }}>
-                <p style={{ margin: "0 0 8px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>Le mie visite guidate</p>
+                <p style={{ margin: "0 0 8px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("myGuidedTours")}</p>
                 <div style={{ display: "grid", gap: 6 }}>
                   {teacherSavedVisits.slice(0, 6).map((visit) => {
                     const studentLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=student`;
@@ -1201,17 +1307,17 @@ export default function App() {
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <button
                             type="button"
-                            onClick={() => copyToClipboard(studentLink, "Link alunni copiato")}
+                            onClick={() => copyToClipboard(studentLink, mp("linkStudentsCopied"))}
                             style={{ padding: "6px 10px", border: "1px solid var(--border)", background: "transparent", borderRadius: 6, color: "var(--text-dim)", cursor: "pointer" }}
                           >
-                            Link alunni
+                            {mp("linkStudents")}
                           </button>
                           <button
                             type="button"
                             onClick={() => window.open(dashboardLink, "_blank", "noopener,noreferrer")}
                             style={{ padding: "6px 10px", border: "1px solid var(--gold)", background: "transparent", borderRadius: 6, color: "var(--gold)", cursor: "pointer" }}
                           >
-                            Avvia visita
+                            {mp("startVisit")}
                           </button>
                           {!visit.navigationStarted && (
                             <button
@@ -1219,7 +1325,7 @@ export default function App() {
                               onClick={() => startEditTeacherVisit(visit)}
                               style={{ padding: "6px 10px", border: "1px solid var(--border)", background: "transparent", borderRadius: 6, color: "var(--text-dim)", cursor: "pointer" }}
                             >
-                              Modifica
+                              {mp("edit")}
                             </button>
                           )}
                           <button
@@ -1227,7 +1333,7 @@ export default function App() {
                             onClick={() => deleteTeacherVisit(visit.id)}
                             style={{ padding: "6px 10px", border: "1px solid #7a2c2c", background: "transparent", borderRadius: 6, color: "#ff9a9a", cursor: "pointer" }}
                           >
-                            Elimina
+                            {mp("delete")}
                           </button>
                         </div>
                       </div>
@@ -1240,7 +1346,7 @@ export default function App() {
               {loadingVisits
                 ? <Skeleton />
                 : pagedVisits.length === 0
-                  ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>Nessun percorso creato</p></div>
+                  ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>{mp("noPathsCreated")}</p></div>
                   : pagedVisits.map((p, i) => (
                     <VisitCard
                       key={p.nome}
@@ -1250,6 +1356,8 @@ export default function App() {
                       onBuy={buyPath}
                       buying={buyingPath === p.nome}
                       delay={i * 0.06}
+                      mp={mp}
+                      displayNome={displayPercorsoNome(p.nome)}
                     />
                   ))
               }
@@ -1267,35 +1375,53 @@ export default function App() {
         >
           <div style={{ width: isMobile ? "min(620px, 100%)" : "min(620px, 90vw)", maxHeight: isMobile ? "calc(100vh - 32px)" : "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: isMobile ? 18 : 12 }}>
             <button onClick={closeProfile} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Account</p>
-            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>Profilo</h3>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("account")}</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{mp("profileTitle")}</h3>
             <form onSubmit={saveProfile} style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                <input value={profileForm.nome} onChange={(e) => setProfileForm((p) => ({ ...p, nome: e.target.value }))} placeholder="Nome" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
-                <input value={profileForm.cognome} onChange={(e) => setProfileForm((p) => ({ ...p, cognome: e.target.value }))} placeholder="Cognome" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+                <input value={profileForm.nome} onChange={(e) => setProfileForm((p) => ({ ...p, nome: e.target.value }))} placeholder={mp("phFirstName")} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+                <input value={profileForm.cognome} onChange={(e) => setProfileForm((p) => ({ ...p, cognome: e.target.value }))} placeholder={mp("phLastName")} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                <input value={profileForm.email} disabled placeholder="Email" style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
-                <input value={profileForm.eta} onChange={(e) => setProfileForm((p) => ({ ...p, eta: e.target.value }))} type="number" min="1" max="120" placeholder="Eta" style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+                <input value={profileForm.email} disabled placeholder={mp("phEmail")} style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+                <input value={profileForm.eta} onChange={(e) => setProfileForm((p) => ({ ...p, eta: e.target.value }))} type="number" min="1" max="120" placeholder={mp("phAge")} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12 }}>
-                <input value={profileForm.ruolo} disabled placeholder="Ruolo" style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+                <input value={profileForm.ruolo} disabled placeholder={mp("phRole")} style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
                 <select value={profileForm.livello} onChange={(e) => setProfileForm((p) => ({ ...p, livello: e.target.value }))} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
-                  <option value="">Livello</option>
-                  <option value="bambino">Bambino</option>
-                  <option value="studente">Studente</option>
-                  <option value="esperto">Esperto</option>
-                  <option value="avanzato">Avanzato</option>
+                  <option value="">{mp("levelPlaceholder")}</option>
+                  <option value="bambino">{mp("lvlChild")}</option>
+                  <option value="studente">{mp("lvlStudent")}</option>
+                  <option value="esperto">{mp("lvlExpert")}</option>
+                  <option value="avanzato">{mp("lvlAdvanced")}</option>
                 </select>
                 <select value={profileForm.durata} onChange={(e) => setProfileForm((p) => ({ ...p, durata: e.target.value }))} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
-                  <option value="">Durata spiegazioni</option>
-                  <option value="corto">Corto</option>
-                  <option value="medio">Medio</option>
-                  <option value="lungo">Lungo</option>
+                  <option value="">{mp("durationExpl")}</option>
+                  <option value="corto">{mp("durOptShort")}</option>
+                  <option value="medio">{mp("durOptMed")}</option>
+                  <option value="lungo">{mp("durOptLong")}</option>
+                  <option value="esteso">{mp("durOptExt")}</option>
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "160px 1fr", gap: 12, alignItems: "center" }}>
+                <label htmlFor="profile-nav-lang" style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", fontFamily: "var(--font-head)" }}>{mp("langLabel")}</label>
+                <select
+                  id="profile-nav-lang"
+                  value={normalizeNavLang(profileForm.navLang)}
+                  onChange={(e) => {
+                    const v = normalizeNavLang(e.target.value);
+                    setProfileForm((p) => ({ ...p, navLang: v }));
+                    setNavLang(v);
+                  }}
+                  style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+                >
+                  {MP_LANG_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
-                <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 10, fontFamily: "var(--font-head)" }}>Interessi</p>
+                <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 10, fontFamily: "var(--font-head)" }}>{mp("interests")}</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: isMobile ? "center" : "flex-start" }}>
                   {PROFILE_INTERESTS.map(([value, label]) => {
                     const active = profileForm.interessi.includes(value);
@@ -1324,8 +1450,8 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
-                <button type="button" onClick={closeProfile} style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Chiudi</button>
-                <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Salva profilo</button>
+                <button type="button" onClick={closeProfile} style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("close")}</button>
+                <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("saveProfile")}</button>
               </div>
             </form>
           </div>
@@ -1336,23 +1462,23 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closeItemModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(760px, 100%)" : "min(980px, 96vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closeItemModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Oggetto</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("itemLabel")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedItem.nome}</h3>
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{ display: "grid", gap: 14 }}>
                 <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Dettagli</p>
+                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("details")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px, 1fr) minmax(0, 2fr)", gap: 12 }}>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Stanza:</strong> {selectedItem.stanza || "N/D"}</p>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>Connessi:</strong> {(selectedItem.connessi || []).join(", ") || "Nessuno"}</p>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Autore:</strong> {selectedItem.autore || "N/D"}</p>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Corrente artistica:</strong> {selectedItem.correnteArtistica || "N/D"}</p>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>Licenza:</strong> {selectedItem.licenza || "N/D"}</p>
-                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>Anno:</strong> {selectedItem.anno || "N/D"}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("room")}</strong> {(selectedItem.stanza && displayStanzaName(selectedItem.stanza)) || mp("nd")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>{mp("connected")}</strong> {(selectedItem.connessi || []).join(", ") || mp("none")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("author")}</strong> {selectedItem.autore || mp("nd")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("artMovement")}</strong> {selectedItem.correnteArtistica || mp("nd")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>{mp("license")}</strong> {selectedItem.licenza || mp("nd")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("year")}</strong> {selectedItem.anno || mp("nd")}</p>
                   </div>
                 </div>
                 <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Descrizioni</p>
+                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("descriptions")}</p>
                   {(() => {
                     const preferred = getPreferredDescription(selectedItem);
                     return (
@@ -1362,7 +1488,7 @@ export default function App() {
                             <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}>{preferred.text}</p>
                           </div>
                         ) : (
-                          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>Nessuna descrizione disponibile.</p>
+                          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>{mp("noDescription")}</p>
                         )}
 
                         <button
@@ -1382,7 +1508,7 @@ export default function App() {
                             color: "var(--gold)",
                           }}
                         >
-                          {showAllDescriptions ? "Nascondi tutte" : "Vedi tutte"}
+                          {showAllDescriptions ? mp("hideAll") : mp("showAll")}
                         </button>
 
                         {showAllDescriptions && (
@@ -1390,7 +1516,7 @@ export default function App() {
                             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                               <thead>
                                 <tr>
-                                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>Livello \\ Lunghezza</th>
+                                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>
                                   {DESCRIPTION_LENGTHS.map((len) => (
                                     <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
                                       {len}
@@ -1400,7 +1526,14 @@ export default function App() {
                               </thead>
                               <tbody>
                                 {DESCRIPTION_LEVELS.map((lvlLabel, lvlIndex) => {
-                                  const group = Array.isArray(selectedItem.descrizioni?.[lvlIndex]) ? selectedItem.descrizioni[lvlIndex] : [];
+                                  const descMatrix =
+                                    navLang !== "it" &&
+                                    selectedItem?.descrizioniI18n?.[navLang] &&
+                                    Array.isArray(selectedItem.descrizioniI18n[navLang]) &&
+                                    selectedItem.descrizioniI18n[navLang].length > 0
+                                      ? selectedItem.descrizioniI18n[navLang]
+                                      : selectedItem.descrizioni;
+                                  const group = Array.isArray(descMatrix?.[lvlIndex]) ? descMatrix[lvlIndex] : [];
                                   return (
                                     <tr key={lvlLabel}>
                                       <td style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text)", fontSize: 13, verticalAlign: "top", whiteSpace: isMobile ? "normal" : "nowrap", overflowWrap: "anywhere" }}>
@@ -1430,9 +1563,9 @@ export default function App() {
                 const activeImage = galleryImages[safeIndex] || null;
                 return (
                   <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                    <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>Galleria immagini</p>
+                    <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("imageGallery")}</p>
                     {galleryImages.length === 0 ? (
-                      <p style={{ color: "var(--text-dim)", fontSize: 14 }}>Nessuna immagine extra disponibile.</p>
+                      <p style={{ color: "var(--text-dim)", fontSize: 14 }}>{mp("noExtraImages")}</p>
                     ) : (
                       <div style={{ display: "grid", gap: 10 }}>
                         <img
@@ -1494,11 +1627,11 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closePathModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(720px, 100%)" : "min(900px, 92vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closePathModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Percorso</p>
-            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedPath.nome}</h3>
-            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>Prezzo: <span style={{ color: "var(--gold)", fontFamily: "var(--font-head)" }}>{formatPrezzo(selectedPath.prezzo)}</span></p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("pathLabel")}</p>
+            <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{displayPercorsoNome(selectedPath.nome)}</h3>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>{mp("price")} <span style={{ color: "var(--gold)", fontFamily: "var(--font-head)" }}>{formatPrezzo(selectedPath.prezzo, mp)}</span></p>
             <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-              <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10, fontFamily: "var(--font-head)" }}>Opere del percorso in ordine</p>
+              <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10, fontFamily: "var(--font-head)" }}>{mp("pathWorksOrder")}</p>
               <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10 }}>
                 {(selectedPath.oggetti || []).map((name) => {
                   const oggetto = allOggetti.find((item) => item.nome === name);
@@ -1506,7 +1639,7 @@ export default function App() {
                     <li key={name} style={{ color: "var(--text)", lineHeight: 1.6 }}>
                       <span style={{ fontFamily: "var(--font-head)", letterSpacing: "0.06em" }}>{name}</span>
                       {oggetto?.stanza ? (
-                        <span style={{ color: "var(--text-dim)" }}>{` — stanza ${oggetto.stanza}`}</span>
+                        <span style={{ color: "var(--text-dim)" }}>{` — ${mp("roomInline")} ${displayStanzaName(oggetto.stanza)}`}</span>
                       ) : null}
                     </li>
                   );
@@ -1521,34 +1654,35 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closeTeacherBuilder(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 720, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(760px, 100%)" : "min(860px, 94vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closeTeacherBuilder} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>Professore</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("professor")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 16 }}>
-              {teacherEditingVisitId ? "Modifica visita guidata classe" : "Crea visita guidata classe"}
+              {teacherEditingVisitId ? mp("editGuidedClass") : mp("createGuidedClass")}
             </h3>
 
             <input
               value={teacherVisitName}
               onChange={(e) => setTeacherVisitName(e.target.value)}
-              placeholder="Nome visita guidata"
+              placeholder={mp("phVisitName")}
               style={{ width: "100%", padding: "12px 14px", marginBottom: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
             />
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <select value={teacherLevel} onChange={(e) => setTeacherLevel(e.target.value)} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
-                <option value="bambino">Bambino</option>
-                <option value="studente">Studente</option>
-                <option value="esperto">Esperto</option>
-                <option value="avanzato">Avanzato</option>
+                <option value="bambino">{mp("lvlChild")}</option>
+                <option value="studente">{mp("lvlStudent")}</option>
+                <option value="esperto">{mp("lvlExpert")}</option>
+                <option value="avanzato">{mp("lvlAdvanced")}</option>
               </select>
               <select value={teacherDuration} onChange={(e) => setTeacherDuration(e.target.value)} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
-                <option value="corto">Corto</option>
-                <option value="medio">Medio</option>
-                <option value="lungo">Lungo</option>
+                <option value="corto">{mp("durOptShort")}</option>
+                <option value="medio">{mp("durOptMed")}</option>
+                <option value="lungo">{mp("durOptLong")}</option>
+                <option value="esteso">{mp("durOptExt")}</option>
               </select>
             </div>
 
             <p style={{ fontSize: 11, letterSpacing: "0.12em", color: "var(--text-dim)", marginBottom: 10 }}>
-              Seleziona gli oggetti e ordina manualmente il percorso: {teacherSelectedObjects.length} selezionati.
+              {mp("selectObjectsHint")} {teacherSelectedObjects.length} {mp("selectedCount")}.
             </p>
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 8, marginBottom: 14 }}>
@@ -1569,20 +1703,20 @@ export default function App() {
 
             {teacherSelectedObjects.length > 0 && (
               <div style={{ marginBottom: 12, display: "grid", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Ordine e descrizioni (default dal DB, modificabili)</p>
+                <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{mp("orderAndDesc")}</p>
                 {teacherSelectedObjects.map((objName) => (
                   <div key={`desc-${objName}`} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
                       <strong style={{ color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 12 }}>{objName}</strong>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" onClick={() => moveTeacherObject(objName, -1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Su</button>
-                        <button type="button" onClick={() => moveTeacherObject(objName, 1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Giu</button>
+                        <button type="button" onClick={() => moveTeacherObject(objName, -1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("up")}</button>
+                        <button type="button" onClick={() => moveTeacherObject(objName, 1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("down")}</button>
                       </div>
                     </div>
                     <textarea
                       value={teacherObjectDescriptions[objName] || ""}
                       onChange={(e) => setTeacherObjectDescriptions((prev) => ({ ...prev, [objName]: e.target.value }))}
-                      placeholder={`Descrizione per ${objName}`}
+                      placeholder={`${mp("phDescFor")} ${objName}`}
                       style={{ width: "100%", minHeight: 70, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
                     />
                   </div>
@@ -1591,13 +1725,13 @@ export default function App() {
             )}
 
             <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Item testo (?)</p>
+              <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{mp("textItemSection")}</p>
               <select
                 value={teacherTextDraft.room}
                 onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, room: e.target.value, insertAfterObject: "" }))}
                 style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
               >
-                <option value="">Seleziona stanza (solo stanze degli oggetti selezionati)</option>
+                <option value="">{mp("selectRoomOpt")}</option>
                 {availableTextRooms.map((room) => (
                   <option key={room} value={room}>{room}</option>
                 ))}
@@ -1607,30 +1741,30 @@ export default function App() {
                 onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, insertAfterObject: e.target.value }))}
                 style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
               >
-                <option value="">Seleziona oggetto della stanza</option>
+                <option value="">{mp("selectObjectRoom")}</option>
                 {availableInsertAfterObjects.map((objName) => (
                   <option key={`after-${objName}`} value={objName}>
-                    Dopo {objName}
+                    {mp("afterObject")} {objName}
                   </option>
                 ))}
               </select>
               <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--text-faint)" }}>
-                L'item ? comparira nella stanza selezionata e nel flusso subito dopo l'oggetto scelto.
+                {mp("textItemHint")}
               </p>
               <input
                 value={teacherTextDraft.name}
                 onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Nome item ? (es. Domanda 1)"
+                placeholder={mp("phTextItemName")}
                 style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
               />
               <textarea
                 value={teacherTextDraft.text}
                 onChange={(e) => setTeacherTextDraft((prev) => ({ ...prev, text: e.target.value }))}
-                placeholder="Testo mostrato al centro stanza"
+                placeholder={mp("phTextItemBody")}
                 style={{ width: "100%", minHeight: 70, padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
               />
               <button type="button" onClick={addTeacherTextItem} style={{ padding: "8px 12px", border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer" }}>
-                {teacherEditingTextItemId ? "Salva modifica item testo" : "Aggiungi item testo"}
+                {teacherEditingTextItemId ? mp("saveTextItem") : mp("addTextItem")}
               </button>
               {teacherTextItems.length > 0 && (
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
@@ -1639,11 +1773,11 @@ export default function App() {
                       <span>
                         {item.name ? `${item.name}: ` : ""}
                         {item.room ? `[${item.room}] ` : ""}{item.text}
-                        {item.insertAfterObject ? ` (dopo ${item.insertAfterObject})` : ""}
+                        {item.insertAfterObject ? ` (${mp("afterObjectParen")} ${item.insertAfterObject})` : ""}
                       </span>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" onClick={() => editTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>Modifica</button>
-                        <button type="button" onClick={() => removeTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>Rimuovi</button>
+                        <button type="button" onClick={() => editTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>{mp("edit")}</button>
+                        <button type="button" onClick={() => removeTeacherTextItem(item.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer" }}>{mp("remove")}</button>
                       </div>
                     </div>
                   ))}
@@ -1652,19 +1786,19 @@ export default function App() {
             </div>
 
             <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", display: "grid", gap: 8 }}>
-              <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Quiz finale</p>
-              <input value={teacherQuizTitle} onChange={(e) => setTeacherQuizTitle(e.target.value)} placeholder="Titolo quiz" style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
-              <input type="number" min="10" value={teacherQuizTimeLimit} onChange={(e) => setTeacherQuizTimeLimit(e.target.value)} placeholder="Tempo massimo (secondi)" style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+              <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{mp("quizBlockTitle")}</p>
+              <input value={teacherQuizTitle} onChange={(e) => setTeacherQuizTitle(e.target.value)} placeholder={mp("quizTitlePh")} style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+              <input type="number" min="10" value={teacherQuizTimeLimit} onChange={(e) => setTeacherQuizTimeLimit(e.target.value)} placeholder={mp("timeLimitSec")} style={{ width: "100%", padding: "8px 10px", background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
               {teacherQuizQuestions.map((question, qIdx) => (
                 <div key={question.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "8px", background: "#111" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ color: "var(--gold)", fontSize: 12 }}>Domanda {qIdx + 1}</span>
-                    <button type="button" onClick={() => removeQuizQuestion(question.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>Rimuovi</button>
+                    <span style={{ color: "var(--gold)", fontSize: 12 }}>{mp("questionLabel")} {qIdx + 1}</span>
+                    <button type="button" onClick={() => removeQuizQuestion(question.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("remove")}</button>
                   </div>
                   <input
                     value={question.question}
                     onChange={(e) => updateQuizQuestion(question.id, (q) => ({ ...q, question: e.target.value }))}
-                    placeholder="Testo domanda"
+                    placeholder={mp("questionTextPh")}
                     style={{ width: "100%", padding: "8px 10px", marginBottom: 8, background: "#1a1a1a", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
                   />
                   {question.options.map((option, optIdx) => (
@@ -1678,7 +1812,7 @@ export default function App() {
                             return { ...q, options: nextOptions };
                           })
                         }
-                        placeholder={`Opzione ${optIdx + 1}`}
+                        placeholder={`${mp("optionPh")} ${optIdx + 1}`}
                         style={{ width: "100%", padding: "8px 10px", background: "#1a1a1a", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
                       />
                       <button
@@ -1703,7 +1837,7 @@ export default function App() {
                       onClick={() => updateQuizQuestion(question.id, (q) => ({ ...q, options: [...q.options, ""] }))}
                       style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "6px 10px" }}
                     >
-                      Aggiungi opzione
+                      {mp("addOption")}
                     </button>
                     <select
                       value={question.correctIndex}
@@ -1712,25 +1846,25 @@ export default function App() {
                     >
                       {question.options.map((_, idx) => (
                         <option key={`${question.id}-correct-${idx}`} value={idx}>
-                          Risposta corretta: opzione {idx + 1}
+                          {mp("correctIsOption")} {idx + 1}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
               ))}
-              <button type="button" onClick={addQuizQuestion} style={{ border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer", padding: "8px 10px" }}>Aggiungi domanda</button>
+              <button type="button" onClick={addQuizQuestion} style={{ border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer", padding: "8px 10px" }}>{mp("addQuestion")}</button>
             </div>
 
             <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
               <button type="button" onClick={saveTeacherGuidedVisit} style={{ padding: "11px 16px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>
-                {teacherEditingVisitId ? "Salva modifiche visita" : "Salva visita guidata"}
+                {teacherEditingVisitId ? mp("saveVisitChanges") : mp("saveGuidedVisitBtn")}
               </button>
             </div>
 
             {teacherOptimizedOrder.length > 0 && (
               <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-                Flusso finale visita: <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
+                {mp("visitFlowFinal")} <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
               </p>
             )}
             {teacherStudentLink && (

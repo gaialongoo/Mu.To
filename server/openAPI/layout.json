@@ -68,7 +68,22 @@
         "tipo": "normale"
       }
     },
-    "corridoi": []
+    "corridoi": [],
+    "labelI18n": {
+      "stanze": {
+        "IN": { "en": "Entrance", "fr": "Entrée" },
+        "sala A": { "en": "Room A", "fr": "Salle A" },
+        "sala B": { "en": "Room B", "fr": "Salle B" },
+        "sala C": { "en": "Room C", "fr": "Salle C" },
+        "OUT": { "en": "Exit", "fr": "Sortie" },
+        "Stanza 6": { "en": "Room 6", "fr": "Salle 6" }
+      },
+      "percorsi": {
+        "Percorso rapido": { "en": "Quick tour", "fr": "Parcours rapide" },
+        "Percorso completo": { "en": "Full tour", "fr": "Parcours complet" },
+        "Percorso archeologico": { "en": "Archaeological tour", "fr": "Parcours archéologique" }
+      }
+    }
   },
   "Museo di Torino": {
     "grid": {
@@ -284,6 +299,24 @@
         "bgImage": null,
         "bgTipo": "preview"
       }
+    },
+    "labelI18n": {
+      "stanze": {
+        "IN": { "en": "Entrance", "fr": "Entrée" },
+        "stanza 1": { "en": "Room 1", "fr": "Salle 1" },
+        "stanza 2": { "en": "Room 2", "fr": "Salle 2" },
+        "stanza 3": { "en": "Room 3", "fr": "Salle 3" },
+        "stanza 4": { "en": "Room 4", "fr": "Salle 4" },
+        "WC": { "en": "Restrooms", "fr": "Toilettes" },
+        "SHOP": { "en": "Shop", "fr": "Boutique" },
+        "OUT": { "en": "Exit", "fr": "Sortie" }
+      },
+      "percorsi": {
+        "Percorso essenziale": { "en": "Essential tour", "fr": "Parcours essentiel" },
+        "Percorso egizio": { "en": "Egyptian tour", "fr": "Parcours égyptien" },
+        "Percorso del potere": { "en": "Power and symbols tour", "fr": "Parcours du pouvoir" },
+        "Percorso completo": { "en": "Complete tour", "fr": "Parcours complet" }
+      }
     }
   },
   "Museo Demo QA": {
@@ -331,6 +364,18 @@
         "a": "OUT",
         "b": "Stanza 5"
       }
-    ]
+    ],
+    "labelI18n": {
+      "stanze": {
+        "IN": { "en": "Entrance", "fr": "Entrée" },
+        "sala 1": { "en": "Room 1", "fr": "Salle 1" },
+        "sala 3": { "en": "Room 3", "fr": "Salle 3" },
+        "OUT": { "en": "Exit", "fr": "Sortie" },
+        "Stanza 5": { "en": "Room 5", "fr": "Salle 5" }
+      },
+      "percorsi": {
+        "Percorso Base": { "en": "Basic tour", "fr": "Parcours de base" }
+      }
+    }
   }
 }

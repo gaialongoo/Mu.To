@@ -43,6 +43,7 @@ class SistemaMusei {
           pos: ogg.pos,
           connessi: ogg.connessi || [],
           descrizioni: ogg.descrizioni || [],
+          descrizioniI18n: ogg.descrizioniI18n && typeof ogg.descrizioniI18n === "object" ? ogg.descrizioniI18n : undefined,
           visibile: ogg.visibile,
           objectType: ogg.objectType || "normal",
           textTitle: ogg.textTitle || "",

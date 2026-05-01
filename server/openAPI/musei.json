@@ -32,6 +32,20 @@
               "L’opera testimonia la ricerca di perfezione formale e anatomica"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["White marble statue depicting a human figure", "This statue shows an elegant figure carved in marble", "The statue displays harmonious proportions and careful details"],
+              ["Classical statue from the Renaissance", "The statue reflects the Florentine Renaissance style", "The balanced forms echo the artistic ideals of the Renaissance"],
+              ["Renaissance marble sculpture", "This sculpture shows the influence of classical antiquity", "The marble carving demonstrates great technical skill"],
+              ["Masterpiece of Italian Renaissance sculpture", "The statue is a significant example of Renaissance art", "The work reflects a quest for formal and anatomical perfection"]
+            ],
+            "fr": [
+              ["Statue en marbre blanc représentant une figure humaine", "Cette statue figure une silhouette élégante sculptée dans le marbre", "On y observe des proportions harmonieuses et des détails soignés"],
+              ["Statue classique de la Renaissance", "La statue relève du style florentin de la Renaissance", "Les formes équilibrées reprennent les canons artistiques de la Renaissance"],
+              ["Sculpture en marbre de la Renaissance", "Cette sculpture montre l’influence de l’art classique antique", "Le travail du marbre révèle une grande maîtrise technique"],
+              ["Chef-d’œuvre sculptural de la Renaissance italienne", "La statue est un exemple marquant de l’art de la Renaissance", "L’œuvre témoigne de la recherche de perfection formelle et anatomique"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -69,6 +83,20 @@
               "Il dipinto è considerato un esempio fondamentale della pittura rinascimentale"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Painting in vivid colours depicting a historical scene", "The painting uses bright colours and a balanced composition", "The scene tells a meaningful episode"],
+              ["Renaissance panel painting", "The work shows the use of perspective", "The figures are arranged in a harmonious scheme"],
+              ["Italian Renaissance painting", "This painting shows mastery of light and shadow", "The faces suggest strong realism"],
+              ["Highly important Renaissance painting", "The work combines technique and narrative", "It is considered a landmark of Renaissance painting"]
+            ],
+            "fr": [
+              ["Tableau aux couleurs vives représentant une scène historique", "Le tableau utilise des couleurs vives et une composition équilibrée", "La scène raconte un épisode significatif"],
+              ["Tableau de la Renaissance sur panneau", "L’œuvre montre l’usage de la perspective", "Les personnages sont disposés selon un schéma harmonieux"],
+              ["Peinture italienne de la Renaissance", "Ce tableau illustre la maîtrise de la lumière et des ombres", "Le rendu des visages suggère un fort réalisme"],
+              ["Tableau de la Renaissance d’une grande valeur artistique", "L’œuvre unit technique et récit", "Il est considéré comme un exemple fondamental de la peinture de la Renaissance"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -105,6 +133,20 @@
               "L’anfora rappresenta un importante esempio di ceramica storica"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Ceramic amphora with geometric decoration", "This amphora has simple yet elegant motifs", "It was probably used to hold liquids"],
+              ["Decorated amphora from antiquity", "The decoration suggests a Mediterranean origin", "The shape is typical of amphorae used in the ancient world"],
+              ["Ancient amphora with ornamental motifs", "The amphora shows skilled craftsmanship", "The decoration suggests symbolic scenes"],
+              ["Historically significant amphora", "This find sheds light on everyday life in antiquity", "The amphora is an important example of historical ceramics"]
+            ],
+            "fr": [
+              ["Amphore en céramique à décor géométrique", "Cette amphore présente des motifs simples mais élégants", "L’objet servait probablement à contenir des liquides"],
+              ["Amphore décorée de l’Antiquité", "Le décor suggère une origine méditerranéenne", "La forme est typique des amphores utilisées dans l’Antiquité"],
+              ["Amphore ancienne à motifs ornementaux", "L’amphore montre un travail artisanal soigné", "Les décorations évoquent des scènes symboliques"],
+              ["Amphore historique d’intérêt archéologique", "Cette pièce informe sur les usages quotidiens antiques", "L’amphore est un exemple important de céramique historique"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -178,6 +220,20 @@
               "L’analisi del sarcofago rivela una complessa simbologia religiosa"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["A large sarcophagus with unusual carved designs", "This sarcophagus feels ancient and mysterious", "Ancient figures are carved on the surface"],
+              ["Ancient decorated sarcophagus", "Symbolic figures adorn this sarcophagus", "It shows scenes of life and ancient ritual"],
+              ["Decorated sarcophagus from the Egyptian period", "An Egyptian sarcophagus with hieroglyphs", "Ritual and religious scenes appear on this Egyptian sarcophagus"],
+              ["Egyptian sarcophagus with complex funerary imagery", "The sarcophagus displays elaborate funerary iconography", "Study of the piece reveals complex religious symbolism"]
+            ],
+            "fr": [
+              ["Un grand sarcophage aux motifs sculptés inhabituels", "Ce sarcophage paraît très ancien et mystérieux", "Des figures antiques sont gravées sur la surface"],
+              ["Sarcophage antique décoré", "Ce sarcophage est orné de figures symboliques", "Le sarcophage montre des scènes de vie et de rituels antiques"],
+              ["Sarcophage décoré de l’époque égyptienne", "Un sarcophage égyptien avec hiéroglyphes", "Ce sarcophage égyptien présente des scènes rituelles et religieuses"],
+              ["Sarcophage égyptien à iconographie funéraire complexe", "Le sarcophage montre une iconographie funéraire élaborée", "L’analyse révèle une symbolique religieuse complexe"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -219,6 +275,20 @@
               "L’oggetto rappresenta la maestria artigianale del Rinascimento"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Sparkling necklace with coloured beads", "This necklace is bright and eye-catching", "It shines with many different colours"],
+              ["Necklace with pearls and gemstones", "An elegant necklace of pearls and stones", "Pearls and stones are finely worked"],
+              ["Renaissance-period necklace", "A Renaissance necklace with pearls and stones", "This Renaissance necklace shows remarkable craftsmanship"],
+              ["Elaborate Renaissance necklace", "Historic Renaissance necklace with pearls and gems", "The piece embodies Renaissance artisan mastery"]
+            ],
+            "fr": [
+              ["Collier brillant avec perles de couleur", "Ce collier est tout en couleurs et très voyant", "Le collier brille de nombreuses teintes"],
+              ["Collier avec perles et pierres précieuses", "Un collier élégant en perles et pierres", "Perles et pierres sont finement travaillées"],
+              ["Collier d’époque de la Renaissance", "Un collier de la Renaissance avec perles et pierres", "Ce collier renaissance montre une grande habileté artisanale"],
+              ["Collier renaissance au décor élaboré", "Collier historique de la Renaissance avec perles et gemmes", "L’objet incarne la maîtrise artisanale de la Renaissance"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -260,6 +330,20 @@
               "L’oggetto testimonia l’importanza delle cerimonie ufficiali"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Sceptre decorated with symbolic motifs", "This sceptre reads as an object of power", "It is adorned with refined details"],
+              ["Ancient ceremonial sceptre", "It was probably used in official ceremonies", "The decoration suggests ritual use"],
+              ["Historic sceptre of symbolic value", "This sceptre stands for authority and command", "Its form and materials point to a prestigious object"],
+              ["Ceremonial sceptre of major historical importance", "The sceptre symbolises political or religious power", "It attests to the importance of official ceremony"]
+            ],
+            "fr": [
+              ["Sceptre décoré de motifs symboliques", "Ce sceptre évoque un objet de pouvoir", "Il est orné de détails raffinés"],
+              ["Sceptre cérémoniel antique", "L’objet servait probablement aux cérémonies officielles", "Le décor suggère un usage rituel"],
+              ["Sceptre historique à forte valeur symbolique", "Ce sceptre représente l’autorité et le commandement", "La forme et les matériaux indiquent un objet de prestige"],
+              ["Sceptre cérémoniel d’une grande importance historique", "Le sceptre est un symbole de pouvoir politique ou religieux", "L’objet témoigne du rôle des cérémonies officielles"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -300,6 +384,20 @@
               "L’oggetto fornisce informazioni sulle credenze dell’epoca"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Decorative mask with stylised features", "The mask has a strongly expressive face", "Details hint at symbolic meaning"],
+              ["Ancient ritual mask", "This mask may have been used in rituals", "The workmanship suggests ceremonial use"],
+              ["Historic mask with symbolic function", "The mask represents a mythological figure", "It was probably used in religious contexts"],
+              ["Ritual mask of high cultural value", "This mask is an important anthropological find", "It informs us about beliefs of the period"]
+            ],
+            "fr": [
+              ["Masque décoratif aux traits stylisés", "Le masque présente un visage très expressif", "Les détails suggèrent une signification symbolique"],
+              ["Masque rituel antique", "Ce masque a pu servir dans des rituels", "La facture indique un usage cérémoniel"],
+              ["Masque historique à fonction symbolique", "Le masque représente une figure mythologique", "L’objet était probablement employé dans un cadre religieux"],
+              ["Masque rituel de grande valeur culturelle", "Ce masque est un important témoignage anthropologique", "L’objet éclaire les croyances de l’époque"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -341,6 +439,20 @@
               "La mummia rappresenta una testimonianza unica della civiltà egizia"
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Mummy wrapped in ancient bandages", "The mummy is in fair condition", "The bandages show great age"],
+              ["Mummy from ancient Egypt", "This mummy likely dates to ancient Egypt", "The body was prepared according to funerary rites"],
+              ["Well-preserved Egyptian mummy", "The mummy shows advanced embalming techniques", "It offers important archaeological information"],
+              ["Egyptian mummy of outstanding historical value", "This find is central to studying funerary practice", "The mummy is a unique witness to Egyptian civilisation"]
+            ],
+            "fr": [
+              ["Momie enveloppée de bandelettes antiques", "La momie est en état convenable", "Les bandelettes montrent une grande ancienneté"],
+              ["Momie de l’Égypte antique", "Cette momie remonte probablement à l’Égypte ancienne", "Le corps a été traité selon les rites funéraires"],
+              ["Momie égyptienne bien conservée", "La momie illustre des techniques d’embaumement avancées", "L’objet apporte des informations archéologiques importantes"],
+              ["Momie égyptienne d’une valeur historique exceptionnelle", "Ce vestige est essentiel pour l’étude des rites funéraires", "La momie est un témoignage unique de la civilisation égyptienne"]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -379,7 +491,21 @@
               ""
             ]
           ],
-          "objectType": "normal",
+          "descrizioniI18n": {
+            "en": [
+              ["askjdbas", "hjskdhjkas", "jsakdhs"],
+              ["bahjsbhasj", "bhjsdbajsdb", "bhdjbahsd"],
+              ["", "", ""],
+              ["", "", ""]
+            ],
+            "fr": [
+              ["askjdbas", "hjskdhjkas", "jsakdhs"],
+              ["bahjsbhasj", "bhjsdbajsdb", "bhdjbahsd"],
+              ["", "", ""],
+              ["", "", ""]
+            ]
+          },
+          "objectType": "text",
           "textTitle": "",
           "textBody": "",
           "autore": "",
@@ -443,6 +569,14 @@
               "Vaso etrusco decorato a figure nere."
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Etruscan black-figure vase."]
+            ],
+            "fr": [
+              ["Vase étrusque à figures noires."]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -464,6 +598,14 @@
               "Composizione astratta su tela."
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["Abstract composition on canvas."]
+            ],
+            "fr": [
+              ["Composition abstraite sur toile."]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
@@ -500,6 +642,20 @@
               ""
             ]
           ],
+          "descrizioniI18n": {
+            "en": [
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", ""]
+            ],
+            "fr": [
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", ""]
+            ]
+          },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
