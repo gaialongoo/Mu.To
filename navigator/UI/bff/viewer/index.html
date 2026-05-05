@@ -2777,6 +2777,8 @@
     return `${String(museoNome || "").trim()}::${String(percorsoNome || "").trim()}`;
   }
 
+  let combinedRouteIndex = new Map();
+
   /* ── PERCORSI — GET /api/musei/{nome}/percorsi */
   function loadPercorsi() {
     const overlay = document.getElementById('overlay');
@@ -2800,21 +2802,12 @@
       return;
     }
 
-    Promise.all([
-      fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi`)
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-      fetch(`${API}/users/me/percorsi?museo=${encodeURIComponent(museoNome)}`, { credentials: "include" })
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-    ])
-      .then(([percorsiData, acquistiData]) => {
+    fetch(`${API}/users/me/percorsi/combined?museo=${encodeURIComponent(museoNome)}`, { credentials: "include" })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((combinedData) => {
         loading.classList.remove('visible');
-        const keys = new Set(Array.isArray(acquistiData?.chiaviAcquisto) ? acquistiData.chiaviAcquisto : []);
-        const percorsiDisponibili = (Array.isArray(percorsiData?.percorsi) ? percorsiData.percorsi : [])
-          .filter((p) => {
-            const prezzo = Number(p?.prezzo || 0);
-            const incluso = Number.isFinite(prezzo) && prezzo <= 0;
-            return incluso || keys.has(makePurchaseKey(museoNome, p?.nome));
-          });
+        const percorsiDisponibili = Array.isArray(combinedData?.percorsi) ? combinedData.percorsi : [];
+        combinedRouteIndex = new Map();
 
         if (percorsiDisponibili.length === 0) {
           error.textContent = homeT("routeErrNoPaths");
@@ -2823,10 +2816,12 @@
           return;
         }
 
-        percorsiDisponibili.forEach(p => {
+        percorsiDisponibili.forEach((p, idx) => {
+          const routeId = String(p?.id || `${p?.source || "std"}::${p?.nome || idx}`);
+          combinedRouteIndex.set(routeId, p);
           const o = document.createElement('option');
-          o.value = p.nome;
-          o.textContent = p.nome;
+          o.value = routeId;
+          o.textContent = p.source === "ai_personalized" ? `${p.nome} (IA)` : p.nome;
           percorso.appendChild(o);
         });
         percorso.disabled = false;
@@ -2867,12 +2862,69 @@
     }
 
     if (selectedMode === 'navigator') {
-      const percorsoNome = document.getElementById('percorso').value;
-      if (!museoNome || !percorsoNome) {
+      const selectedRouteId = document.getElementById('percorso').value;
+      if (!museoNome || !selectedRouteId) {
         alert(homeT("alertPickMuseumRoute"));
         return;
       }
+      const selectedRoute = combinedRouteIndex.get(selectedRouteId);
+      if (!selectedRoute) {
+        alert("Percorso non trovato");
+        return;
+      }
 
+      if (selectedRoute.source === "ai_personalized") {
+        const objectNodes = Array.isArray(selectedRoute.oggetti) ? selectedRoute.oggetti : [];
+        const flowNodes = Array.isArray(selectedRoute.flowNodes) && selectedRoute.flowNodes.length > 0
+          ? selectedRoute.flowNodes
+          : objectNodes;
+        const firstNode = flowNodes[0] || objectNodes[0];
+        if (!firstNode) {
+          alert("Percorso IA vuoto");
+          return;
+        }
+        const personalizedRouteId = String(selectedRoute.id || "");
+        if (personalizedRouteId) {
+          try {
+            const currentLang = getHomeLang();
+            const i18n = selectedRoute.customDescriptionsByObjectI18n && typeof selectedRoute.customDescriptionsByObjectI18n === "object"
+              ? selectedRoute.customDescriptionsByObjectI18n
+              : {};
+            const descMap = i18n[currentLang] && typeof i18n[currentLang] === "object"
+              ? i18n[currentLang]
+              : (i18n.it && typeof i18n.it === "object"
+                ? i18n.it
+                : (selectedRoute.customDescriptionsByObject && typeof selectedRoute.customDescriptionsByObject === "object"
+                  ? selectedRoute.customDescriptionsByObject
+                  : {}));
+            const normalizedMap = Object.fromEntries(
+              Object.entries(descMap)
+                .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+                .filter(([k, v]) => !!k && !!v)
+            );
+            localStorage.setItem(`personalized_desc_${personalizedRouteId}`, JSON.stringify(normalizedMap));
+            localStorage.setItem(`personalized_desc_i18n_${personalizedRouteId}`, JSON.stringify(i18n));
+          } catch {}
+        }
+
+        // Cookie sessione MINIMALE: i dettagli percorso IA sono caricati dal DB utente all'avvio navigator.
+        setSession({
+          museo: museoNome,
+          percorso: ["IN", "OUT"],
+          createdAt: Date.now(),
+          personalizedRouteId,
+        });
+        history.replaceState(
+          null,
+          "",
+          `/?stanza=${encodeURIComponent("IN")}/path/${encodeURIComponent("IN")}/${encodeURIComponent(firstNode)}`
+        );
+        closeOverlay();
+        startReact();
+        return;
+      }
+
+      const percorsoNome = String(selectedRoute.nome || "").trim();
       fetch(`${API}/musei/${encodeURIComponent(museoNome)}/percorsi/${encodeURIComponent(percorsoNome)}`)
         .then(r => r.json())
         .then(d => {

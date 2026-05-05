@@ -21,6 +21,7 @@ type Session = {
   guideRole?: "teacher" | "student";
   guidedVisitId?: string;
   guidedParticipantToken?: string;
+  personalizedRouteId?: string;
   guidedCustomDescriptions?: Record<string, string>;
   guidedTextSteps?: Array<{ id?: string; room: string; text: string }>;
   guidedVirtualObjects?: Record<string, { room: string; label?: string; descrizioni?: string[][] }>;
@@ -205,6 +206,8 @@ export default function SvgViewer() {
   const [teacherVisitState, setTeacherVisitState] = useState<any>(null);
   const [teacherQuizResults, setTeacherQuizResults] = useState<any[]>([]);
   const [teacherShowResults, setTeacherShowResults] = useState(false);
+  const [personalizedRouteHydrating, setPersonalizedRouteHydrating] = useState(false);
+  const [personalizedRouteError, setPersonalizedRouteError] = useState<string | null>(null);
   const isGuidedVisit = !!session?.guidedVisitId;
 
   const lockedViewBox = useRef<string | null>(null);
@@ -226,6 +229,10 @@ export default function SvgViewer() {
 
   useEffect(() => {
     if (!session) return;
+    if (session?.personalizedRouteId && (!Array.isArray(session.guidedFlowNodes) || session.guidedFlowNodes.length < 1)) {
+      // Attendi hydration dal DB utente prima di caricare SVG/navigazione.
+      return;
+    }
     lastLoadedSvgUrlRef.current = null;
     const url = computeSvgUrl(session);
     loadSvg(
@@ -239,6 +246,105 @@ export default function SvgViewer() {
       !freeExploreRef.current
     );
   }, [session]);
+
+  useEffect(() => {
+    const routeId = String(session?.personalizedRouteId || "").trim();
+    if (!routeId) return;
+    if (Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0) return;
+    setPersonalizedRouteHydrating(true);
+    setPersonalizedRouteError(null);
+    let cancelled = false;
+    fetch(`${API_BASE}/users/me/percorsi/personalizzati/${encodeURIComponent(routeId)}`, { credentials: "include" })
+      .then(async (r) => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const reason = String(payload?.error || `HTTP ${r.status}`).trim();
+          throw new Error(reason || "risposta non valida dal server");
+        }
+        return payload;
+      })
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.error) {
+          const msg = `Errore caricamento visita personalizzata: ${d.error}`;
+          console.error(msg);
+          setPersonalizedRouteError(msg);
+          return;
+        }
+        const route = d?.percorsoPersonalizzato;
+        if (!route || typeof route !== "object") {
+          const msg = "Errore caricamento visita personalizzata: percorso non valido.";
+          console.error(msg, d);
+          setPersonalizedRouteError(msg);
+          return;
+        }
+        const objectNodes = Array.isArray(route.objectNodes)
+          ? route.objectNodes.map((x: any) => String(x || "").trim()).filter(Boolean)
+          : [];
+        const flowNodes = Array.isArray(route.flowNodes)
+          ? route.flowNodes.map((x: any) => String(x || "").trim()).filter(Boolean)
+          : objectNodes;
+        const textSteps = Array.isArray(route.textSteps) ? route.textSteps : [];
+        const currentLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
+        const routeI18n =
+          route?.customDescriptionsByObjectI18n && typeof route.customDescriptionsByObjectI18n === "object"
+            ? route.customDescriptionsByObjectI18n
+            : {};
+        const selectedDescMapRaw =
+          (routeI18n[currentLang] && typeof routeI18n[currentLang] === "object"
+            ? routeI18n[currentLang]
+            : (routeI18n.it && typeof routeI18n.it === "object"
+              ? routeI18n.it
+              : (route?.customDescriptionsByObject && typeof route.customDescriptionsByObject === "object"
+                ? route.customDescriptionsByObject
+                : {})));
+        const selectedDescMap = Object.fromEntries(
+          Object.entries(selectedDescMapRaw)
+            .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+            .filter(([k, v]) => !!k && !!v)
+        );
+        try {
+          localStorage.setItem(`personalized_desc_${routeId}`, JSON.stringify(selectedDescMap));
+          localStorage.setItem(`personalized_desc_i18n_${routeId}`, JSON.stringify(routeI18n));
+        } catch {}
+        const virtualObjects = textSteps.reduce((acc: any, step: any) => {
+          const stepId = String(step?.id || "").trim();
+          if (!stepId) return acc;
+          const node = `__text__${stepId}`;
+          const text = String(step?.text || "").trim();
+          const label = String(step?.label || "").trim();
+          acc[node] = {
+            room: String(step?.room || "").trim(),
+            label: label || "?",
+            descrizioni: Array.from({ length: 4 }, () => [text || "Item testo", text || "Item testo", text || "Item testo"]),
+          };
+          return acc;
+        }, {} as Record<string, any>);
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            percorso: ["IN", ...objectNodes, "OUT"],
+            guidedFlowNodes: flowNodes,
+            guidedTextSteps: textSteps,
+            guidedVirtualObjects: virtualObjects,
+            guidedCustomDescriptions: {},
+          };
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = `Errore caricamento visita personalizzata: ${err?.message || "errore sconosciuto"}`;
+        console.error(msg, err);
+        setPersonalizedRouteError(msg);
+      })
+      .finally(() => {
+        if (!cancelled) setPersonalizedRouteHydrating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.personalizedRouteId, session?.guidedFlowNodes, lang]);
 
   useEffect(() => {
     if (!session || freeExplore) return;
@@ -830,6 +936,17 @@ export default function SvgViewer() {
   };
 
   if (!session) return <div style={{ padding: 20 }}>{t("loading")}</div>;
+  if (session.personalizedRouteId && personalizedRouteHydrating) {
+    return <div style={{ padding: 20 }}>Caricamento visita personalizzata in corso...</div>;
+  }
+  if (session.personalizedRouteId && personalizedRouteError) {
+    return (
+      <div style={{ padding: 20 }}>
+        <p style={{ margin: "0 0 10px", color: "#b3261e", fontWeight: 700 }}>Errore visita personalizzata</p>
+        <p style={{ margin: 0, color: "#444" }}>{personalizedRouteError}</p>
+      </div>
+    );
+  }
 
   const objectDetailOverlayOpen = focusedObject != null;
   const blockMapChromeWhileObjectOpen = objectDetailOverlayOpen
@@ -1412,6 +1529,7 @@ function loadSvg(
 ) {
   const host = document.getElementById("svg-host");
   if (!host) return;
+  host.style.visibility = "hidden";
   fetch(url)
     .then(r => r.text())
     .then(svgText => {
@@ -1419,8 +1537,12 @@ function loadSvg(
       const svg = host.querySelector<SVGSVGElement>("svg");
       if (!svg) return;
       ensureCanonicalStanzaLabels(svg);
+      svg.style.visibility = "hidden";
       svg.style.transform = "";
       fitSvgToViewport(svg);
+      // Salva una viewBox base stabile per i calcoli zoom successivi.
+      // Evita oscillazioni quando zoomToRect viene chiamato partendo da una viewBox gia` zoomata.
+      svg.setAttribute("data-base-viewbox", svg.getAttribute("viewBox") || "0 0 800 600");
       svg.setAttribute("overflow", "visible");
       svg.style.overflow = "visible";
 
@@ -1432,16 +1554,33 @@ function loadSvg(
       bindObjectClicks(svg, session);
       renderGuidedTextMarkers(svg, session);
       mountExitInOutRoom(svg, onExitRequested);
+      requestAnimationFrame(() => {
+        svg.style.visibility = "visible";
+        host.style.visibility = "visible";
+      });
       onLoaded?.();
+    })
+    .catch(() => {
+      host.style.visibility = "visible";
     });
 }
 
 function renderGuidedTextMarkers(svg: SVGSVGElement, session: Session) {
   if (session?.guidedVisitId) return;
+  const flowSet = new Set(
+    Array.isArray(session?.guidedFlowNodes)
+      ? session.guidedFlowNodes.map((n) => String(n || "").trim()).filter(Boolean)
+      : []
+  );
   const textSteps = Array.isArray(session?.guidedTextSteps) ? session.guidedTextSteps : [];
   if (textSteps.length < 1) return;
   const byRoom = new Map<string, string>();
   for (const step of textSteps) {
+    const stepId = String(step?.id || "").trim();
+    const virtualNode = stepId ? `__text__${stepId}` : "";
+    // Nei percorsi personalizzati renderizza solo i focus davvero virtuali
+    // (quelli non già mappati a item testo reali nel flow).
+    if (session?.personalizedRouteId && (!virtualNode || !flowSet.has(virtualNode))) continue;
     const room = String(step?.room || "").trim();
     if (!room) continue;
     if (!byRoom.has(normalize(room))) byRoom.set(normalize(room), String(step?.text || "").trim());
@@ -1491,21 +1630,25 @@ function renderGuidedTextMarkers(svg: SVGSVGElement, session: Session) {
     g.style.pointerEvents = "all";
     g.setAttribute("transform", `translate(${center.x}, ${center.y})`);
 
-    const c = document.createElementNS(ns, "circle");
-    c.setAttribute("cx", "0");
-    c.setAttribute("cy", "0");
-    c.setAttribute("r", "10");
-    c.setAttribute("class", "oggetto");
-    g.appendChild(c);
+    // Hit-area invisibile: evita il "cerchio blu" sotto la preview custom.
+    const hit = document.createElementNS(ns, "circle");
+    hit.setAttribute("cx", "0");
+    hit.setAttribute("cy", "0");
+    hit.setAttribute("r", "16");
+    hit.setAttribute("fill", "transparent");
+    hit.setAttribute("stroke", "none");
+    g.appendChild(hit);
 
-    const t = document.createElementNS(ns, "text");
-    t.setAttribute("x", "0");
-    t.setAttribute("y", "3");
-    t.setAttribute("text-anchor", "middle");
-    t.setAttribute("dominant-baseline", "middle");
-    t.setAttribute("class", "oggetto-label");
-    t.textContent = "?";
-    g.appendChild(t);
+    const img = document.createElementNS(ns, "image");
+    img.setAttribute("href", "/foto/pt.png");
+    img.setAttribute("x", "-15");
+    img.setAttribute("y", "-15");
+    img.setAttribute("width", "30");
+    img.setAttribute("height", "30");
+    img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    img.setAttribute("pointer-events", "none");
+    g.appendChild(img);
+
     const textNode = textNodeByRoom.get(roomLabel);
     if (textNode) {
       g.addEventListener("click", (e) => {
@@ -2268,8 +2411,9 @@ function zoomToRect(
 
   const svgRect = svg.getBoundingClientRect();
   const vbParts = (svg.getAttribute("viewBox") ?? "0 0 800 600").split(" ").map(Number);
-  const fallbackW = vbParts[2] || 800;
-  const fallbackH = vbParts[3] || 600;
+  const baseVbParts = (svg.getAttribute("data-base-viewbox") ?? svg.getAttribute("viewBox") ?? "0 0 800 600").split(" ").map(Number);
+  const fallbackW = baseVbParts[2] || vbParts[2] || 800;
+  const fallbackH = baseVbParts[3] || vbParts[3] || 600;
   const svgW = svgRect.width || svg.clientWidth || fallbackW;
   const svgH = svgRect.height || svg.clientHeight || fallbackH;
   const containerAspect = svgW / svgH;
@@ -2432,6 +2576,7 @@ function ObjectOverlay({
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [fetchedObjectType, setFetchedObjectType] = useState<string | null>(null);
+  const [preloadedPersonalizedDescMap, setPreloadedPersonalizedDescMap] = useState<Record<string, string>>({});
   const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
     ? session.guidedFlowNodes
     : (Array.isArray(session?.percorso) ? session.percorso : []);
@@ -2450,13 +2595,101 @@ function ObjectOverlay({
     ? String(virtualObject.label || "").trim() || t("itemTextFallback")
     : nome;
 
+  const readImmediateGuidedText = () => {
+    const fromState = String(
+      session?.guidedCustomDescriptions?.[nome]
+      || preloadedPersonalizedDescMap?.[nome]
+      || ""
+    ).trim();
+    if (fromState) return fromState;
+    const routeId = String(session?.personalizedRouteId || "").trim();
+    if (!routeId) return "";
+    try {
+      const currentLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
+      const rawI18n = localStorage.getItem(`personalized_desc_i18n_${routeId}`);
+      if (rawI18n) {
+        const parsed = JSON.parse(rawI18n);
+        if (parsed && typeof parsed === "object") {
+          const row =
+            (parsed[currentLang] && typeof parsed[currentLang] === "object")
+              ? parsed[currentLang]
+              : ((parsed.it && typeof parsed.it === "object") ? parsed.it : {});
+          const text = String(row?.[nome] || "").trim();
+          if (text) return text;
+        }
+      }
+      const raw = localStorage.getItem(`personalized_desc_${routeId}`);
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return "";
+      return String(parsed?.[nome] || "").trim();
+    } catch {
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    const routeId = String(session?.personalizedRouteId || "").trim();
+    if (!routeId) {
+      setPreloadedPersonalizedDescMap({});
+      return;
+    }
+    try {
+      const currentLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
+      const i18nRaw = localStorage.getItem(`personalized_desc_i18n_${routeId}`);
+      if (i18nRaw) {
+        const i18nParsed = JSON.parse(i18nRaw);
+        if (i18nParsed && typeof i18nParsed === "object") {
+          const langMapRaw =
+            (i18nParsed[currentLang] && typeof i18nParsed[currentLang] === "object"
+              ? i18nParsed[currentLang]
+              : (i18nParsed.it && typeof i18nParsed.it === "object" ? i18nParsed.it : {}));
+          const normalized = Object.fromEntries(
+            Object.entries(langMapRaw)
+              .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+              .filter(([k, v]) => !!k && !!v)
+          );
+          setPreloadedPersonalizedDescMap(normalized);
+          return;
+        }
+      }
+      const raw = localStorage.getItem(`personalized_desc_${routeId}`);
+      if (!raw) {
+        setPreloadedPersonalizedDescMap({});
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        setPreloadedPersonalizedDescMap({});
+        return;
+      }
+      const normalized = Object.fromEntries(
+        Object.entries(parsed)
+          .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+          .filter(([k, v]) => !!k && !!v)
+      );
+      setPreloadedPersonalizedDescMap(normalized);
+    } catch {
+      setPreloadedPersonalizedDescMap({});
+    }
+  }, [session?.personalizedRouteId, lang]);
+
   useEffect(() => {
     setSlideIdx(0);
     setFetchedObjectType(null);
+    const guidedText = readImmediateGuidedText();
     if (virtualObject) {
       setAutore("");
       setCorrenteArtistica("");
       setAnno("");
+      if (guidedText) {
+        setDescrizione(guidedText);
+        setImmagini([]);
+        return;
+      }
+      if (session?.personalizedRouteId && (lang === "en" || lang === "fr")) {
+        console.error(`Descrizione custom mancante per ${nome} in lingua ${lang}; fallback usato.`);
+      }
       getUserPreferences()
         .then((prefs) =>
           setDescrizione(
@@ -2470,7 +2703,6 @@ function ObjectOverlay({
       setImmagini([]);
       return;
     }
-    const guidedText = String(session?.guidedCustomDescriptions?.[nome] || "").trim();
     // Carica dettagli oggetto (descrizione + meta dati autore/corrente).
     Promise.all([
       fetch(
@@ -2483,15 +2715,17 @@ function ObjectOverlay({
         setAutore(String(d?.autore || "").trim());
         setCorrenteArtistica(String(d?.correnteArtistica || "").trim());
         setAnno(String(d?.anno || "").trim());
-        if (guidedText) {
-          setDescrizione(guidedText);
-          return;
-        }
         const best = pickDescriptionByPreferences(
           pickDescrizioniMatrixForLang(d, lang),
           prefs
         );
-        setDescrizione(best);
+        // Le descrizioni custom dei percorsi IA sono salvate in italiano:
+        // se utente cambia lingua, preferiamo la descrizione oggetto nella lingua selezionata.
+        if (guidedText && normalize(lang) === "it") {
+          setDescrizione(guidedText);
+          return;
+        }
+        setDescrizione(best || guidedText || null);
       })
       .catch(() => {
         setFetchedObjectType(null);
@@ -2513,7 +2747,7 @@ function ObjectOverlay({
         setImmagini(lista);
       })
       .catch(() => setImmagini([]));
-  }, [nome, session, virtualObject, lang]);
+  }, [nome, session, virtualObject, lang, preloadedPersonalizedDescMap]);
 
   useEffect(() => {
     setChatMessages([]);
@@ -2551,7 +2785,6 @@ function ObjectOverlay({
       };
       const stanzaFrom = await getNodeRoom(oggettoCorrente);
       history.pushState(null, "", `/?stanza=${encodeURIComponent(stanzaFrom || "IN")}/path/${encodeURIComponent(oggettoCorrente)}/${encodeURIComponent(oggettoAltro)}`);
-      onClose();
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {
       console.error("Errore updateURL:", err);
@@ -2646,7 +2879,6 @@ function ObjectOverlay({
           await syncTeacherNavigationByNode("OUT");
           const stanzaObj = await fetchObjectRoom(session.museo, nome);
           history.pushState(null, "", `/?stanza=${stanzaObj}/path/${encodeURIComponent(nome)}/${encodeURIComponent("OUT")}`);
-          onClose();
           window.dispatchEvent(new PopStateEvent("popstate"));
         }
         return;
@@ -2659,12 +2891,14 @@ function ObjectOverlay({
     }
     const percorso = session.percorso;
     const index = percorso.indexOf(nome);
-    if (index === -1 || index >= percorso.length - 2) {
-      if (session.guideRole === "teacher" && index === percorso.length - 2) {
-        await syncTeacherNavigationByNode("OUT");
+    if (index === -1) return;
+    if (index >= percorso.length - 2) {
+      if (index === percorso.length - 2) {
+        if (session.guideRole === "teacher") {
+          await syncTeacherNavigationByNode("OUT");
+        }
         const stanzaObj = await fetchObjectRoom(session.museo, nome);
         history.pushState(null, "", `/?stanza=${stanzaObj}/path/${encodeURIComponent(nome)}/${encodeURIComponent("OUT")}`);
-        onClose();
         window.dispatchEvent(new PopStateEvent("popstate"));
       }
       return;
@@ -2689,10 +2923,11 @@ function ObjectOverlay({
     const percorso = session.percorso;
     const index = percorso.indexOf(nome);
     if (index <= 1) return;
-    const target = percorso[index - 1];
-    await syncTeacherNavigationByObject(target);
-    const source = index - 2 >= 0 ? percorso[index - 2] : "IN";
-    updateURL(source, target);
+    const prevNode = percorso[index - 1];
+    await syncTeacherNavigationByObject(prevNode);
+    // Manteniamo la coppia locale precedente->corrente (es: mummia->collana)
+    // per evitare salti al segmento precedente (es: IN->mummia).
+    updateURL(prevNode, percorso[index]);
   };
 
   const prevSlide = (e: React.MouseEvent) => {
@@ -2920,7 +3155,6 @@ function ObjectOverlay({
               <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "#1a2b3c", textTransform: "uppercase" }}>
                 {t("aiQuestions")}
               </p>
-              <span style={{ fontSize: 10, color: "#7a8794" }}>{t("aiQuestionsHint")}</span>
             </div>
 
             {!chatLoading && (
@@ -2958,62 +3192,59 @@ function ObjectOverlay({
               </div>
             )}
 
-            <div
-              style={{
-                maxHeight: 200,
-                overflowY: "auto",
-                borderRadius: 12,
-                padding: 10,
-                background: "#eef2f7",
-                border: "1px solid #dce4ee",
-                marginBottom: 10,
-                touchAction: "pan-y",
-                WebkitOverflowScrolling: "touch",
-                overscrollBehavior: "contain",
-              }}
-            >
-              {chatMessages.length === 0 && !chatLoading && (
-                <p style={{ margin: 0, color: "#6b7c8c", fontSize: 12, lineHeight: 1.45 }}>
-                  {t("aiHelpInitial")}
-                </p>
-              )}
-              {chatMessages.length > 0 && !chatLoading && (
-                <p style={{ margin: "0 0 8px", color: "#6b7c8c", fontSize: 11, lineHeight: 1.4 }}>
-                  {t("aiHelpFollow")}
-                </p>
-              )}
-              {chatMessages.map((msg, idx) => (
-                <div
-                  key={`${msg.role}-${idx}`}
-                  style={{
-                    display: "flex",
-                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                    marginBottom: 8,
-                  }}
-                >
+            {(chatMessages.length > 0 || chatLoading) && (
+              <div
+                style={{
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  borderRadius: 12,
+                  padding: 10,
+                  background: "#eef2f7",
+                  border: "1px solid #dce4ee",
+                  marginBottom: 10,
+                  touchAction: "pan-y",
+                  WebkitOverflowScrolling: "touch",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {chatMessages.length > 0 && !chatLoading && (
+                  <p style={{ margin: "0 0 8px", color: "#6b7c8c", fontSize: 11, lineHeight: 1.4 }}>
+                    {t("aiHelpFollow")}
+                  </p>
+                )}
+                {chatMessages.map((msg, idx) => (
                   <div
+                    key={`${msg.role}-${idx}`}
                     style={{
-                      maxWidth: "92%",
-                      padding: "8px 11px",
-                      borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                      background: msg.role === "user" ? "#185FA5" : "#fff",
-                      color: msg.role === "user" ? "#fff" : "#2c3e50",
-                      boxShadow: msg.role === "user" ? "0 2px 8px rgba(24,95,165,0.25)" : "0 1px 3px rgba(0,0,0,0.06)",
-                      border: msg.role === "user" ? "none" : "1px solid #e4eaf2",
+                      display: "flex",
+                      justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                      marginBottom: 8,
                     }}
                   >
-                    {msg.text}
+                    <div
+                      style={{
+                        maxWidth: "92%",
+                        padding: "8px 11px",
+                        borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        background: msg.role === "user" ? "#185FA5" : "#fff",
+                        color: msg.role === "user" ? "#fff" : "#2c3e50",
+                        boxShadow: msg.role === "user" ? "0 2px 8px rgba(24,95,165,0.25)" : "0 1px 3px rgba(0,0,0,0.06)",
+                        border: msg.role === "user" ? "none" : "1px solid #e4eaf2",
+                      }}
+                    >
+                      {msg.text}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {chatLoading && (
-                <p style={{ margin: 0, fontSize: 11, color: "#185FA5", fontStyle: "italic" }}>
-                  {t("aiThinking")}
-                </p>
-              )}
-            </div>
+                ))}
+                {chatLoading && (
+                  <p style={{ margin: 0, fontSize: 11, color: "#185FA5", fontStyle: "italic" }}>
+                    {t("aiThinking")}
+                  </p>
+                )}
+              </div>
+            )}
 
             <form
               onSubmit={(e) => {
@@ -3069,7 +3300,7 @@ function ObjectOverlay({
         </div>
 
         {/* ── Navigazione percorso ── */}
-        {showNav && isObjectInPath && (
+        {showNav && isObjectInPath && !isGuidedVirtualTextItem && (
           <div style={{
             display: "flex", justifyContent: "space-between",
             padding: "12px 24px", borderTop: "1px solid #eee", flexShrink: 0,

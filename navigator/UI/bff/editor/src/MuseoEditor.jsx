@@ -99,6 +99,21 @@ async function apiListRoomImages(museo, stanza) {
   return res.json();
 }
 
+async function apiListMarketplaceRequests(museo, status = "") {
+  const qs = new URLSearchParams();
+  if (museo) qs.set("museo", museo);
+  if (status) qs.set("status", status);
+  const query = qs.toString();
+  return apiFetch(`/admin/marketplace/richieste${query ? `?${query}` : ""}`);
+}
+
+async function apiDecideMarketplaceRequest(id, status, note = "") {
+  return apiFetch(`/admin/marketplace/richieste/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, note }),
+  });
+}
+
 function roomBackgroundUrl(museo, stanza, tipo = "preview", v = 0) {
   const baseUrl = `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${encodeURIComponent(tipo)}`;
   return v > 0 ? `${baseUrl}?v=${v}` : baseUrl;
@@ -953,6 +968,10 @@ export default function MuseoEditor() {
   const [percorsoHoverObj, setPercorsoHoverObj] = useState(null);
   const [rightPanelTab, setRightPanelTab]       = useState("details");
   const [mobileSection, setMobileSection]       = useState("canvas");
+  const [marketplaceRequests, setMarketplaceRequests] = useState([]);
+  const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("pending");
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+  const [marketplaceActionId, setMarketplaceActionId] = useState("");
 
   const showPrompt = (message, defaultValue = "") =>
     new Promise(resolve => setModal({ message, defaultValue, onConfirm: resolve }));
@@ -1084,6 +1103,38 @@ export default function MuseoEditor() {
       setSelected(null); setScreen("editor");
     } catch(e) { alert(`Errore caricamento: ${e.message}`); }
     finally { setLoadingMuseo(null); }
+  };
+
+  const loadMarketplaceRequests = useCallback(async () => {
+    if (!museo.nome || screen !== "editor") return;
+    setMarketplaceLoading(true);
+    try {
+      const data = await apiListMarketplaceRequests(museo.nome, marketplaceStatusFilter);
+      setMarketplaceRequests(Array.isArray(data?.richieste) ? data.richieste : []);
+    } catch (e) {
+      setMarketplaceRequests([]);
+      showToast(`Errore richieste marketplace: ${e.message}`, false);
+    } finally {
+      setMarketplaceLoading(false);
+    }
+  }, [museo.nome, marketplaceStatusFilter, screen]);
+
+  useEffect(() => {
+    if (screen === "editor" && museo.nome) loadMarketplaceRequests();
+  }, [screen, museo.nome, loadMarketplaceRequests]);
+
+  const decideMarketplaceRequest = async (requestId, status) => {
+    if (!requestId) return;
+    setMarketplaceActionId(requestId);
+    try {
+      await apiDecideMarketplaceRequest(requestId, status);
+      showToast(status === "approved" ? "Richiesta approvata" : "Richiesta rifiutata");
+      await loadMarketplaceRequests();
+    } catch (e) {
+      showToast(`Errore aggiornamento richiesta: ${e.message}`, false);
+    } finally {
+      setMarketplaceActionId("");
+    }
   };
 
   const creaMuseoNuovo = async () => {
@@ -2248,6 +2299,16 @@ export default function MuseoEditor() {
           >
             Liste
           </button>
+          <button
+            onClick={() => setRightPanelTab("requests")}
+            style={{
+              flex:1,padding:"7px 8px",borderRadius:6,border:`1px solid ${rightPanelTab==="requests"?THEME.accent:THEME.border}`,
+              background:rightPanelTab==="requests"?THEME.accentSoft:THEME.surface,color:rightPanelTab==="requests"?THEME.accent:THEME.textDim,
+              fontSize:11,cursor:"pointer"
+            }}
+          >
+            Richieste
+          </button>
         </div>
 
         <div style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
@@ -2481,6 +2542,73 @@ export default function MuseoEditor() {
                 </div>
               </div>
               <button onClick={deleteSelected} style={{...DELBTN,marginTop:12}}>✕ Elimina corridoio</button>
+            </Card>
+          )}
+
+          {rightPanelTab === "requests" && (
+            <Card title="RICHIESTE MARKETPLACE" color={THEME.accent}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <select
+                  value={marketplaceStatusFilter}
+                  onChange={(e) => setMarketplaceStatusFilter(e.target.value)}
+                  style={{ ...INP, marginBottom: 0 }}
+                >
+                  <option value="pending">In attesa</option>
+                  <option value="approved">Approvate</option>
+                  <option value="rejected">Rifiutate</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadMarketplaceRequests}
+                  style={{ ...BTN_SM, minWidth: 92 }}
+                >
+                  Aggiorna
+                </button>
+              </div>
+              {marketplaceLoading ? (
+                <div style={{ fontSize: 12, color: THEME.textDim }}>Caricamento richieste...</div>
+              ) : marketplaceRequests.length === 0 ? (
+                <div style={{ fontSize: 12, color: THEME.textFaint }}>Nessuna richiesta per questo filtro.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {marketplaceRequests.map((r) => {
+                    const busy = marketplaceActionId === r.id;
+                    const fullName = `${r.userNome || ""} ${r.userCognome || ""}`.trim();
+                    return (
+                      <div key={r.id} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "8px 10px", background: THEME.surface }}>
+                        <div style={{ fontSize: 12, color: THEME.text, marginBottom: 4 }}>
+                          <strong>{r.oggetto}</strong> - {Number(r.prezzo || 0).toFixed(2).replace(".", ",")} EUR
+                        </div>
+                        <div style={{ fontSize: 11, color: THEME.textDim, marginBottom: 2 }}>Museo: {r.museo}</div>
+                        <div style={{ fontSize: 11, color: THEME.textDim, marginBottom: 6 }}>
+                          Utente: {fullName || "N/D"} ({r.userEmail || "N/D"})
+                        </div>
+                        <div style={{ fontSize: 11, color: THEME.textFaint, marginBottom: 8 }}>Stato: {r.status || "pending"}</div>
+                        {String(r.status || "").toLowerCase() === "pending" && (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => decideMarketplaceRequest(r.id, "approved")}
+                              style={{ ...BTN_SM, border: `1px solid ${THEME.accent}`, color: THEME.accent, opacity: busy ? 0.7 : 1 }}
+                            >
+                              Approva
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => decideMarketplaceRequest(r.id, "rejected")}
+                              style={{ ...BTN_SM, border: `1px solid ${THEME.danger}`, color: THEME.danger, opacity: busy ? 0.7 : 1 }}
+                            >
+                              Rifiuta
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </Card>
           )}
 

@@ -52,8 +52,12 @@ const USERS_COLLECTION = "users";
 const SESSIONS_COLLECTION = "sessions";
 const PROFESSOR_CODES_COLLECTION = "professor_codes";
 const GUIDED_VISITS_COLLECTION = "guided_visits";
+const MARKETPLACE_OBJECT_REQUESTS_COLLECTION = "marketplace_object_requests";
 const SESSION_COOKIE_NAME = "muto_auth";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const MARKETPLACE_OBJECT_FIXED_PRICE = normalizePrezzo(process.env.MARKETPLACE_OBJECT_FIXED_PRICE || 25);
+const PERSONAL_ROUTE_AI_RATE_MS = 1000 * 20;
+const personalRouteRateMap = new Map();
 
 const ALLOWED_INTERESTS = [
   "storia",
@@ -67,6 +71,11 @@ const ALLOWED_INTERESTS = [
 ];
 const ALLOWED_LEVELS = ["bambino", "studente", "esperto", "avanzato"];
 const ALLOWED_DURATIONS = ["corto", "medio", "lungo", "esteso"];
+const PERSONAL_ROUTE_LENGTH_PRESETS = {
+  breve: 0.2,
+  medio: 0.5,
+  lungo: 0.8,
+};
 /** Lingua UI navigatore / traduzione risposte AI (default it) */
 const ALLOWED_NAV_LANGS = ["it", "en", "fr"];
 
@@ -80,6 +89,32 @@ function normalizePrezzo(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.round(parsed * 100) / 100;
+}
+
+function clampInt(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function uniqueStrings(list = []) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of list) {
+    const value = String(raw || "").trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function normalizePersonalRouteLengthPreset(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(PERSONAL_ROUTE_LENGTH_PRESETS, key) ? key : "medio";
+}
+
+function personalRouteTargetCount(totalObjects, lengthPreset) {
+  const ratio = PERSONAL_ROUTE_LENGTH_PRESETS[normalizePersonalRouteLengthPreset(lengthPreset)] || 0.5;
+  return clampInt(Math.round(totalObjects * ratio), 1, Math.max(1, totalObjects));
 }
 
 function normalizePercorso(percorso = {}) {
@@ -182,6 +217,7 @@ function userPublicView(user) {
     navLang: normalizeNavLang(user.navLang),
     ruolo: user.ruolo,
     percorsiAcquistati: user.percorsiAcquistati || [],
+    percorsiPersonalizzati: user.percorsiPersonalizzati || [],
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -189,6 +225,10 @@ function userPublicView(user) {
 
 function isProfessor(user) {
   return String(user?.ruolo || "").toLowerCase() === "professore";
+}
+
+function isAdmin(user) {
+  return String(user?.ruolo || "").toLowerCase() === "admin";
 }
 
 function sanitizeGuidedVisitStep(step = {}, fallbackIndex = 0) {
@@ -436,6 +476,18 @@ async function aiCompleteJsonObject({ system, user, maxTokens = 3500, temperatur
   }
 }
 
+async function withTimeout(promise, ms, label = "operation") {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function aiTranslateDescrizioniMatrixFromIt(matrixIt, targetLang) {
   const langName = targetLang === "en" ? "English" : "French";
   const system = [
@@ -465,6 +517,513 @@ async function aiTranslateLayoutLabels({ stanzeNomi, percorsiNomi }) {
   const stanze = out?.stanze && typeof out.stanze === "object" ? out.stanze : {};
   const percorsi = out?.percorsi && typeof out.percorsi === "object" ? out.percorsi : {};
   return { stanze, percorsi };
+}
+
+function normalizePersonalRouteStorage(route = {}, fallbackMuseo = "") {
+  const id = String(route.id || new ObjectId().toString()).trim();
+  const museo = String(route.museo || fallbackMuseo || "").trim();
+  const nome = String(route.nome || "Percorso personalizzato").trim();
+  const lengthPreset = normalizePersonalRouteLengthPreset(route.lengthPreset);
+  const targetRatio = Number(PERSONAL_ROUTE_LENGTH_PRESETS[lengthPreset] || 0.5);
+  const flowNodes = uniqueStrings(Array.isArray(route.flowNodes) ? route.flowNodes : []);
+  const objectNodes = uniqueStrings(Array.isArray(route.objectNodes) ? route.objectNodes : flowNodes.filter((n) => !String(n).startsWith("__text__")));
+  const textSteps = (Array.isArray(route.textSteps) ? route.textSteps : [])
+    .map((step, idx) => ({
+      id: String(step?.id || `txt_${idx + 1}`).trim(),
+      room: String(step?.room || "").trim(),
+      label: String(step?.label || "").trim(),
+      text: String(step?.text || "").trim(),
+      insertAfterObject: String(step?.insertAfterObject || "").trim(),
+    }))
+    .filter((step) => !!step.id && !!step.room && !!step.text);
+  const customDescriptionsByObject = Object.fromEntries(
+    Object.entries(route.customDescriptionsByObject && typeof route.customDescriptionsByObject === "object" ? route.customDescriptionsByObject : {})
+      .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+      .filter(([k, v]) => !!k && !!v)
+  );
+  const customDescriptionsByObjectI18nRaw =
+    route.customDescriptionsByObjectI18n && typeof route.customDescriptionsByObjectI18n === "object"
+      ? route.customDescriptionsByObjectI18n
+      : {};
+  const customDescriptionsByObjectI18n = {};
+  for (const lang of ALLOWED_NAV_LANGS) {
+    const row = customDescriptionsByObjectI18nRaw[lang];
+    if (!row || typeof row !== "object") continue;
+    const normalizedRow = Object.fromEntries(
+      Object.entries(row)
+        .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+        .filter(([k, v]) => !!k && !!v)
+    );
+    if (Object.keys(normalizedRow).length > 0) customDescriptionsByObjectI18n[lang] = normalizedRow;
+  }
+  const generatedFrom = route.generatedFrom && typeof route.generatedFrom === "object" ? route.generatedFrom : {};
+  return {
+    id,
+    museo,
+    nome,
+    source: "ai_personalized",
+    lengthPreset,
+    targetRatio,
+    flowNodes,
+    objectNodes,
+    textSteps,
+    customDescriptionsByObject,
+    customDescriptionsByObjectI18n,
+    generatedFrom: {
+      interessi: Array.isArray(generatedFrom.interessi) ? generatedFrom.interessi : [],
+      livello: String(generatedFrom.livello || "").trim(),
+      durata: String(generatedFrom.durata || "").trim(),
+      navLang: normalizeNavLang(generatedFrom.navLang),
+    },
+    createdAt: route.createdAt ? new Date(route.createdAt) : new Date(),
+    updatedAt: route.updatedAt ? new Date(route.updatedAt) : new Date(),
+  };
+}
+
+function buildMuseumObjectDocs(museo) {
+  return Array.from((museo?.oggetti instanceof Map ? museo.oggetti.values() : [])).map((o) => ({
+    nome: String(o?.nome || "").trim(),
+    stanza: String(o?.stanza || "").trim(),
+    objectType: String(o?.objectType || "").trim().toLowerCase() || "normal",
+    autore: String(o?.autore || "").trim(),
+    anno: String(o?.anno || "").trim(),
+    correnteArtistica: String(o?.correnteArtistica || "").trim(),
+    connessi: uniqueStrings(Array.isArray(o?.connessi) ? o.connessi : []),
+    descrizioni: Array.isArray(o?.descrizioni) ? o.descrizioni : [],
+    descrizioniI18n: o?.descrizioniI18n && typeof o.descrizioniI18n === "object" ? o.descrizioniI18n : {},
+  })).filter((o) => !!o.nome);
+}
+
+function fallbackPersonalizedRoute({ objectDocs, targetCount, userPrefs }) {
+  const interests = Array.isArray(userPrefs?.interessi) ? userPrefs.interessi.map((x) => String(x || "").toLowerCase()) : [];
+  const scoreObject = (obj) => {
+    const hay = `${obj.nome} ${obj.autore} ${obj.correnteArtistica}`.toLowerCase();
+    let score = 1;
+    for (const interest of interests) {
+      if (!interest) continue;
+      if (hay.includes(interest.replaceAll("_", " "))) score += 4;
+    }
+    if (obj.autore) score += 1;
+    if (obj.correnteArtistica) score += 1;
+    return score;
+  };
+  const selectedObjects = objectDocs
+    .slice()
+    .sort((a, b) => scoreObject(b) - scoreObject(a))
+    .slice(0, targetCount)
+    .map((o) => o.nome);
+  const byName = new Map(objectDocs.map((o) => [o.nome, o]));
+  const textObjectByRoom = new Map(
+    objectDocs
+      .filter((o) => String(o?.objectType || "").toLowerCase() === "text" && o?.stanza && o?.nome)
+      .map((o) => [String(o.stanza).trim().toLowerCase(), o.nome])
+  );
+  const usedRooms = new Set();
+  const textSteps = [];
+  const textDescriptionsByObject = {};
+  for (const objName of selectedObjects) {
+    const obj = byName.get(objName);
+    if (!obj) continue;
+    const room = String(obj.stanza || "").trim();
+    if (!room || usedRooms.has(room)) continue;
+    usedRooms.add(room);
+    const tema = interests.length > 0 ? interests.join(", ") : "la tua sensibilita culturale";
+    const autore = obj.autore ? `, attribuita a ${obj.autore}` : "";
+    const corrente = obj.correnteArtistica ? ` legata a ${obj.correnteArtistica}` : "";
+    const anno = obj.anno ? ` e datata ${obj.anno}` : "";
+    const text = `Entrando in questa sala, ${objName}${autore}${anno}${corrente} diventa un ottimo punto di partenza per leggere un tema vicino ai tuoi interessi (${tema}). Nota una curiosita: dettagli simbolici e scelte stilistiche simili compaiono anche in altre collezioni europee dedicate al potere e al rito, spesso legate a figure storiche molto note. Prova a confrontare materiali, gesto e funzione dell'opera: capirai meglio perche questa stanza e strategica nel tuo percorso personalizzato.`;
+    const mappedTextObject = textObjectByRoom.get(room.toLowerCase());
+    if (mappedTextObject) {
+      textDescriptionsByObject[mappedTextObject] = text;
+    }
+    textSteps.push({
+      id: `txt_${textSteps.length + 1}`,
+      room,
+      label: `Focus ${textSteps.length + 1}`,
+      text,
+      insertAfterObject: objName,
+    });
+    if (textSteps.length >= 2) break;
+  }
+  return { selectedObjects, textSteps, textDescriptionsByObject };
+}
+
+async function aiGeneratePersonalRoute({ museoNome, objectDocs, targetCount, userPrefs }) {
+  if (!aiUpstreamReady()) {
+    return fallbackPersonalizedRoute({ objectDocs, targetCount, userPrefs });
+  }
+  const system = [
+    "Sei un curatore museale che produce JSON valido per un percorso personalizzato.",
+    "Rispondi SOLO con JSON, nessun testo extra.",
+    "Schema richiesto: {\"selectedObjects\":[\"...\"],\"textSteps\":[{\"room\":\"...\",\"label\":\"...\",\"text\":\"...\",\"insertAfterObject\":\"...\"}],\"rationaleShort\":\"...\"}.",
+    "Vincoli: selectedObjects deve contenere SOLO nomi presenti in input, senza duplicati, lunghezza vicina a targetCount.",
+    "Vincoli textSteps: max 3, room e insertAfterObject devono essere coerenti con selectedObjects.",
+    "Inserisci textSteps in stanze significative per interessi utente.",
+    "Ogni textStep deve essere scritto come mini-racconto curatoriale di stanza, non come scheda tecnica.",
+    "Ogni textStep deve includere: 1) un gancio narrativo, 2) almeno una curiosita concreta, 3) un collegamento a personaggi/eventi/opere celebri anche esterni al museo (esplicitando che e un confronto culturale), 4) una piccola domanda o spunto di osservazione personalizzato.",
+    "Evita formule generiche ripetitive come 'In questa stanza trovi...'.",
+  ].join(" ");
+  const user = JSON.stringify({
+    museo: museoNome,
+    targetCount,
+    userPreferences: {
+      interessi: userPrefs?.interessi || [],
+      livello: userPrefs?.livello || "",
+      durata: userPrefs?.durata || "",
+      navLang: normalizeNavLang(userPrefs?.navLang),
+    },
+    objects: objectDocs.map((o) => ({
+      nome: o.nome,
+      stanza: o.stanza,
+      autore: o.autore,
+      anno: o.anno,
+      correnteArtistica: o.correnteArtistica,
+      connessi: o.connessi,
+    })),
+  });
+  const out = await aiCompleteJsonObject({ system, user, maxTokens: 3200, temperature: 0.25 });
+  return {
+    selectedObjects: uniqueStrings(Array.isArray(out?.selectedObjects) ? out.selectedObjects : []),
+    textSteps: Array.isArray(out?.textSteps) ? out.textSteps : [],
+  };
+}
+
+function validateAndRepairPersonalRoute({ objectDocs, aiRoute, targetCount }) {
+  const byName = new Map(objectDocs.map((o) => [o.nome, o]));
+  const textObjectByRoom = new Map(
+    objectDocs
+      .filter((o) => String(o?.objectType || "").toLowerCase() === "text" && o?.stanza && o?.nome)
+      .map((o) => [String(o.stanza).trim().toLowerCase(), o.nome])
+  );
+  let selectedObjects = uniqueStrings(Array.isArray(aiRoute?.selectedObjects) ? aiRoute.selectedObjects : [])
+    .filter((name) => byName.has(name));
+  if (selectedObjects.length < 1) {
+    selectedObjects = objectDocs.slice(0, targetCount).map((o) => o.nome);
+  }
+  if (selectedObjects.length > targetCount) selectedObjects = selectedObjects.slice(0, targetCount);
+  if (selectedObjects.length < targetCount) {
+    for (const obj of objectDocs) {
+      if (selectedObjects.includes(obj.nome)) continue;
+      selectedObjects.push(obj.nome);
+      if (selectedObjects.length >= targetCount) break;
+    }
+  }
+  const selectedSet = new Set(selectedObjects);
+  const usedTextIds = new Set();
+  const roomTextObjectUsed = new Set();
+  const roomVirtualTextUsed = new Set();
+  const textDescriptionsByObject = {};
+  const textSteps = (Array.isArray(aiRoute?.textSteps) ? aiRoute.textSteps : [])
+    .map((s, idx) => ({
+      id: String(s?.id || `txt_${idx + 1}`).trim(),
+      room: String(s?.room || "").trim(),
+      label: String(s?.label || "").trim() || `Focus ${idx + 1}`,
+      text: String(s?.text || "").trim(),
+      insertAfterObject: String(s?.insertAfterObject || "").trim(),
+    }))
+    .filter((s) => s.text && s.room && s.insertAfterObject && selectedSet.has(s.insertAfterObject))
+    .filter((s) => {
+      if (!s.id || usedTextIds.has(s.id)) return false;
+      const roomKey = String(s.room || "").trim().toLowerCase();
+      const mappedTextObject = textObjectByRoom.get(roomKey);
+      if (mappedTextObject) {
+        if (roomTextObjectUsed.has(mappedTextObject)) return false;
+        roomTextObjectUsed.add(mappedTextObject);
+        textDescriptionsByObject[mappedTextObject] = s.text;
+      } else {
+        if (roomVirtualTextUsed.has(roomKey)) return false;
+        roomVirtualTextUsed.add(roomKey);
+        textDescriptionsByObject[`__text__${s.id}`] = s.text;
+      }
+      usedTextIds.add(s.id);
+      return true;
+    })
+    .slice(0, 3);
+
+  const flowNodes = [];
+  const objectNodesWithText = [];
+  for (const objectName of selectedObjects) {
+    flowNodes.push(objectName);
+    objectNodesWithText.push(objectName);
+    const inlineTexts = textSteps.filter((t) => t.insertAfterObject === objectName && String(t.room || "").trim());
+    for (const t of inlineTexts) {
+      const mappedTextObject = textObjectByRoom.get(String(t.room || "").trim().toLowerCase());
+      if (mappedTextObject) {
+        flowNodes.push(mappedTextObject);
+        objectNodesWithText.push(mappedTextObject);
+        continue;
+      }
+      // Fallback: se la stanza non ha item testo reale, mantieni un focus virtuale custom.
+      flowNodes.push(`__text__${t.id}`);
+    }
+  }
+  return {
+    selectedObjects: uniqueStrings(selectedObjects),
+    objectNodes: uniqueStrings(objectNodesWithText),
+    textSteps,
+    flowNodes: uniqueStrings(flowNodes),
+    textDescriptionsByObject,
+  };
+}
+
+async function aiGeneratePersonalDescriptions({ museoNome, objectDocs, selectedObjects, userPrefs, navLangOverride }) {
+  const byName = new Map(objectDocs.map((o) => [o.nome, o]));
+  const navLang = normalizeNavLang(navLangOverride ?? userPrefs?.navLang);
+  if (!aiUpstreamReady()) {
+    return Object.fromEntries(
+      selectedObjects.map((name) => {
+        const o = byName.get(name);
+        const localizedMatrix = descrizioniMatrixForNavLang({
+          descrizioni: o?.descrizioni || [],
+          descrizioniI18n: o?.descrizioniI18n || {},
+        }, navLang);
+        const bestBase = pickOurDescription(localizedMatrix, userPrefs) || "";
+        const interesse = Array.isArray(userPrefs?.interessi) ? userPrefs.interessi.map((x) => String(x || "").trim()).filter(Boolean).join(", ") : "";
+        const autore = String(o?.autore || "").trim();
+        const anno = String(o?.anno || "").trim();
+        const corrente = String(o?.correnteArtistica || "").trim();
+        const context = [
+          autore ? `Autore: ${autore}.` : "",
+          anno ? `Periodo: ${anno}.` : "",
+          corrente ? `Corrente: ${corrente}.` : "",
+        ].filter(Boolean).join(" ");
+        const richer = [
+          bestBase || `Questa opera (${name}) e significativa nel percorso personalizzato.`,
+          context,
+          interesse ? `Collegamento ai tuoi interessi: ${interesse}.` : "",
+          "Osserva un dettaglio formale (materiale, gesto, composizione) e chiediti che funzione comunicativa avesse nel suo contesto originario.",
+        ].filter(Boolean).join(" ");
+        const best = richer || `Descrizione personalizzata non disponibile per ${name}.`;
+        return [name, best];
+      })
+    );
+  }
+  const system = [
+    "Sei una guida museale personalizzata.",
+    "Produci SOLO JSON valido con schema {\"objectDescriptions\":[{\"objectName\":\"...\",\"text\":\"...\"}]}",
+    "Per ogni objectName in input deve esserci una descrizione.",
+    "Adatta tono e complessita a livello/durata/interessi del profilo utente.",
+    "Usa solo i dati disponibili nel contesto oggetti; non inventare fatti.",
+    "Stile richiesto: descrizioni vive, interessanti e narrative, non didascaliche.",
+    "Per ogni oggetto includi: 1) un gancio interpretativo, 2) almeno una curiosita o confronto culturale pertinente, 3) un aggancio esplicito agli interessi dell'utente, 4) uno spunto di osservazione finale.",
+    "I confronti con artisti/opere/eventi famosi sono consentiti solo come parallelismi culturali plausibili, senza attribuire dati storici non presenti nel contesto.",
+    "Evita frasi template ripetitive; ogni oggetto deve avere una voce distinta ma coerente ai dati.",
+  ].join(" ");
+  const user = JSON.stringify({
+    museo: museoNome,
+    userPreferences: {
+      interessi: userPrefs?.interessi || [],
+      livello: userPrefs?.livello || "",
+      durata: userPrefs?.durata || "",
+      navLang,
+    },
+    objects: selectedObjects.map((name) => {
+      const o = byName.get(name);
+      return {
+        objectName: name,
+        stanza: o?.stanza || "",
+        autore: o?.autore || "",
+        anno: o?.anno || "",
+        correnteArtistica: o?.correnteArtistica || "",
+        descrizioni: descrizioniMatrixForNavLang({
+          descrizioni: o?.descrizioni || [],
+          descrizioniI18n: o?.descrizioniI18n || {},
+        }, navLang),
+      };
+    }),
+  });
+  const out = await aiCompleteJsonObject({ system, user, maxTokens: 4200, temperature: 0.35 });
+  const rows = Array.isArray(out?.objectDescriptions) ? out.objectDescriptions : [];
+  const mapped = {};
+  for (const row of rows) {
+    const objectName = String(row?.objectName || "").trim();
+    const text = String(row?.text || "").trim();
+    if (!objectName || !text) continue;
+    mapped[objectName] = text;
+  }
+  return mapped;
+}
+
+async function aiTranslateCustomTextMap({ textMap, targetLang }) {
+  const lang = normalizeNavLang(targetLang);
+  const normalized = Object.fromEntries(
+    Object.entries(textMap && typeof textMap === "object" ? textMap : {})
+      .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+      .filter(([k, v]) => !!k && !!v)
+  );
+  if (lang === "it" || Object.keys(normalized).length < 1) return normalized;
+  if (!aiUpstreamReady()) {
+    console.warn(`AI translate textSteps skipped (${lang}): upstream non configurato`);
+    return normalized;
+  }
+  const makePrompt = (strict = false) => ({
+    system: [
+      `Traduci i testi di focus museale in ${lang === "en" ? "inglese" : "francese"}.`,
+      "Rispondi SOLO con JSON valido schema: {\"translations\":[{\"id\":\"...\",\"text\":\"...\"}]}",
+      "Mantieni tono da guida museale, naturale e scorrevole.",
+      "Non inventare fatti; traduci fedelmente il contenuto.",
+      strict
+        ? "OBBLIGATORIO: il testo finale deve essere interamente nella lingua target (non lasciare frasi in italiano)."
+        : "Preferisci una traduzione naturale, con lessico accessibile.",
+    ].join(" "),
+    user: JSON.stringify({
+      targetLang: lang,
+      strictLanguage: strict,
+      items: Object.entries(normalized).map(([id, text]) => ({ id, text })),
+    }),
+  });
+  try {
+    const parseRows = (out) => {
+      const rows = Array.isArray(out?.translations) ? out.translations : [];
+      const mapped = {};
+      for (const row of rows) {
+        const id = String(row?.id || "").trim();
+        const text = String(row?.text || "").trim();
+        if (!id || !text) continue;
+        mapped[id] = text;
+      }
+      return mapped;
+    };
+    const firstPrompt = makePrompt(false);
+    const out = await aiCompleteJsonObject({
+      system: firstPrompt.system,
+      user: firstPrompt.user,
+      maxTokens: 2400,
+      temperature: 0.2,
+    });
+    let mapped = parseRows(out);
+    const unchanged = Object.keys(mapped).filter((k) => String(mapped[k] || "").trim() === String(normalized[k] || "").trim());
+    if (unchanged.length > 0) {
+      const retryPrompt = makePrompt(true);
+      const retry = await aiCompleteJsonObject({
+        system: retryPrompt.system,
+        user: retryPrompt.user,
+        maxTokens: 2400,
+        temperature: 0.1,
+      });
+      const strictMapped = parseRows(retry);
+      mapped = { ...mapped, ...strictMapped };
+    }
+    return Object.keys(mapped).length > 0 ? { ...normalized, ...mapped } : normalized;
+  } catch (err) {
+    console.warn(`AI translate textSteps fallback ${lang}:`, err?.message || err);
+    return normalized;
+  }
+}
+
+function fallbackFocusTextByLang({ lang, room, objectName, interests }) {
+  const safeLang = normalizeNavLang(lang);
+  const roomText = String(room || "").trim();
+  const objText = String(objectName || "").trim();
+  const interestsText = Array.isArray(interests) && interests.length > 0
+    ? interests.map((x) => String(x || "").trim()).filter(Boolean).join(", ")
+    : "";
+  if (safeLang === "en") {
+    return `At this stop${roomText ? ` in room ${roomText}` : ""}, ${objText || "the featured work"} opens a richer thread linked to your interests${interestsText ? ` (${interestsText})` : ""}. Curatorial curiosity: similar symbols of authority and ritual appear in well-known collections far beyond this museum, often discussed alongside iconic historical figures. Use this as a cultural comparison rather than a direct attribution, and look closely at gesture, material, and display context: what makes this object feel ceremonial, political, or intimate to you?`;
+  }
+  if (safeLang === "fr") {
+    return `A cette etape${roomText ? ` dans la salle ${roomText}` : ""}, ${objText || "l'oeuvre mise en avant"} ouvre une lecture plus riche de vos interets${interestsText ? ` (${interestsText})` : ""}. Curiosite curatoriale: des symboles similaires de pouvoir et de rituel apparaissent aussi dans des collections celebres hors de ce musee, souvent rapproches de personnages historiques connus. Prenez cela comme comparaison culturelle (pas comme attribution directe) et observez geste, matiere et mise en scene: qu'est-ce qui vous semble le plus solennel ou le plus humain?`;
+  }
+  return `In questa tappa${roomText ? `, nella sala ${roomText}` : ""}, ${objText || "l'opera selezionata"} apre un filo narrativo piu ricco legato ai tuoi interessi${interestsText ? ` (${interestsText})` : ""}. Curiosita curatoriale: simboli simili di potere, rito e identita compaiono anche in collezioni molto note fuori da questo museo, spesso accostate a personaggi storici famosi. Prendilo come confronto culturale (non come attribuzione diretta) e osserva gesto, materiale e funzione: quale dettaglio ti fa leggere l'opera come oggetto di prestigio, memoria o propaganda?`;
+}
+
+async function ensureCustomDescriptionsI18n(route) {
+  const normalizedRoute = normalizePersonalRouteStorage(route);
+  const current = normalizedRoute.customDescriptionsByObjectI18n && typeof normalizedRoute.customDescriptionsByObjectI18n === "object"
+    ? normalizedRoute.customDescriptionsByObjectI18n
+    : {};
+  const baseMapFromRoute = Object.fromEntries(
+    Object.entries(normalizedRoute.customDescriptionsByObject && typeof normalizedRoute.customDescriptionsByObject === "object"
+      ? normalizedRoute.customDescriptionsByObject
+      : {})
+      .map(([k, v]) => [String(k || "").trim(), String(v || "").trim()])
+      .filter(([k, v]) => !!k && !!v)
+  );
+  const baseMapFromTextSteps = Object.fromEntries(
+    (Array.isArray(normalizedRoute.textSteps) ? normalizedRoute.textSteps : [])
+      .map((step) => {
+        const id = String(step?.id || "").trim();
+        const text = String(step?.text || "").trim();
+        return [`__text__${id}`, text];
+      })
+      .filter(([k, v]) => !!k && !!v)
+  );
+  const baseMap = {
+    ...baseMapFromTextSteps,
+    ...baseMapFromRoute,
+  };
+  const requiredKeys = new Set(
+    uniqueStrings([
+      ...Object.keys(baseMap),
+      ...(Array.isArray(normalizedRoute.flowNodes) ? normalizedRoute.flowNodes : []),
+    ])
+  );
+  const hasAllLangs = ALLOWED_NAV_LANGS.every((lang) => {
+    const row = current[lang];
+    if (!row || typeof row !== "object") return false;
+    for (const k of requiredKeys) {
+      if (!k) continue;
+      if (!String(row[k] || "").trim()) return false;
+    }
+    return true;
+  });
+  if (hasAllLangs) return { route: normalizedRoute, changed: false };
+
+  const i18n = {};
+  const textStepByNode = new Map(
+    (Array.isArray(normalizedRoute.textSteps) ? normalizedRoute.textSteps : [])
+      .map((s) => [`__text__${String(s?.id || "").trim()}`, s])
+  );
+  const interests =
+    Array.isArray(normalizedRoute?.generatedFrom?.interessi)
+      ? normalizedRoute.generatedFrom.interessi
+      : [];
+  for (const lang of ALLOWED_NAV_LANGS) {
+    const existingRow = current[lang] && typeof current[lang] === "object" ? current[lang] : {};
+    const missingKeys = Array.from(requiredKeys).filter((k) => !String(existingRow[k] || "").trim());
+    if (missingKeys.length < 1) {
+      i18n[lang] = existingRow;
+      continue;
+    }
+    const translated = await withTimeout(
+      aiTranslateCustomTextMap({
+        textMap: Object.fromEntries(missingKeys.map((k) => [k, baseMap[k] || ""])),
+        targetLang: lang,
+      }),
+      12000,
+      `route_i18n_backfill_${lang}`
+    ).catch(() => Object.fromEntries(missingKeys.map((k) => [k, baseMap[k] || ""])));
+    const merged = {
+      ...existingRow,
+      ...translated,
+    };
+    if (lang !== "it") {
+      for (const key of requiredKeys) {
+        const base = String(baseMap[key] || "").trim();
+        const value = String(merged[key] || "").trim();
+        if (!key || !base) continue;
+        if (!value || value === base) {
+          const step = textStepByNode.get(key);
+          merged[key] = fallbackFocusTextByLang({
+            lang,
+            room: step?.room || "",
+            objectName: step?.insertAfterObject || "",
+            interests,
+          });
+        }
+      }
+    }
+    i18n[lang] = merged;
+  }
+  return {
+    changed: true,
+    route: {
+      ...normalizedRoute,
+      customDescriptionsByObjectI18n: i18n,
+      customDescriptionsByObject: i18n.it && typeof i18n.it === "object" ? i18n.it : baseMap,
+      updatedAt: new Date(),
+    },
+  };
 }
 
 async function listOggettoImmagineMetas(nomeMuseo, nomeOggetto) {
@@ -971,6 +1530,7 @@ async function startServer(cliOptions) {
         eta: input.eta,
         ruolo,
         percorsiAcquistati: [],
+        percorsiPersonalizzati: [],
         createdAt: now,
         updatedAt: now,
       };
@@ -1109,6 +1669,604 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore acquisto percorso:", err.message);
       res.status(500).json({ error: "errore acquisto percorso" });
+    }
+  });
+
+  app.get("/users/me/percorsi/personalizzati", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const museo = String(req.query?.museo || "").trim();
+      const routes = Array.isArray(session.user.percorsiPersonalizzati) ? session.user.percorsiPersonalizzati : [];
+      const normalized = routes
+        .map((r) => normalizePersonalRouteStorage(r))
+        .filter((r) => !museo || r.museo === museo);
+      res.json({ percorsiPersonalizzati: normalized });
+    } catch (err) {
+      console.error("Errore lista percorsi personalizzati:", err.message);
+      res.status(500).json({ error: "errore recupero percorsi personalizzati" });
+    }
+  });
+
+  app.get("/users/me/percorsi/personalizzati/:id", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const id = String(req.params?.id || "").trim();
+      if (!id) return res.status(400).json({ error: "id percorso obbligatorio" });
+      const routes = Array.isArray(session.user.percorsiPersonalizzati) ? session.user.percorsiPersonalizzati : [];
+      const routeIndex = routes.findIndex((r) => String(r?.id || "").trim() === id);
+      if (routeIndex < 0) return res.status(404).json({ error: "percorso personalizzato non trovato" });
+      const ensured = await ensureCustomDescriptionsI18n(routes[routeIndex]);
+      const route = ensured.route;
+      if (!route) return res.status(404).json({ error: "percorso personalizzato non trovato" });
+      if (ensured.changed) {
+        const userId = new ObjectId(String(session.user._id));
+        const nextRoutes = routes.slice();
+        nextRoutes[routeIndex] = route;
+        await withUsersDb(async (db) => {
+          await db.collection(USERS_COLLECTION).updateOne(
+            { _id: userId },
+            { $set: { percorsiPersonalizzati: nextRoutes, updatedAt: new Date() } }
+          );
+        });
+      }
+      res.json({ percorsoPersonalizzato: route });
+    } catch (err) {
+      console.error("Errore dettaglio percorso personalizzato:", err.message);
+      res.status(500).json({ error: "errore dettaglio percorso personalizzato" });
+    }
+  });
+
+  app.delete("/users/me/percorsi/personalizzati/:id", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const id = String(req.params?.id || "").trim();
+      if (!id) return res.status(400).json({ error: "id percorso obbligatorio" });
+      const userId = new ObjectId(String(session.user._id));
+      await withUsersDb(async (db) => {
+        await db.collection(USERS_COLLECTION).updateOne(
+          { _id: userId },
+          {
+            $pull: { percorsiPersonalizzati: { id } },
+            $set: { updatedAt: new Date() },
+          }
+        );
+      });
+      res.json({ ok: true, id });
+    } catch (err) {
+      console.error("Errore delete percorso personalizzato:", err.message);
+      res.status(500).json({ error: "errore eliminazione percorso personalizzato" });
+    }
+  });
+
+  app.get("/users/me/percorsi/combined", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const museoNome = String(req.query?.museo || "").trim();
+      if (!museoNome) return res.status(400).json({ error: "museo obbligatorio" });
+      const museo = sistema.get_museo(museoNome);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const purchased = Array.isArray(session.user.percorsiAcquistati) ? session.user.percorsiAcquistati : [];
+      const purchaseKeys = new Set(purchased.map((p) => percorsoPurchaseKey(p?.museo, p?.percorso)));
+      const standard = (Array.isArray(museo.percorsi) ? museo.percorsi : [])
+        .map((p) => normalizePercorso(p))
+        .filter((p) => {
+          const included = Number(p.prezzo || 0) <= 0;
+          return included || purchaseKeys.has(percorsoPurchaseKey(museoNome, p.nome));
+        })
+        .map((p) => ({
+          id: `std::${museoNome}::${p.nome}`,
+          source: "standard",
+          museo: museoNome,
+          nome: p.nome,
+          oggetti: p.oggetti || [],
+          prezzo: p.prezzo || 0,
+        }));
+
+      const personalized = (Array.isArray(session.user.percorsiPersonalizzati) ? session.user.percorsiPersonalizzati : [])
+        .map((r) => normalizePersonalRouteStorage(r, museoNome))
+        .filter((r) => r.museo === museoNome)
+        .map((r) => ({
+          id: r.id,
+          source: "ai_personalized",
+          museo: r.museo,
+          nome: r.nome,
+          oggetti: r.objectNodes,
+          flowNodes: r.flowNodes,
+          textSteps: r.textSteps,
+          customDescriptionsByObject: r.customDescriptionsByObject,
+          customDescriptionsByObjectI18n: r.customDescriptionsByObjectI18n,
+          lengthPreset: r.lengthPreset,
+          targetRatio: r.targetRatio,
+          prezzo: 0,
+          createdAt: r.createdAt,
+        }));
+
+      res.json({ percorsi: [...standard, ...personalized] });
+    } catch (err) {
+      console.error("Errore lista percorsi combined:", err.message);
+      res.status(500).json({ error: "errore recupero percorsi combined" });
+    }
+  });
+
+  app.post("/users/me/percorsi/personalizzati/genera", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const userRateKey = String(session.user._id);
+      const lastReqTs = Number(personalRouteRateMap.get(userRateKey) || 0);
+      if (Date.now() - lastReqTs < PERSONAL_ROUTE_AI_RATE_MS) {
+        return res.status(429).json({ error: "richieste troppo frequenti, riprova tra pochi secondi" });
+      }
+      personalRouteRateMap.set(userRateKey, Date.now());
+      const museoNome = String(req.body?.museo || "").trim();
+      if (!museoNome) return res.status(400).json({ error: "museo obbligatorio" });
+      const lengthPreset = normalizePersonalRouteLengthPreset(req.body?.lengthPreset);
+      const museo = sistema.get_museo(museoNome);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const objectDocs = buildMuseumObjectDocs(museo).filter((o) => {
+        const key = String(o.nome || "").trim().toLowerCase();
+        return key !== "in" && key !== "out";
+      });
+      if (objectDocs.length < 1) return res.status(400).json({ error: "museo senza oggetti utili" });
+
+      const targetCount = personalRouteTargetCount(objectDocs.length, lengthPreset);
+      const userPrefs = {
+        interessi: Array.isArray(session.user.interessi) ? session.user.interessi : [],
+        livello: session.user.livello || "studente",
+        durata: session.user.durata || "medio",
+        navLang: normalizeNavLang(session.user.navLang),
+      };
+
+      const fallbackRoute = fallbackPersonalizedRoute({ objectDocs, targetCount, userPrefs });
+      const aiRouteRaw = await withTimeout(aiGeneratePersonalRoute({
+        museoNome,
+        objectDocs,
+        targetCount,
+        userPrefs,
+      }), 16000, "ai_route").catch((err) => {
+        console.warn("AI1 fallback route planner:", err.message);
+        return fallbackRoute;
+      });
+
+      const repaired = validateAndRepairPersonalRoute({
+        objectDocs,
+        aiRoute: aiRouteRaw,
+        targetCount,
+      });
+
+      const generatedDescriptionsByLangEntries = await Promise.all(
+        ALLOWED_NAV_LANGS.map(async (lang) => {
+          const rows = await withTimeout(aiGeneratePersonalDescriptions({
+            museoNome,
+            objectDocs,
+            selectedObjects: repaired.objectNodes || repaired.selectedObjects,
+            userPrefs,
+            navLangOverride: lang,
+          }), 18000, `ai_descriptions_${lang}`).catch((err) => {
+            console.warn(`AI2 fallback descrizioni ${lang}:`, err.message);
+            return {};
+          });
+          return [lang, rows];
+        })
+      );
+      const generatedDescriptionsByLang = Object.fromEntries(generatedDescriptionsByLangEntries);
+      const baseTextMap = {
+        ...(fallbackRoute.textDescriptionsByObject && typeof fallbackRoute.textDescriptionsByObject === "object"
+          ? fallbackRoute.textDescriptionsByObject
+          : {}),
+        ...(repaired.textDescriptionsByObject && typeof repaired.textDescriptionsByObject === "object"
+          ? repaired.textDescriptionsByObject
+          : {}),
+      };
+      const textDescriptionsByLangEntries = await Promise.all(
+        ALLOWED_NAV_LANGS.map(async (lang) => {
+          const translated = await withTimeout(
+            aiTranslateCustomTextMap({ textMap: baseTextMap, targetLang: lang }),
+            12000,
+            `ai_translate_textsteps_${lang}`
+          ).catch(() => baseTextMap);
+          return [lang, translated];
+        })
+      );
+      const textDescriptionsByLang = Object.fromEntries(textDescriptionsByLangEntries);
+      const textStepByNode = new Map(
+        (Array.isArray(repaired.textSteps) ? repaired.textSteps : [])
+          .map((s) => [`__text__${String(s?.id || "").trim()}`, s])
+      );
+      for (const lang of ALLOWED_NAV_LANGS) {
+        if (lang === "it") continue;
+        const row = textDescriptionsByLang[lang] && typeof textDescriptionsByLang[lang] === "object"
+          ? textDescriptionsByLang[lang]
+          : {};
+        for (const [key, baseText] of Object.entries(baseTextMap)) {
+          const v = String(row[key] || "").trim();
+          const b = String(baseText || "").trim();
+          if (!b) continue;
+          if (!v || v === b) {
+            const step = textStepByNode.get(key);
+            row[key] = fallbackFocusTextByLang({
+              lang,
+              room: step?.room || "",
+              objectName: step?.insertAfterObject || "",
+              interests: userPrefs?.interessi || [],
+            });
+          }
+        }
+        textDescriptionsByLang[lang] = row;
+      }
+      const routeNodesForDescriptions = uniqueStrings(
+        Array.isArray(repaired.flowNodes) && repaired.flowNodes.length > 0
+          ? repaired.flowNodes
+          : (repaired.objectNodes || repaired.selectedObjects)
+      );
+
+      const byName = new Map(objectDocs.map((o) => [o.nome, o]));
+      const mergedDescriptionsByLang = {};
+      for (const lang of ALLOWED_NAV_LANGS) {
+        const mergedDescriptions = {};
+        const langRows = generatedDescriptionsByLang[lang] && typeof generatedDescriptionsByLang[lang] === "object"
+          ? generatedDescriptionsByLang[lang]
+          : {};
+        for (const name of routeNodesForDescriptions) {
+          const overrideText = textDescriptionsByLang?.[lang]?.[name];
+          if (overrideText) {
+            mergedDescriptions[name] = overrideText;
+            continue;
+          }
+          if (langRows[name]) {
+            mergedDescriptions[name] = langRows[name];
+            continue;
+          }
+          const localizedMatrix = descrizioniMatrixForNavLang({
+            descrizioni: byName.get(name)?.descrizioni || [],
+            descrizioniI18n: byName.get(name)?.descrizioniI18n || {},
+          }, lang);
+          const fallback = pickOurDescription(localizedMatrix, userPrefs);
+          mergedDescriptions[name] = fallback || `Descrizione personalizzata non disponibile per ${name}.`;
+        }
+        mergedDescriptionsByLang[lang] = mergedDescriptions;
+      }
+
+      const now = new Date();
+      const customRouteName = String(req.body?.nome || "").trim();
+      const routeName = customRouteName || `Visita IA ${lengthPreset} ${now.toLocaleDateString("it-IT")}`;
+      const routeDoc = normalizePersonalRouteStorage({
+        id: new ObjectId().toString(),
+        museo: museoNome,
+        nome: routeName,
+        lengthPreset,
+        targetRatio: PERSONAL_ROUTE_LENGTH_PRESETS[lengthPreset] || 0.5,
+        flowNodes: repaired.flowNodes,
+        objectNodes: repaired.objectNodes || repaired.selectedObjects,
+        textSteps: repaired.textSteps,
+        customDescriptionsByObject: mergedDescriptionsByLang[userPrefs.navLang] || mergedDescriptionsByLang.it || {},
+        customDescriptionsByObjectI18n: mergedDescriptionsByLang,
+        generatedFrom: userPrefs,
+        createdAt: now,
+        updatedAt: now,
+      }, museoNome);
+
+      const userId = new ObjectId(String(session.user._id));
+      await withUsersDb(async (db) => {
+        const usersCol = db.collection(USERS_COLLECTION);
+        const fresh = await usersCol.findOne({ _id: userId }, { projection: { percorsiPersonalizzati: 1 } });
+        const current = Array.isArray(fresh?.percorsiPersonalizzati) ? fresh.percorsiPersonalizzati : [];
+        const capped = current.slice(-19);
+        await usersCol.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              percorsiPersonalizzati: [...capped, routeDoc],
+              updatedAt: now,
+            },
+          }
+        );
+      });
+
+      res.status(201).json({ percorsoPersonalizzato: routeDoc });
+    } catch (err) {
+      console.error("Errore generazione percorso personalizzato:", err.message);
+      res.status(500).json({ error: "errore generazione percorso personalizzato" });
+    }
+  });
+
+  app.get("/users/me/oggetti/richieste", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      const museo = String(req.query?.museo || "").trim();
+      const oggetto = String(req.query?.oggetto || "").trim();
+      const stanza = String(req.query?.stanza || "").trim();
+      const filter = { userId: String(session.user._id) };
+      if (museo) filter.museo = museo;
+      if (oggetto) filter.oggetto = oggetto;
+      if (stanza) filter.stanza = stanza;
+      const richieste = await withUsersDb(async (db) =>
+        db
+          .collection(MARKETPLACE_OBJECT_REQUESTS_COLLECTION)
+          .find(filter)
+          .sort({ createdAt: -1 })
+          .toArray()
+      );
+      res.json({
+        prezzoFisso: MARKETPLACE_OBJECT_FIXED_PRICE,
+        richieste: richieste.map((r) => ({
+          id: String(r._id),
+          museo: r.museo,
+          oggetto: r.oggetto,
+          stanza: r.stanza || "",
+          prezzo: normalizePrezzo(r.prezzo),
+          status: r.status || "pending",
+          note: r.note || "",
+          decidedBy: r.decidedBy || "",
+          createdAt: r.createdAt,
+          decidedAt: r.decidedAt || null,
+        })),
+      });
+    } catch (err) {
+      console.error("Errore lista richieste acquisto oggetti:", err.message);
+      res.status(500).json({ error: "errore recupero richieste acquisto oggetti" });
+    }
+  });
+
+  app.post("/users/me/oggetti/acquista-richiesta", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+
+      const nomeMuseo = String(req.body?.museo || "").trim();
+      const nomeOggetto = String(req.body?.oggetto || "").trim();
+      const nomeStanza = String(req.body?.stanza || "").trim();
+      if (!nomeMuseo || !nomeOggetto) {
+        return res.status(400).json({ error: "museo e oggetto sono obbligatori" });
+      }
+
+      const museo = sistema.get_museo(nomeMuseo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+      const oggettiList = museo?.oggetti instanceof Map
+        ? Array.from(museo.oggetti.values())
+        : Array.isArray(museo?.oggetti)
+          ? museo.oggetti
+          : [];
+      const oggetto = oggettiList.find((o) => {
+        const sameName = String(o?.nome || "").trim() === nomeOggetto;
+        if (!sameName) return false;
+        if (!nomeStanza) return true;
+        return String(o?.stanza || "").trim() === nomeStanza;
+      });
+      if (!oggetto) return res.status(404).json({ error: "Oggetto non trovato" });
+      const stanzaOggetto = String(oggetto?.stanza || nomeStanza).trim();
+
+      const userId = String(session.user._id);
+      const now = new Date();
+      const existing = await withUsersDb(async (db) =>
+        db.collection(MARKETPLACE_OBJECT_REQUESTS_COLLECTION).findOne({
+          userId,
+          museo: nomeMuseo,
+          oggetto: nomeOggetto,
+          stanza: stanzaOggetto,
+          status: { $in: ["pending", "approved"] },
+        })
+      );
+      if (existing) {
+        return res.json({
+          duplicate: true,
+          richiesta: {
+            id: String(existing._id),
+            museo: existing.museo,
+            oggetto: existing.oggetto,
+            stanza: existing.stanza || "",
+            prezzo: normalizePrezzo(existing.prezzo),
+            status: existing.status || "pending",
+            createdAt: existing.createdAt,
+          },
+        });
+      }
+
+      const richiesta = {
+        userId,
+        userEmail: String(session.user.email || ""),
+        userNome: String(session.user.nome || ""),
+        userCognome: String(session.user.cognome || ""),
+        museo: nomeMuseo,
+        oggetto: nomeOggetto,
+        stanza: stanzaOggetto,
+        prezzo: MARKETPLACE_OBJECT_FIXED_PRICE,
+        status: "pending",
+        note: "",
+        decidedBy: "",
+        decidedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const inserted = await withUsersDb(async (db) =>
+        db.collection(MARKETPLACE_OBJECT_REQUESTS_COLLECTION).insertOne(richiesta)
+      );
+      res.status(201).json({
+        duplicate: false,
+        richiesta: {
+          ...richiesta,
+          id: String(inserted.insertedId),
+        },
+      });
+    } catch (err) {
+      console.error("Errore richiesta acquisto oggetto:", err.message);
+      res.status(500).json({ error: "errore richiesta acquisto oggetto" });
+    }
+  });
+
+  app.get("/admin/marketplace/richieste", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isAdmin(session.user)) return res.status(403).json({ error: "solo admin" });
+
+      const museo = String(req.query?.museo || "").trim();
+      const status = String(req.query?.status || "").trim().toLowerCase();
+      const filter = {};
+      if (museo) filter.museo = museo;
+      if (status) filter.status = status;
+      const richieste = await withUsersDb(async (db) =>
+        db
+          .collection(MARKETPLACE_OBJECT_REQUESTS_COLLECTION)
+          .find(filter)
+          .sort({ createdAt: -1 })
+          .toArray()
+      );
+      res.json({
+        prezzoFisso: MARKETPLACE_OBJECT_FIXED_PRICE,
+        richieste: richieste.map((r) => ({
+          id: String(r._id),
+          userId: r.userId,
+          userEmail: r.userEmail || "",
+          userNome: r.userNome || "",
+          userCognome: r.userCognome || "",
+          museo: r.museo,
+          oggetto: r.oggetto,
+          stanza: r.stanza || "",
+          prezzo: normalizePrezzo(r.prezzo),
+          status: r.status || "pending",
+          note: r.note || "",
+          decidedBy: r.decidedBy || "",
+          createdAt: r.createdAt,
+          decidedAt: r.decidedAt || null,
+        })),
+      });
+    } catch (err) {
+      console.error("Errore lista richieste admin marketplace:", err.message);
+      res.status(500).json({ error: "errore lista richieste admin marketplace" });
+    }
+  });
+
+  app.patch("/admin/marketplace/richieste/:id", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isAdmin(session.user)) return res.status(403).json({ error: "solo admin" });
+
+      const id = String(req.params?.id || "").trim();
+      if (!ObjectId.isValid(id)) return res.status(400).json({ error: "id richiesta non valido" });
+      const status = String(req.body?.status || "").trim().toLowerCase();
+      if (!["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "status non valido (approved|rejected)" });
+      }
+      const note = String(req.body?.note || "").trim();
+      const decidedBy = String(session.user.email || session.user.nome || "admin");
+      const now = new Date();
+      const requestId = new ObjectId(id);
+      const collName = MARKETPLACE_OBJECT_REQUESTS_COLLECTION;
+
+      const richiesta = await withUsersDb(async (db) => db.collection(collName).findOne({ _id: requestId }));
+      if (!richiesta) return res.status(404).json({ error: "richiesta non trovata" });
+      if (String(richiesta.status || "").toLowerCase() !== "pending") {
+        return res.status(400).json({ error: "richiesta gia processata" });
+      }
+
+      await withUsersDb(async (db) => {
+        await db.collection(collName).updateOne(
+          { _id: requestId },
+          { $set: { status, note, decidedBy, decidedAt: now, updatedAt: now } }
+        );
+        if (status === "approved") {
+          await db.collection(USERS_COLLECTION).updateOne(
+            { _id: new ObjectId(String(richiesta.userId)) },
+            {
+              $addToSet: {
+                oggettiAcquistati: {
+                  museo: richiesta.museo,
+                  oggetto: richiesta.oggetto,
+                  stanza: richiesta.stanza || "",
+                  prezzo: normalizePrezzo(richiesta.prezzo),
+                  purchasedAt: now,
+                },
+              },
+              $set: { updatedAt: now },
+            }
+          );
+
+          // Rimuove l'oggetto dal museo e ricuce i collegamenti (A->B->C diventa A->C)
+          const museo = sistema.get_museo(richiesta.museo);
+          if (museo) {
+            const removedName = String(richiesta.oggetto || "").trim();
+            const removedObj = museo.get_oggetto(removedName);
+            if (removedObj) {
+              const successors = Array.isArray(removedObj.connessi)
+                ? removedObj.connessi.map((x) => String(x || "").trim()).filter(Boolean)
+                : [];
+              const predecessors = [];
+
+              for (const obj of museo.oggetti.values()) {
+                if (obj.nome === removedName) continue;
+                const current = Array.isArray(obj.connessi) ? obj.connessi.map((x) => String(x || "").trim()).filter(Boolean) : [];
+                if (!current.includes(removedName)) continue;
+                predecessors.push(obj.nome);
+                const rewritten = current.filter((n) => n !== removedName);
+                for (const nxt of successors) {
+                  if (nxt && nxt !== obj.nome && nxt !== removedName && !rewritten.includes(nxt)) {
+                    rewritten.push(nxt);
+                  }
+                }
+                obj.connessi = rewritten;
+              }
+
+              // Ricucitura simmetrica: se il grafo e` usato anche "al contrario",
+              // colleghiamo anche i successori verso i predecessori.
+              for (const succ of successors) {
+                const succObj = museo.get_oggetto(succ);
+                if (!succObj) continue;
+                const succConns = Array.isArray(succObj.connessi)
+                  ? succObj.connessi.map((x) => String(x || "").trim()).filter(Boolean)
+                  : [];
+                for (const pred of predecessors) {
+                  if (!pred || pred === succ || pred === removedName) continue;
+                  if (!succConns.includes(pred)) succConns.push(pred);
+                }
+                succObj.connessi = succConns;
+              }
+
+              museo.oggetti.delete(removedName);
+              if (!Array.isArray(museo.percorsi)) museo.percorsi = [];
+              museo.percorsi = museo.percorsi.map((p) => ({
+                ...p,
+                oggetti: Array.isArray(p.oggetti) ? p.oggetti.filter((n) => n !== removedName) : [],
+              }));
+
+              // Rebuild mappa_oggetti dopo le modifiche ai connessi
+              museo.mappa_oggetti.adj.clear();
+              for (const obj of museo.oggetti.values()) {
+                museo.mappa_oggetti.addNode(obj.nome);
+              }
+              for (const obj of museo.oggetti.values()) {
+                const conns = Array.isArray(obj.connessi) ? obj.connessi : [];
+                for (const to of conns) {
+                  if (museo.oggetti.has(to)) museo.mappa_oggetti.addEdge(obj.nome, to);
+                }
+              }
+
+              sistema.salvaSuFile(FILE_JSON);
+              try {
+                await upsertMuseo({
+                  nome: museo.nome,
+                  citta: museo.citta,
+                  oggetti: Array.from(museo.oggetti.values()),
+                  percorsi: museo.percorsi || [],
+                });
+              } catch (mongoErr) {
+                console.error("Errore sync Mongo dopo vendita oggetto marketplace:", mongoErr.message);
+              }
+            }
+          }
+        }
+      });
+
+      res.json({ ok: true, status, id });
+    } catch (err) {
+      console.error("Errore update richiesta admin marketplace:", err.message);
+      res.status(500).json({ error: "errore update richiesta admin marketplace" });
     }
   });
 

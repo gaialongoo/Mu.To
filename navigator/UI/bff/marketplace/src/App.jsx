@@ -91,6 +91,12 @@ function formatPrezzo(prezzo, mp) {
   return `${amount.toFixed(2).replace(".", ",")} EUR`;
 }
 
+function formatFixedEuro(prezzo) {
+  const amount = Number(prezzo);
+  if (!Number.isFinite(amount) || amount <= 0) return "0,00 EUR";
+  return `${amount.toFixed(2).replace(".", ",")} EUR`;
+}
+
 function encodeSharePayload(payload) {
   const json = JSON.stringify(payload);
   return btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -382,11 +388,20 @@ export default function App() {
   const [modalOpen,    setModalOpen]    = useState(false);
   const [allOggetti,   setAllOggetti]   = useState([]);
   const [percorsi,     setPercorsi]     = useState([]);
+  const [personalRoutes, setPersonalRoutes] = useState([]);
   const [percorsiLoaded, setPercorsiLoaded] = useState(false);
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingVisits,setLoadingVisits]= useState(false);
   const [buyingPath, setBuyingPath] = useState(null);
+  const [aiLengthPreset, setAiLengthPreset] = useState("medio");
+  const [generatingAiRoute, setGeneratingAiRoute] = useState(false);
+  const [aiRouteNameDraft, setAiRouteNameDraft] = useState("");
+  const [showAiGenerateModal, setShowAiGenerateModal] = useState(false);
   const [purchasedKeys, setPurchasedKeys] = useState(new Set());
+  const [objectPurchaseRequests, setObjectPurchaseRequests] = useState([]);
+  const [loadingObjectRequests, setLoadingObjectRequests] = useState(false);
+  const [requestingObjectName, setRequestingObjectName] = useState(null);
+  const [fixedObjectPrice, setFixedObjectPrice] = useState(0);
   const [stanze,       setStanze]       = useState([]);
   const [search,       setSearch]       = useState("");
   const [stanzaFilter, setStanzaFilter] = useState("");
@@ -515,6 +530,17 @@ export default function App() {
     }
   }, [MUSEO]);
 
+  const loadPersonalRoutes = useCallback(async () => {
+    if (!MUSEO) return;
+    try {
+      const data = await api(`/users/me/percorsi/personalizzati?museo=${enc(MUSEO)}`, { credentials: "include" });
+      setPersonalRoutes(Array.isArray(data.percorsiPersonalizzati) ? data.percorsiPersonalizzati : []);
+    } catch (e) {
+      setPersonalRoutes([]);
+      showToast("Errore caricamento visite IA: " + e.message, "error");
+    }
+  }, [MUSEO]);
+
   const loadPurchasedPaths = useCallback(async () => {
     if (!MUSEO) return;
     try {
@@ -527,8 +553,25 @@ export default function App() {
     }
   }, [MUSEO]);
 
+  const loadObjectPurchaseRequests = useCallback(async () => {
+    if (!MUSEO) return;
+    setLoadingObjectRequests(true);
+    try {
+      const data = await api(`/users/me/oggetti/richieste?museo=${enc(MUSEO)}`, { credentials: "include" });
+      setObjectPurchaseRequests(Array.isArray(data.richieste) ? data.richieste : []);
+      setFixedObjectPrice(Number(data.prezzoFisso || 0));
+    } catch (e) {
+      setObjectPurchaseRequests([]);
+      showToast("Errore caricamento richieste oggetti: " + e.message, "error");
+    } finally {
+      setLoadingObjectRequests(false);
+    }
+  }, [MUSEO]);
+
   useEffect(() => { loadMuseo(); }, [loadMuseo]);
   useEffect(() => { if (authChecked) loadPurchasedPaths(); }, [authChecked, loadPurchasedPaths]);
+  useEffect(() => { if (authChecked) loadObjectPurchaseRequests(); }, [authChecked, loadObjectPurchaseRequests]);
+  useEffect(() => { if (authChecked) loadPersonalRoutes(); }, [authChecked, loadPersonalRoutes]);
 
   // ── Filtered items ─────────────────────────────────────────────────────────
   const autori = [...new Set(
@@ -570,7 +613,11 @@ export default function App() {
     return true;
   });
   const pagedItems = filtered.slice((itemPage - 1) * PAGE_SIZE, itemPage * PAGE_SIZE);
-  const pagedVisits = percorsi.slice((visitPage - 1) * PAGE_SIZE, visitPage * PAGE_SIZE);
+  const allVisitRoutes = useMemo(
+    () => [...percorsi, ...personalRoutes.map((r) => ({ ...r, oggetti: r.objectNodes || r.oggetti || [], prezzo: 0, isPersonalized: true }))],
+    [percorsi, personalRoutes]
+  );
+  const pagedVisits = allVisitRoutes.slice((visitPage - 1) * PAGE_SIZE, visitPage * PAGE_SIZE);
 
   // ── Navigation switching ───────────────────────────────────────────────────
   const currentSection = activeTab === "visits" ? "visits" : "items";
@@ -998,14 +1045,35 @@ export default function App() {
     setShowAllDescriptions(false);
     setSelectedGalleryIndex(0);
     try {
-      const data = await api(`/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}/immagini`);
-      setSelectedItemImages(data.immagini || []);
+      const full = await api(`/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}`);
+      if (full && typeof full === "object") {
+        setSelectedItem((prev) => ({ ...(prev || {}), ...full }));
+      }
     } catch {
-      setSelectedItemImages([]);
+      // fallback sui dati gia presenti in card
+    }
+    try {
+      const data = await api(`/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}/immagini`);
+      const imgs = Array.isArray(data.immagini) ? data.immagini : [];
+      if (imgs.length === 0) {
+        setSelectedItemImages([
+          { tipo: "preview", url: `/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}/immagini/preview` },
+        ]);
+      } else {
+        setSelectedItemImages(imgs);
+      }
+    } catch {
+      setSelectedItemImages([
+        { tipo: "preview", url: `/musei/${enc(MUSEO)}/oggetti/${enc(oggetto.nome)}/immagini/preview` },
+      ]);
     }
   };
 
   const openPathDetails = (percorso) => {
+    if (generatingAiRoute) {
+      showToast("Attendi la fine della generazione IA prima di aprire il percorso", "error");
+      return;
+    }
     if (!canAccessPath(percorso)) {
       showToast("Acquista il percorso per visualizzarlo", "error");
       return;
@@ -1015,6 +1083,30 @@ export default function App() {
 
   const makePurchaseKey = (percorso) => `${MUSEO}::${percorso.nome}`;
   const canAccessPath = (percorso) => Number(percorso?.prezzo || 0) <= 0 || purchasedKeys.has(makePurchaseKey(percorso));
+
+  const makeObjectRequestKey = useCallback(
+    (obj) => `${String(obj?.nome || "").trim()}::${String(obj?.stanza || "").trim()}`,
+    []
+  );
+
+  const latestObjectRequestByName = useMemo(() => {
+    const map = new Map();
+    for (const req of objectPurchaseRequests) {
+      const key = `${String(req?.oggetto || "").trim()}::${String(req?.stanza || "").trim()}`;
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, req);
+    }
+    return map;
+  }, [objectPurchaseRequests]);
+
+  const getObjectPurchaseUi = useCallback((oggetto) => {
+    const req = latestObjectRequestByName.get(makeObjectRequestKey(oggetto));
+    if (!req) return { label: mp("requestBuy"), disabled: false };
+    const status = String(req.status || "").toLowerCase();
+    if (status === "pending") return { label: mp("requestPending"), disabled: true };
+    if (status === "approved") return { label: mp("requestApproved"), disabled: true };
+    return { label: mp("requestRejected"), disabled: false };
+  }, [latestObjectRequestByName, makeObjectRequestKey, mp]);
 
   const buyPath = async (percorso) => {
     if (!percorso?.nome) return;
@@ -1035,6 +1127,70 @@ export default function App() {
       showToast("Errore acquisto percorso: " + e.message, "error");
     } finally {
       setBuyingPath(null);
+    }
+  };
+
+  const generateAiRoute = async () => {
+    if (!MUSEO || generatingAiRoute) return;
+    setGeneratingAiRoute(true);
+    try {
+      await api("/users/me/percorsi/personalizzati/genera", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ museo: MUSEO, lengthPreset: aiLengthPreset, nome: aiRouteNameDraft.trim() }),
+      });
+      showToast(mp("aiRouteCreated"));
+      await loadPersonalRoutes();
+      if (!percorsiLoaded) setPercorsiLoaded(true);
+      setActiveTab("visits");
+      setShowAiGenerateModal(false);
+      setAiRouteNameDraft("");
+    } catch (e) {
+      showToast("Errore generazione visita IA: " + e.message, "error");
+    } finally {
+      setGeneratingAiRoute(false);
+    }
+  };
+
+  const deleteAiRoute = async (routeId) => {
+    const ok = window.confirm("Eliminare questa visita IA?");
+    if (!ok) return;
+    try {
+      await api(`/users/me/percorsi/personalizzati/${enc(routeId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      loadPersonalRoutes();
+      showToast("Visita IA eliminata");
+    } catch (e) {
+      showToast("Errore eliminazione visita IA: " + e.message, "error");
+    }
+  };
+
+  const requestObjectPurchase = async (oggetto) => {
+    const nomeOggetto = String(oggetto?.nome || "").trim();
+    const nomeStanza = String(oggetto?.stanza || "").trim();
+    if (!nomeOggetto || !MUSEO) return;
+    const uiState = getObjectPurchaseUi(oggetto);
+    const requestKey = makeObjectRequestKey(oggetto);
+    if (uiState.disabled || requestingObjectName) return;
+    setRequestingObjectName(requestKey);
+    try {
+      const data = await api("/users/me/oggetti/acquista-richiesta", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ museo: MUSEO, oggetto: nomeOggetto, stanza: nomeStanza }),
+      });
+      if (data?.duplicate) {
+        showToast(mp("requestAlreadySent"));
+      } else {
+        showToast(mp("requestSent"));
+      }
+      loadObjectPurchaseRequests();
+    } catch (e) {
+      showToast("Errore richiesta acquisto oggetto: " + e.message, "error");
+    } finally {
+      setRequestingObjectName(null);
     }
   };
 
@@ -1276,14 +1432,25 @@ export default function App() {
                 : pagedItems.length === 0
                   ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--text-faint)" }}><p style={{ fontFamily: "var(--font-head)", fontSize: 13, letterSpacing: "0.1em" }}>{mp("noItemsFound")}</p></div>
                   : pagedItems.map((o, i) => (
+                    (() => {
+                      const requestUi = getObjectPurchaseUi(o);
+                      const requestKey = makeObjectRequestKey(o);
+                      const isBusy = loadingObjectRequests || requestingObjectName === requestKey;
+                      return (
                     <ItemCard
-                      key={o.nome}
+                      key={`${o.nome}::${o.stanza || i}`}
                       oggetto={o}
                       museo={MUSEO}
                       onView={openItemDetails}
                       delay={i * 0.05}
                       displayStanza={o.stanza ? displayStanzaName(o.stanza) : ""}
+                      onRequestPurchase={requestObjectPurchase}
+                      purchaseLabel={isBusy && requestingObjectName === requestKey ? mp("requestSending") : requestUi.label}
+                      purchaseDisabled={isBusy || requestUi.disabled}
+                      fixedPriceLabel={formatFixedEuro(fixedObjectPrice)}
                     />
+                      );
+                    })()
                   ))
               }
             </div>
@@ -1294,6 +1461,36 @@ export default function App() {
         {/* ── Tab: Percorsi ── */}
         {activeTab === "visits" && (
           <>
+            <div style={{ marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)" }}>
+              <p style={{ margin: "0 0 6px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("aiRouteTitle")}</p>
+              <p style={{ margin: "0 0 10px", color: "var(--text-dim)", fontSize: 12 }}>{mp("aiRouteHint")}</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <select value={aiLengthPreset} onChange={(e) => setAiLengthPreset(e.target.value)} style={{ padding: "10px 12px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+                  <option value="breve">{mp("aiLenShort")}</option>
+                  <option value="medio">{mp("aiLenMedium")}</option>
+                  <option value="lungo">{mp("aiLenLong")}</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowAiGenerateModal(true)}
+                  disabled={generatingAiRoute}
+                  style={{ padding: "10px 14px", border: "1px solid var(--gold)", borderRadius: 8, background: "transparent", color: "var(--gold)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}
+                >
+                  {generatingAiRoute ? mp("aiRouteGenerating") : mp("aiRouteGenerate")}
+                </button>
+              </div>
+              {personalRoutes.length > 0 && (
+                <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{mp("aiMyRoutes")}</p>
+                  {personalRoutes.map((r) => (
+                    <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: "var(--text)" }}>{r.nome}</span>
+                      <button type="button" onClick={() => deleteAiRoute(r.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("aiRouteDelete")}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {isProfessor && teacherSavedVisits.length > 0 && (
               <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-card)" }}>
                 <p style={{ margin: "0 0 8px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("myGuidedTours")}</p>
@@ -1362,7 +1559,7 @@ export default function App() {
                   ))
               }
             </div>
-            <Pagination total={percorsi.length} current={visitPage} onChange={setVisitPage} />
+            <Pagination total={allVisitRoutes.length} current={visitPage} onChange={setVisitPage} />
           </>
         )}
 
@@ -1464,8 +1661,39 @@ export default function App() {
             <button onClick={closeItemModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
             <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("itemLabel")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedItem.nome}</h3>
+            {String(selectedItem?.objectType || "").toLowerCase() !== "text" && (
+              <div style={{ marginBottom: 14 }}>
+                {(() => {
+                  const requestUi = getObjectPurchaseUi(selectedItem);
+                  const requestKey = makeObjectRequestKey(selectedItem);
+                  const isBusy = loadingObjectRequests || requestingObjectName === requestKey;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => requestObjectPurchase(selectedItem)}
+                      disabled={isBusy || requestUi.disabled}
+                      style={{
+                        padding: "8px 12px",
+                        background: "var(--gold-dim)",
+                        border: "1px solid rgba(92,191,128,0.35)",
+                        borderRadius: "var(--radius)",
+                        cursor: isBusy || requestUi.disabled ? "not-allowed" : "pointer",
+                        fontFamily: "var(--font-head)",
+                        fontSize: 10,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "var(--gold)",
+                        opacity: isBusy || requestUi.disabled ? 0.7 : 1,
+                      }}
+                    >
+                      {isBusy && requestingObjectName === requestKey ? mp("requestSending") : requestUi.label}
+                    </button>
+                  );
+                })()}
+              </div>
+            )}
             <div style={{ display: "grid", gap: 14 }}>
-              <div style={{ display: "grid", gap: 14 }}>
+              {String(selectedItem?.objectType || "").toLowerCase() !== "text" && (
                 <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
                   <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("details")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px, 1fr) minmax(0, 2fr)", gap: 12 }}>
@@ -1477,144 +1705,141 @@ export default function App() {
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("year")}</strong> {selectedItem.anno || mp("nd")}</p>
                   </div>
                 </div>
-                <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("descriptions")}</p>
-                  {(() => {
-                    const preferred = getPreferredDescription(selectedItem);
-                    return (
-                      <>
-                        {preferred?.text ? (
-                          <div style={{ display: "grid", gap: 10 }}>
-                            <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}>{preferred.text}</p>
-                          </div>
-                        ) : (
-                          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>{mp("noDescription")}</p>
-                        )}
+              )}
+              <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("descriptions")}</p>
+                {(() => {
+                  const preferred = getPreferredDescription(selectedItem);
+                  return (
+                    <>
+                      {preferred?.text ? (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}>{preferred.text}</p>
+                        </div>
+                      ) : (
+                        <p style={{ color: "var(--text-dim)", fontSize: 14 }}>{mp("noDescription")}</p>
+                      )}
 
-                        <button
-                          type="button"
-                          onClick={() => setShowAllDescriptions((prev) => !prev)}
-                          style={{
-                            marginTop: 12,
-                            padding: "8px 12px",
-                            background: "transparent",
-                            border: "1px solid var(--border)",
-                            borderRadius: "var(--radius)",
-                            cursor: "pointer",
-                            fontFamily: "var(--font-head)",
-                            fontSize: 10,
-                            letterSpacing: "0.12em",
-                            textTransform: "uppercase",
-                            color: "var(--gold)",
-                          }}
-                        >
-                          {showAllDescriptions ? mp("hideAll") : mp("showAll")}
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllDescriptions((prev) => !prev)}
+                        style={{
+                          marginTop: 12,
+                          padding: "8px 12px",
+                          background: "transparent",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius)",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-head)",
+                          fontSize: 10,
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          color: "var(--gold)",
+                        }}
+                      >
+                        {showAllDescriptions ? mp("hideAll") : mp("showAll")}
+                      </button>
 
-                        {showAllDescriptions && (
-                          <div style={{ marginTop: 12 }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-                              <thead>
-                                <tr>
-                                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>
-                                  {DESCRIPTION_LENGTHS.map((len) => (
-                                    <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
-                                      {len}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {DESCRIPTION_LEVELS.map((lvlLabel, lvlIndex) => {
-                                  const descMatrix =
-                                    navLang !== "it" &&
-                                    selectedItem?.descrizioniI18n?.[navLang] &&
-                                    Array.isArray(selectedItem.descrizioniI18n[navLang]) &&
-                                    selectedItem.descrizioniI18n[navLang].length > 0
-                                      ? selectedItem.descrizioniI18n[navLang]
-                                      : selectedItem.descrizioni;
-                                  const group = Array.isArray(descMatrix?.[lvlIndex]) ? descMatrix[lvlIndex] : [];
-                                  return (
-                                    <tr key={lvlLabel}>
-                                      <td style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text)", fontSize: 13, verticalAlign: "top", whiteSpace: isMobile ? "normal" : "nowrap", overflowWrap: "anywhere" }}>
-                                        {lvlLabel}
+                      {showAllDescriptions && (
+                        <div style={{ marginTop: 12 }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>
+                                {DESCRIPTION_LENGTHS.map((len) => (
+                                  <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
+                                    {len}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {DESCRIPTION_LEVELS.map((lvlLabel, lvlIndex) => {
+                                const descMatrix =
+                                  navLang !== "it" &&
+                                  selectedItem?.descrizioniI18n?.[navLang] &&
+                                  Array.isArray(selectedItem.descrizioniI18n[navLang]) &&
+                                  selectedItem.descrizioniI18n[navLang].length > 0
+                                    ? selectedItem.descrizioniI18n[navLang]
+                                    : selectedItem.descrizioni;
+                                const group = Array.isArray(descMatrix?.[lvlIndex]) ? descMatrix[lvlIndex] : [];
+                                return (
+                                  <tr key={lvlLabel}>
+                                    <td style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text)", fontSize: 13, verticalAlign: "top", whiteSpace: isMobile ? "normal" : "nowrap", overflowWrap: "anywhere" }}>
+                                      {lvlLabel}
+                                    </td>
+                                    {DESCRIPTION_LENGTHS.map((lenLabel, lenIndex) => (
+                                      <td key={`${lvlLabel}-${lenLabel}`} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text-dim)", fontSize: isMobile ? 12 : 14, lineHeight: 1.55, verticalAlign: "top", overflowWrap: "anywhere" }}>
+                                        {group?.[lenIndex] || "—"}
                                       </td>
-                                      {DESCRIPTION_LENGTHS.map((lenLabel, lenIndex) => (
-                                        <td key={`${lvlLabel}-${lenLabel}`} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "var(--text-dim)", fontSize: isMobile ? 12 : 14, lineHeight: 1.55, verticalAlign: "top", overflowWrap: "anywhere" }}>
-                                          {group?.[lenIndex] || "—"}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
+                                    ))}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
-              {(() => {
+              {String(selectedItem?.objectType || "").toLowerCase() !== "text" && (() => {
                 const galleryImages = selectedItemImages.filter((img) => img.tipo !== "preview");
+                if (galleryImages.length === 0) return null;
                 const safeIndex = Math.min(selectedGalleryIndex, Math.max(galleryImages.length - 1, 0));
                 const activeImage = galleryImages[safeIndex] || null;
                 return (
                   <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
                     <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("imageGallery")}</p>
-                    {galleryImages.length === 0 ? (
-                      <p style={{ color: "var(--text-dim)", fontSize: 14 }}>{mp("noExtraImages")}</p>
-                    ) : (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        <img
-                          src={activeImage.url.startsWith("/api") ? activeImage.url : `/api${activeImage.url}`}
-                          alt={`${selectedItem.nome} ${activeImage.tipo}`}
-                          style={{ width: "100%", height: isMobile ? 220 : 260, objectFit: "cover", borderRadius: 12, background: "#111" }}
-                        />
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))}
-                            style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
-                          >
-                            ‹
-                          </button>
-                          <div style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1, paddingBottom: 2 }}>
-                            {galleryImages.map((img, index) => (
-                              <button
-                                key={img.tipo}
-                                type="button"
-                                onClick={() => setSelectedGalleryIndex(index)}
-                                style={{
-                                  border: index === safeIndex ? "1px solid var(--gold)" : "1px solid var(--border)",
-                                  padding: 0,
-                                  borderRadius: 12,
-                                  overflow: "hidden",
-                                  background: "transparent",
-                                  cursor: "pointer",
-                                  minWidth: isMobile ? 84 : 72,
-                                }}
-                              >
-                                <img
-                                  src={img.url.startsWith("/api") ? img.url : `/api${img.url}`}
-                                  alt={`${selectedItem.nome} thumb ${img.tipo}`}
-                                  style={{ width: isMobile ? 84 : 72, height: isMobile ? 60 : 52, objectFit: "cover", display: "block" }}
-                                />
-                              </button>
-                            ))}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))}
-                            style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
-                          >
-                            ›
-                          </button>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <img
+                        src={activeImage.url.startsWith("/api") ? activeImage.url : `/api${activeImage.url}`}
+                        alt={`${selectedItem.nome} ${activeImage.tipo}`}
+                        style={{ width: "100%", height: isMobile ? 220 : 260, objectFit: "contain", borderRadius: 12, background: "#111", padding: 8 }}
+                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))}
+                          style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
+                        >
+                          ‹
+                        </button>
+                        <div style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1, paddingBottom: 2 }}>
+                          {galleryImages.map((img, index) => (
+                            <button
+                              key={img.tipo}
+                              type="button"
+                              onClick={() => setSelectedGalleryIndex(index)}
+                              style={{
+                                border: index === safeIndex ? "1px solid var(--gold)" : "1px solid var(--border)",
+                                padding: 0,
+                                borderRadius: 12,
+                                overflow: "hidden",
+                                background: "transparent",
+                                cursor: "pointer",
+                                minWidth: isMobile ? 84 : 72,
+                              }}
+                            >
+                              <img
+                                src={img.url.startsWith("/api") ? img.url : `/api${img.url}`}
+                                alt={`${selectedItem.nome} thumb ${img.tipo}`}
+                                style={{ width: isMobile ? 84 : 72, height: isMobile ? 60 : 52, objectFit: "contain", display: "block", background: "#111" }}
+                              />
+                            </button>
+                          ))}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))}
+                          style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer" }}
+                        >
+                          ›
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })()}
@@ -1873,6 +2098,33 @@ export default function App() {
             {teacherDashboardLink && (
               <input readOnly value={teacherDashboardLink} style={{ width: "100%", marginTop: 8, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
             )}
+          </div>
+        </div>
+      )}
+
+      {showAiGenerateModal && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setShowAiGenerateModal(false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(10px)", zIndex: 730, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ width: isMobile ? "min(560px, 100%)" : "min(560px, 92vw)", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 14, padding: isMobile ? "16px 12px" : "20px 18px", position: "relative" }}>
+            <button onClick={() => setShowAiGenerateModal(false)} style={{ position: "absolute", top: 10, right: 10, width: 30, height: 30, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+            <p style={{ margin: "0 0 6px", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", fontFamily: "var(--font-head)" }}>{mp("aiRouteTitle")}</p>
+            <h3 style={{ margin: "0 0 12px", fontFamily: "var(--font-head)", fontWeight: 400 }}>{mp("aiRouteGenerate")}</h3>
+            <input
+              value={aiRouteNameDraft}
+              onChange={(e) => setAiRouteNameDraft(e.target.value)}
+              placeholder="Nome percorso IA (opzionale)"
+              style={{ width: "100%", padding: "10px 12px", marginBottom: 10, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+            />
+            <select value={aiLengthPreset} onChange={(e) => setAiLengthPreset(e.target.value)} style={{ width: "100%", padding: "10px 12px", marginBottom: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
+              <option value="breve">{mp("aiLenShort")}</option>
+              <option value="medio">{mp("aiLenMedium")}</option>
+              <option value="lungo">{mp("aiLenLong")}</option>
+            </select>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setShowAiGenerateModal(false)} style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "transparent", color: "var(--text-dim)", cursor: "pointer" }}>Annulla</button>
+              <button onClick={generateAiRoute} disabled={generatingAiRoute} style={{ padding: "9px 12px", border: "1px solid var(--gold)", borderRadius: 8, background: "transparent", color: "var(--gold)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}>
+                {generatingAiRoute ? `${mp("aiRouteGenerating")} ⏳` : mp("aiRouteGenerate")}
+              </button>
+            </div>
           </div>
         </div>
       )}

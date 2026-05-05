@@ -1,9 +1,20 @@
 import React from "react";
 import { previewUrl } from "../api";
 
-export default function ItemCard({ oggetto, museo, onView, delay = 0, displayStanza }) {
+export default function ItemCard({
+  oggetto,
+  museo,
+  onView,
+  delay = 0,
+  displayStanza,
+  onRequestPurchase,
+  purchaseLabel,
+  purchaseDisabled = false,
+  fixedPriceLabel = "",
+}) {
   const nD = Array.isArray(oggetto.descrizioni) ? oggetto.descrizioni.length : 0;
   const nC = Array.isArray(oggetto.connessi) ? oggetto.connessi.length : 0;
+  const isTextObject = String(oggetto?.objectType || "").toLowerCase() === "text";
 
   return (
     <div
@@ -39,7 +50,7 @@ export default function ItemCard({ oggetto, museo, onView, delay = 0, displaySta
           src={previewUrl(museo, oggetto.nome)}
           alt={oggetto.nome}
           onError={(e) => { e.target.style.display = "none"; }}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8, display: "block" }}
         />
       </div>
 
@@ -105,26 +116,55 @@ export default function ItemCard({ oggetto, museo, onView, delay = 0, displaySta
         </div>
       </div>
 
-      <div style={{ padding: "10px 22px 18px" }}>
-        <button
-          onClick={() => onView?.(oggetto)}
-          style={{
-            width: "100%",
-            padding: "8px 10px",
-            background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            cursor: "pointer",
-            fontFamily: "var(--font-head)",
-            fontSize: 9,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color: "var(--gold)",
-            transition: "all 0.2s",
-          }}
-        >
-          Visualizza
-        </button>
+      <div style={{ padding: "10px 22px 18px", display: "grid", gap: 8 }}>
+        {!isTextObject && (
+          <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+            Prezzo fisso: <span style={{ color: "var(--gold)" }}>{fixedPriceLabel || "—"}</span>
+          </div>
+        )}
+        <div style={{ display: "grid", gap: 8, gridTemplateColumns: isTextObject ? "1fr" : "1fr 1fr" }}>
+          <button
+            onClick={() => onView?.(oggetto)}
+            style={{
+              width: "100%",
+              padding: "8px 10px",
+              background: "transparent",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              cursor: "pointer",
+              fontFamily: "var(--font-head)",
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--gold)",
+              transition: "all 0.2s",
+            }}
+          >
+            Visualizza
+          </button>
+          {!isTextObject && (
+            <button
+              onClick={() => onRequestPurchase?.(oggetto)}
+              disabled={purchaseDisabled}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                background: "var(--gold-dim)",
+                border: "1px solid rgba(92,191,128,0.3)",
+                borderRadius: "var(--radius)",
+                cursor: purchaseDisabled ? "not-allowed" : "pointer",
+                fontFamily: "var(--font-head)",
+                fontSize: 9,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--gold)",
+                opacity: purchaseDisabled ? 0.7 : 1,
+              }}
+            >
+              {purchaseLabel || "Richiedi"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
