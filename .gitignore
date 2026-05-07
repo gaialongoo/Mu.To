@@ -7,3 +7,9 @@ dist/
 .env
 # secrets
 server/openAPI/.env
+<<<<<<< HEAD
+=======
+
+# secrets
+server/openAPI/.env
+>>>>>>> cceb6bf (wip)
