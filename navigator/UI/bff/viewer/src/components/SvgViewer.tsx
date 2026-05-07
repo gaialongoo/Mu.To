@@ -161,6 +161,14 @@ export default function SvgViewer() {
   }, []);
 
   const [session, setSession] = useState<Session | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(() => {
+    try {
+      return localStorage.getItem("mu_nav_tutorial_dismissed") !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const [tutorialDontShow, setTutorialDontShow] = useState(false);
   const [availableQuickRooms, setAvailableQuickRooms] = useState({
     shop: false,
     wc: false,
@@ -1021,6 +1029,146 @@ export default function SvgViewer() {
         position: "relative",
       }}
     >
+      {tutorialOpen && (
+        <div
+          onClick={() => {
+            try {
+              if (tutorialDontShow) localStorage.setItem("mu_nav_tutorial_dismissed", "1");
+            } catch {}
+            setTutorialOpen(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9050,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            background: "transparent",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(720px, 94vw)",
+              maxHeight: "88vh",
+              overflowY: "auto",
+              background: "var(--surface)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: "18px 18px",
+              boxShadow: "0 40px 100px rgba(0,0,0,0.7), 0 0 50px rgba(92,191,128,0.10)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.22em", color: "var(--green)", textTransform: "uppercase" }}>
+                  Tutorial
+                </div>
+                <div style={{ fontFamily: "var(--font-head)", fontSize: 16, letterSpacing: "0.08em", marginTop: 6 }}>
+                  Come usare il Navigator
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (tutorialDontShow) localStorage.setItem("mu_nav_tutorial_dismissed", "1");
+                  } catch {}
+                  setTutorialOpen(false);
+                }}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+                aria-label="Chiudi tutorial"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ height: 1, background: "linear-gradient(90deg, transparent, var(--green), transparent)", opacity: 0.55, margin: "14px 10px 14px" }} />
+
+            <div style={{ display: "grid", gap: 12, fontSize: 13, lineHeight: 1.8, color: "var(--text)" }}>
+              <div style={{ background: "rgba(240,234,216,0.03)", border: "1px solid rgba(92,191,128,0.12)", borderRadius: 16, padding: "12px 14px" }}>
+                <div style={{ fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.18em", color: "var(--green)", textTransform: "uppercase", marginBottom: 6 }}>
+                  Muoversi nella mappa
+                </div>
+                <div style={{ color: "var(--text-dim)" }}>
+                  - Trascina per spostarti, usa pinch/rotella per zoom.<br />
+                  - Il pulsante tondo in basso a destra (🗺/🔒) cambia modalità: <strong style={{ color: "var(--text)" }}>esplora libera</strong> / <strong style={{ color: "var(--text)" }}>vista bloccata</strong>.
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(240,234,216,0.03)", border: "1px solid rgba(92,191,128,0.12)", borderRadius: 16, padding: "12px 14px" }}>
+                <div style={{ fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.18em", color: "var(--green)", textTransform: "uppercase", marginBottom: 6 }}>
+                  Interagire con le stanze e gli oggetti
+                </div>
+                <div style={{ color: "var(--text-dim)" }}>
+                  - Tocca/clicca un oggetto per aprire la scheda con descrizione e strumenti (audio, chat).<br />
+                  - Se vedi i pulsanti rapidi <strong style={{ color: "var(--text)" }}>WC / SHOP / OUT</strong>, puoi saltare subito a quei punti (se disponibili).
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(240,234,216,0.03)", border: "1px solid rgba(92,191,128,0.12)", borderRadius: 16, padding: "12px 14px" }}>
+                <div style={{ fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.18em", color: "var(--green)", textTransform: "uppercase", marginBottom: 6 }}>
+                  Uscire e controlli
+                </div>
+                <div style={{ color: "var(--text-dim)" }}>
+                  - In alto a destra trovi <strong style={{ color: "var(--text)" }}>{t("exit")}</strong> per uscire dalla visita.<br />
+                  - Puoi chiudere qualsiasi popup cliccando fuori dalla card o usando ✕.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-dim)", fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={tutorialDontShow}
+                  onChange={(e) => setTutorialDontShow(e.target.checked)}
+                />
+                Non mostrarlo più
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (tutorialDontShow) localStorage.setItem("mu_nav_tutorial_dismissed", "1");
+                  } catch {}
+                  setTutorialOpen(false);
+                }}
+                style={{
+                  border: "1px solid var(--green)",
+                  background: "var(--green)",
+                  color: "#0d0d0d",
+                  borderRadius: 14,
+                  padding: "10px 14px",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Ho capito
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!isGuidedVisit && (
         <button
           onClick={() => setExitConfirmOpen(true)}
