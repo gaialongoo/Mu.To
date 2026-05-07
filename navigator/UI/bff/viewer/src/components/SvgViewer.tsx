@@ -63,6 +63,11 @@ const SVG_SERVER_BASE = "/svg";
 const API_BASE = "/api";
 const MOBILE_BREAKPOINT = 768;
 
+// Modelli STT Vosk (tar.gz) hostati su GitHub raw.
+// Nota: vosk-browser richiede un tar.gz con cartella `model/` interna (non zip).
+const VOSK_MODEL_BASE_URL =
+  "https://raw.githubusercontent.com/gaialongoo/Mu.To/main/navigator/UI/bff/viewer/public";
+
 /* ===================== STANZA / PATH LOGIC ===================== */
 
 type ParsedStanza = {
@@ -2583,7 +2588,22 @@ function ObjectOverlay({
   const [_sttPreview, setSttPreview] = useState<string>("");
   const [ttsError, setTtsError] = useState<string | null>(null);
   const [ttsBusyKey, setTtsBusyKey] = useState<string | null>(null);
+  const [ttsPaused, setTtsPaused] = useState(false);
+  const [ttsRate, setTtsRate] = useState(1);
+  const [ttsRange, setTtsRange] = useState<{ start: number; end: number } | null>(null);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const ttsKeyRef = useRef<string | null>(null);
+  const ttsFullTextRef = useRef<string>("");
+  const ttsCharIndexRef = useRef<number>(0);
+  const ttsManualRemainingRef = useRef<string>("");
+  const ttsPausingRef = useRef(false);
+  const ttsUtteranceBaseRef = useRef<number>(0);
+  const ttsFallbackTimerRef = useRef<number | null>(null);
+  const ttsFallbackStartedRef = useRef(false);
+  const ttsFallbackStartTsRef = useRef<number>(0);
+  const ttsFallbackElapsedBeforePauseRef = useRef<number>(0);
+  const ttsWordRangesRef = useRef<Array<{ start: number; end: number }>>([]);
   const voskModelRef = useRef<Model | null>(null);
   const voskModelLangRef = useRef<string>("");
   const recognizerRef = useRef<KaldiRecognizer | null>(null);
@@ -2807,6 +2827,9 @@ function ObjectOverlay({
       }
     } catch {}
     setTtsBusyKey(null);
+    setTtsPaused(false);
+    setTtsRange(null);
+    utteranceRef.current = null;
   }, [nome]);
 
   const waitForVoices = async () => {
@@ -2841,7 +2864,243 @@ function ObjectOverlay({
         ttsAudioRef.current.src = "";
       }
     } catch {}
+    if (ttsFallbackTimerRef.current) {
+      window.clearInterval(ttsFallbackTimerRef.current);
+      ttsFallbackTimerRef.current = null;
+    }
+    ttsFallbackStartedRef.current = false;
+    ttsFallbackElapsedBeforePauseRef.current = 0;
+    ttsWordRangesRef.current = [];
     setTtsBusyKey(null);
+    ttsKeyRef.current = null;
+    setTtsPaused(false);
+    ttsPausingRef.current = false;
+    setTtsRange(null);
+    utteranceRef.current = null;
+    ttsFullTextRef.current = "";
+    ttsManualRemainingRef.current = "";
+    ttsCharIndexRef.current = 0;
+  };
+
+  const pauseTts = () => {
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        const synth = window.speechSynthesis;
+        // Firefox spesso non pausa davvero: facciamo una pausa "vera"
+        // cancellando e salvando il testo rimanente.
+        const idxFromRange = ttsRange?.end != null ? Number(ttsRange.end) : 0;
+        const idx = Math.max(
+          0,
+          Math.min(
+            ttsFullTextRef.current.length,
+            Math.max(ttsCharIndexRef.current || 0, Number.isFinite(idxFromRange) ? idxFromRange : 0)
+          )
+        );
+        const remaining = String(ttsFullTextRef.current || "").slice(idx).trimStart();
+        if (remaining) ttsManualRemainingRef.current = remaining;
+        // Segna che la cancel è una "pausa", non uno stop definitivo
+        ttsPausingRef.current = true;
+        synth.cancel();
+        setTtsPaused(true);
+        if (ttsFallbackTimerRef.current) {
+          window.clearInterval(ttsFallbackTimerRef.current);
+          ttsFallbackTimerRef.current = null;
+        }
+        if (ttsFallbackStartedRef.current) {
+          const now = Date.now();
+          const elapsed = Math.max(0, now - ttsFallbackStartTsRef.current);
+          ttsFallbackElapsedBeforePauseRef.current += elapsed;
+        }
+      }
+    } catch {}
+  };
+
+  const resumeTts = () => {
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        setTtsPaused(false);
+        ttsPausingRef.current = false;
+        // Riprendi da dove avevamo "pausato" (manuale).
+        const key = ttsKeyRef.current;
+        const remaining = String(ttsManualRemainingRef.current || "").trim();
+        if (key && remaining) {
+          // riavvia parlato e fallback highlight dal punto corrente
+          ttsManualRemainingRef.current = "";
+          // non resettiamo ttsBusyKey: resta lo stesso
+          void startUtterance(remaining, key, { isResume: true });
+        } else {
+          // se browser supporta resume, prova comunque
+          try { window.speechSynthesis.resume(); } catch {}
+        }
+        if (ttsFallbackStartedRef.current && ttsWordRangesRef.current.length > 0 && !ttsFallbackTimerRef.current) {
+          ttsFallbackStartTsRef.current = Date.now();
+          ttsFallbackTimerRef.current = window.setInterval(() => {
+            const rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+            const wps = 2.5 * rate;
+            const elapsedMs = ttsFallbackElapsedBeforePauseRef.current + Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
+            const wordIdx = Math.floor((elapsedMs / 1000) * wps);
+            const r = ttsWordRangesRef.current[Math.max(0, Math.min(ttsWordRangesRef.current.length - 1, wordIdx))];
+            if (r) setTtsRange(r);
+          }, 120);
+        }
+      }
+    } catch {}
+  };
+
+  const estimateTtsSeconds = (text: string, rate: number) => {
+    const words = String(text || "").trim().split(/\s+/).filter(Boolean).length;
+    // baseline ~2.5 words/sec at rate=1 (rough)
+    const wps = 2.5 * Math.max(0.5, Math.min(2, Number(rate) || 1));
+    return Math.max(1, Math.round(words / wps));
+  };
+
+  const buildWordRanges = (text: string) => {
+    const s = String(text || "");
+    const ranges: Array<{ start: number; end: number }> = [];
+    const re = /\S+/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      const start = m.index;
+      const end = start + m[0].length;
+      ranges.push({ start, end });
+    }
+    return ranges;
+  };
+
+  const startTtsHighlightFallback = (fullText: string) => {
+    if (ttsFallbackStartedRef.current) return;
+    const ranges = buildWordRanges(fullText);
+    if (ranges.length < 2) return;
+    ttsWordRangesRef.current = ranges;
+    ttsFallbackStartedRef.current = true;
+    ttsFallbackElapsedBeforePauseRef.current = 0;
+    ttsFallbackStartTsRef.current = Date.now();
+    if (ttsFallbackTimerRef.current) {
+      window.clearInterval(ttsFallbackTimerRef.current);
+      ttsFallbackTimerRef.current = null;
+    }
+    ttsFallbackTimerRef.current = window.setInterval(() => {
+      const rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+      const wps = 2.5 * rate;
+      const elapsedMs = ttsFallbackElapsedBeforePauseRef.current + Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
+      const wordIdx = Math.floor((elapsedMs / 1000) * wps);
+      const r = ranges[Math.max(0, Math.min(ranges.length - 1, wordIdx))];
+      if (r) {
+        setTtsRange(r);
+        // Aggiorna anche l'indice corrente così Pausa/Riprendi riparte dal punto giusto
+        ttsCharIndexRef.current = r.end;
+      }
+    }, 120);
+  };
+
+  const startUtterance = async (text: string, key: string, { isResume }: { isResume: boolean }) => {
+    const clean = String(text || "").trim();
+    if (!clean) return;
+    // Browser TTS only
+    await waitForVoices();
+    const synth = window.speechSynthesis;
+    const voicesNow = synth.getVoices?.() || [];
+    if (voicesNow.length === 0) {
+      setTtsBusyKey(null);
+      ttsKeyRef.current = null;
+      setTtsError("Sintesi vocale non disponibile: nessuna voce installata nel browser.");
+      return;
+    }
+    const desiredLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = desiredLang;
+    u.rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+    try {
+      const v =
+        voicesNow.find((vv) => String(vv?.lang || "").toLowerCase().startsWith(`${desiredLang}-`)) ||
+        voicesNow.find((vv) => String(vv?.lang || "").toLowerCase() === desiredLang) ||
+        null;
+      if (v) u.voice = v as any;
+    } catch {}
+
+    let gotBoundary = false;
+    // base nel testo completo (serve per resume e per non "sommarlo" male)
+    const base = Math.max(0, Math.min(ttsFullTextRef.current.length, ttsCharIndexRef.current || 0));
+    ttsUtteranceBaseRef.current = base;
+    u.onboundary = (ev: any) => {
+      gotBoundary = true;
+      const idx = Number(ev?.charIndex);
+      const len = Number(ev?.charLength || 1);
+      if (!Number.isFinite(idx) || idx < 0) return;
+      // charIndex è relativo a "clean" di questa utterance; sommiamo l'offset corrente
+      const start = ttsUtteranceBaseRef.current + idx;
+      const end = ttsUtteranceBaseRef.current + idx + (Number.isFinite(len) && len > 0 ? len : 1);
+      ttsCharIndexRef.current = end;
+      setTtsRange({ start, end });
+    };
+
+    u.onstart = () => {
+      // Fallback highlight: se non arrivano boundary dopo un attimo, evidenziamo “a tempo”.
+      setTimeout(() => {
+        if (!gotBoundary && ttsKeyRef.current === key) startTtsHighlightFallback(ttsFullTextRef.current);
+      }, 250);
+    };
+    u.onend = () => {
+      // Se abbiamo fatto cancel per "pausa", NON chiudere lo stato: serve il tasto Riprendi.
+      if (ttsPausingRef.current) {
+        return;
+      }
+      setTtsBusyKey(null);
+      ttsKeyRef.current = null;
+      setTtsPaused(false);
+      setTtsRange(null);
+      utteranceRef.current = null;
+      if (ttsFallbackTimerRef.current) {
+        window.clearInterval(ttsFallbackTimerRef.current);
+        ttsFallbackTimerRef.current = null;
+      }
+      ttsFallbackStartedRef.current = false;
+      ttsFallbackElapsedBeforePauseRef.current = 0;
+      ttsWordRangesRef.current = [];
+      ttsFullTextRef.current = "";
+      ttsCharIndexRef.current = 0;
+      ttsManualRemainingRef.current = "";
+    };
+    u.onerror = () => {
+      setTtsBusyKey(null);
+      ttsKeyRef.current = null;
+      setTtsError("Sintesi vocale non disponibile in questo browser.");
+      setTtsPaused(false);
+      setTtsRange(null);
+      utteranceRef.current = null;
+      if (ttsFallbackTimerRef.current) {
+        window.clearInterval(ttsFallbackTimerRef.current);
+        ttsFallbackTimerRef.current = null;
+      }
+      ttsFallbackStartedRef.current = false;
+      ttsFallbackElapsedBeforePauseRef.current = 0;
+      ttsWordRangesRef.current = [];
+      ttsFullTextRef.current = "";
+      ttsCharIndexRef.current = 0;
+      ttsManualRemainingRef.current = "";
+    };
+
+    // avvio
+    utteranceRef.current = u;
+    if (!isResume) synth.cancel();
+    synth.speak(u);
+  };
+
+  const renderHighlightedText = (text: string, key: string) => {
+    const s = String(text || "");
+    const isActive = ttsBusyKey === key && ttsRange && ttsRange.end > ttsRange.start;
+    if (!isActive) return <>{s}</>;
+    const start = Math.max(0, Math.min(s.length, ttsRange.start));
+    const end = Math.max(start, Math.min(s.length, ttsRange.end));
+    return (
+      <>
+        {s.slice(0, start)}
+        <span style={{ background: "rgba(24,95,165,0.18)", padding: "0 2px", borderRadius: 3 }}>
+          {s.slice(start, end)}
+        </span>
+        {s.slice(end)}
+      </>
+    );
   };
 
   const speakText = async (text: string, key: string) => {
@@ -2854,51 +3113,39 @@ function ObjectOverlay({
     stopTts();
     setTtsError(null);
     setTtsBusyKey(key);
+    ttsKeyRef.current = key;
+    setTtsPaused(false);
+    setTtsRange(null);
+    if (ttsFallbackTimerRef.current) {
+      window.clearInterval(ttsFallbackTimerRef.current);
+      ttsFallbackTimerRef.current = null;
+    }
+    ttsFallbackStartedRef.current = false;
+    ttsFallbackElapsedBeforePauseRef.current = 0;
+    ttsWordRangesRef.current = [];
 
     // Browser TTS if available
     try {
       if (typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
-        await waitForVoices();
-        const synth = window.speechSynthesis;
-        const voicesNow = synth.getVoices?.() || [];
-        if (voicesNow.length === 0) {
-          setTtsBusyKey(null);
-          setTtsError("Sintesi vocale non disponibile: nessuna voce installata nel browser.");
-          return;
-        }
-        const desiredLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
-        const u = new SpeechSynthesisUtterance(clean);
-        u.lang = desiredLang;
-        try {
-          const v =
-            voicesNow.find((vv) => String(vv?.lang || "").toLowerCase().startsWith(`${desiredLang}-`)) ||
-            voicesNow.find((vv) => String(vv?.lang || "").toLowerCase() === desiredLang) ||
-            null;
-          if (v) u.voice = v as any;
-        } catch {}
-        // Alcuni browser triggerano end/error subito se non hanno voci pronte.
-        let started = false;
-        u.onstart = () => { started = true; };
-        u.onend = () => setTtsBusyKey(null);
-        u.onerror = () => {
-          setTtsBusyKey(null);
-          setTtsError("Sintesi vocale non disponibile in questo browser.");
-        };
-        synth.cancel();
-        synth.speak(u);
+        // set base tracking
+        ttsFullTextRef.current = clean;
+        ttsCharIndexRef.current = 0;
+        ttsManualRemainingRef.current = "";
+        await startUtterance(clean, key, { isResume: false });
         // Se non parte davvero entro poco, consideriamo “non supportato”.
         setTimeout(() => {
           try {
-            const active = started || synth.speaking || synth.pending;
+            const synth = window.speechSynthesis;
+            const active = synth.speaking || synth.pending;
             if (!active) {
               setTtsBusyKey(null);
+              ttsKeyRef.current = null;
               setTtsError("Sintesi vocale non disponibile in questo browser.");
             }
           } catch {
-            if (!started) {
-              setTtsBusyKey(null);
-              setTtsError("Sintesi vocale non disponibile in questo browser.");
-            }
+            setTtsBusyKey(null);
+            ttsKeyRef.current = null;
+            setTtsError("Sintesi vocale non disponibile in questo browser.");
           }
         }, 500);
         return;
@@ -2913,11 +3160,18 @@ function ObjectOverlay({
 
   const ensureVoskModel = async (): Promise<Model> => {
     const currentLang = (lang === "en" || lang === "fr" || lang === "it") ? lang : "it";
-    const modelUrl = currentLang === "fr"
+    const remoteModelUrl = currentLang === "fr"
+      ? `${VOSK_MODEL_BASE_URL}/vosk-model-fr.tar.gz`
+      : currentLang === "en"
+        ? `${VOSK_MODEL_BASE_URL}/vosk-model-en.tar.gz`
+        : `${VOSK_MODEL_BASE_URL}/vosk-model-it.tar.gz`;
+    // Fallback locale (se disponibile nello stesso host)
+    const localModelUrl = currentLang === "fr"
       ? "/vosk-model-fr.tar.gz"
       : currentLang === "en"
         ? "/vosk-model-en.tar.gz"
         : "/vosk-model-it.tar.gz";
+    const modelUrl = remoteModelUrl;
 
     if (voskModelRef.current && voskModelLangRef.current === modelUrl) {
       return voskModelRef.current;
@@ -2937,12 +3191,24 @@ function ObjectOverlay({
       voskModelRef.current = m;
       return m;
     } catch (e: any) {
+      // Prova fallback locale (utile in sviluppo o se raw GitHub è bloccato).
+      try {
+        const m2 = await Promise.race([
+          createModel(localModelUrl, -1),
+          new Promise<never>((_resolve, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 12000)
+          ),
+        ]);
+        voskModelRef.current = m2;
+        voskModelLangRef.current = localModelUrl;
+        return m2;
+      } catch {}
       const msg = e?.message || "Impossibile caricare il modello STT";
       const isIso = typeof window !== "undefined" ? (window as any).crossOriginIsolated : false;
       const hint =
         msg === "timeout"
           ? `Caricamento STT bloccato (Chrome). Prova a ricaricare la pagina. Se persiste: abilita COOP/COEP (crossOriginIsolated=${isIso ? "true" : "false"}).`
-          : `Controlla che esista ${modelUrl} in public/.`;
+          : `Controlla URL modello: ${modelUrl} (o fallback ${localModelUrl}).`;
       setSttError(`${msg === "timeout" ? "STT timeout" : msg}. ${hint}`);
       throw e;
     } finally {
@@ -3483,7 +3749,9 @@ function ObjectOverlay({
           {descrizione
             ? (
               <div style={{ display: "grid", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>
+                  {renderHighlightedText(descrizione, "desc")}
+                </p>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     type="button"
@@ -3500,6 +3768,40 @@ function ObjectOverlay({
                   >
                     {ttsBusyKey === "desc" ? t("stop") : t("listen")}
                   </button>
+                  {ttsBusyKey === "desc" && !ttsPaused && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); pauseTts(); }}
+                      style={{
+                        border: "1px solid #e1e6ee",
+                        background: "#fff",
+                        color: "#6b7c8c",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {t("pause")}
+                    </button>
+                  )}
+                  {ttsBusyKey === "desc" && ttsPaused && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); resumeTts(); }}
+                      style={{
+                        border: "1px solid #e1e6ee",
+                        background: "#fff",
+                        color: "#6b7c8c",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {t("resume")}
+                    </button>
+                  )}
                   {ttsBusyKey && (
                     <button
                       type="button"
@@ -3517,6 +3819,23 @@ function ObjectOverlay({
                       {t("stop")}
                     </button>
                   )}
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: "#6b7c8c" }}>
+                    {t("ttsEta")}: ~{estimateTtsSeconds(descrizione, ttsRate)}s
+                  </span>
+                  <label style={{ fontSize: 11, color: "#6b7c8c", display: "flex", gap: 6, alignItems: "center" }}>
+                    {t("ttsRate")}
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="1.4"
+                      step="0.05"
+                      value={ttsRate}
+                      onChange={(e) => setTtsRate(Number(e.target.value))}
+                    />
+                    <span style={{ minWidth: 34, textAlign: "right" }}>{ttsRate.toFixed(2)}×</span>
+                  </label>
                 </div>
               </div>
             )
@@ -3615,7 +3934,7 @@ function ObjectOverlay({
                       }}
                     >
                       <div style={{ display: "grid", gap: 6 }}>
-                        <div>{msg.text}</div>
+                        <div>{renderHighlightedText(msg.text, `msg:${idx}`)}</div>
                         {msg.role === "assistant" && (
                           <div style={{ display: "flex", gap: 8 }}>
                             <button
@@ -3633,6 +3952,43 @@ function ObjectOverlay({
                             >
                               {ttsBusyKey === `msg:${idx}` ? t("stop") : t("listen")}
                             </button>
+                            {ttsBusyKey === `msg:${idx}` && !ttsPaused && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); pauseTts(); }}
+                                style={{
+                                  border: "1px solid #e1e6ee",
+                                  background: "#fff",
+                                  color: "#6b7c8c",
+                                  borderRadius: 10,
+                                  padding: "4px 8px",
+                                  fontSize: 11,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {t("pause")}
+                              </button>
+                            )}
+                            {ttsBusyKey === `msg:${idx}` && ttsPaused && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); resumeTts(); }}
+                                style={{
+                                  border: "1px solid #e1e6ee",
+                                  background: "#fff",
+                                  color: "#6b7c8c",
+                                  borderRadius: 10,
+                                  padding: "4px 8px",
+                                  fontSize: 11,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {t("resume")}
+                              </button>
+                            )}
+                            <span style={{ fontSize: 10, color: "#6b7c8c", alignSelf: "center" }}>
+                              ~{estimateTtsSeconds(msg.text, ttsRate)}s
+                            </span>
                           </div>
                         )}
                       </div>

@@ -77,6 +77,10 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiUnknownError: "impossibile ottenere la risposta.",
     listen: "Ascolta",
     stop: "Stop",
+    pause: "Pausa",
+    resume: "Riprendi",
+    ttsRate: "Velocità",
+    ttsEta: "Tempo stimato",
   },
   en: {
     loading: "Loading…",
@@ -148,6 +152,10 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiUnknownError: "could not get a reply.",
     listen: "Listen",
     stop: "Stop",
+    pause: "Pause",
+    resume: "Resume",
+    ttsRate: "Speed",
+    ttsEta: "Estimated",
   },
   fr: {
     loading: "Chargement…",
@@ -219,5 +227,9 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiUnknownError: "impossible d’obtenir une réponse.",
     listen: "Écouter",
     stop: "Stop",
+    pause: "Pause",
+    resume: "Reprendre",
+    ttsRate: "Vitesse",
+    ttsEta: "Temps estimé",
   },
 };

@@ -1294,8 +1294,8 @@
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
   </style>
-  <script type="module" crossorigin src="/assets/index-DI9_vw38.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BjAZ4g_1.css">
+  <script type="module" crossorigin src="/assets/index-DW8GLJ5T.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BXcMfQ6S.css">
 </head>
 <body>
 
@@ -1972,11 +1972,14 @@
         return true;
       }
     };
+    const VOSK_MODEL_BASE_URL =
+      "https://raw.githubusercontent.com/gaialongoo/Mu.To/main/navigator/UI/bff/viewer/public";
+
     const sttModelUrlForLang = (nl) => {
       const lang = normalizeNavLang(nl);
-      return lang === "fr" ? "/vosk-model-fr.tar.gz"
-        : lang === "en" ? "/vosk-model-en.tar.gz"
-        : "/vosk-model-it.tar.gz";
+      return lang === "fr" ? `${VOSK_MODEL_BASE_URL}/vosk-model-fr.tar.gz`
+        : lang === "en" ? `${VOSK_MODEL_BASE_URL}/vosk-model-en.tar.gz`
+        : `${VOSK_MODEL_BASE_URL}/vosk-model-it.tar.gz`;
     };
     const preloadSttModelForLang = (nl) => {
       if (!shouldPreloadStt()) return;

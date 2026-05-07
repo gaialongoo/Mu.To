@@ -1970,11 +1970,14 @@
         return true;
       }
     };
+    const VOSK_MODEL_BASE_URL =
+      "https://raw.githubusercontent.com/gaialongoo/Mu.To/main/navigator/UI/bff/viewer/public";
+
     const sttModelUrlForLang = (nl) => {
       const lang = normalizeNavLang(nl);
-      return lang === "fr" ? "/vosk-model-fr.tar.gz"
-        : lang === "en" ? "/vosk-model-en.tar.gz"
-        : "/vosk-model-it.tar.gz";
+      return lang === "fr" ? `${VOSK_MODEL_BASE_URL}/vosk-model-fr.tar.gz`
+        : lang === "en" ? `${VOSK_MODEL_BASE_URL}/vosk-model-en.tar.gz`
+        : `${VOSK_MODEL_BASE_URL}/vosk-model-it.tar.gz`;
     };
     const preloadSttModelForLang = (nl) => {
       if (!shouldPreloadStt()) return;
