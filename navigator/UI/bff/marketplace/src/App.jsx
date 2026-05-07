@@ -1548,12 +1548,8 @@ export default function App() {
             <div style={{ marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)" }}>
               <p style={{ margin: "0 0 6px", color: "var(--green)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("aiRouteTitle")}</p>
               <p style={{ margin: "0 0 10px", color: "var(--text-dim)", fontSize: 12 }}>{mp("aiRouteHint")}</p>
+              <p style={{ margin: "0 0 12px", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.75 }}>{mp("aiRouteWhatIs")}</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <select value={aiLengthPreset} onChange={(e) => setAiLengthPreset(e.target.value)} style={{ padding: "10px 12px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
-                  <option value="breve">{mp("aiLenShort")}</option>
-                  <option value="medio">{mp("aiLenMedium")}</option>
-                  <option value="lungo">{mp("aiLenLong")}</option>
-                </select>
                 <button
                   type="button"
                   onClick={() => setShowAiGenerateModal(true)}
@@ -2193,17 +2189,24 @@ export default function App() {
             <button onClick={() => setShowAiGenerateModal(false)} style={{ position: "absolute", top: 10, right: 10, width: 30, height: 30, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
             <p style={{ margin: "0 0 6px", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", fontFamily: "var(--font-head)" }}>{mp("aiRouteTitle")}</p>
             <h3 style={{ margin: "0 0 12px", fontFamily: "var(--font-head)", fontWeight: 400 }}>{mp("aiRouteGenerate")}</h3>
+            <p style={{ margin: "0 0 12px", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.75 }}>{mp("aiRouteWhatIs")}</p>
             <input
               value={aiRouteNameDraft}
               onChange={(e) => setAiRouteNameDraft(e.target.value)}
               placeholder="Nome percorso IA (opzionale)"
               style={{ width: "100%", padding: "10px 12px", marginBottom: 10, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
             />
+            <label style={{ display: "block", margin: "2px 0 6px", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-dim)" }}>
+              {mp("aiLenLabel")}
+            </label>
             <select value={aiLengthPreset} onChange={(e) => setAiLengthPreset(e.target.value)} style={{ width: "100%", padding: "10px 12px", marginBottom: 12, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
               <option value="breve">{mp("aiLenShort")}</option>
               <option value="medio">{mp("aiLenMedium")}</option>
               <option value="lungo">{mp("aiLenLong")}</option>
             </select>
+            <p style={{ margin: "-4px 0 14px", color: "var(--text-faint)", fontSize: 11, lineHeight: 1.7 }}>
+              {mp("aiLenExplain")}
+            </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setShowAiGenerateModal(false)} style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "transparent", color: "var(--text-dim)", cursor: "pointer" }}>Annulla</button>
               <button onClick={generateAiRoute} disabled={generatingAiRoute} style={{ padding: "9px 12px", border: "1px solid var(--green)", borderRadius: 8, background: "transparent", color: "var(--green)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}>
