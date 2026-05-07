@@ -19,7 +19,7 @@ const Toast = forwardRef(function Toast(_, ref) {
         padding: "14px 22px",
         background: "var(--bg-card)",
         border: `1px solid ${state.type === "error" ? "rgba(200,70,60,0.4)" : "var(--border)"}`,
-        borderLeft: `3px solid ${state.type === "error" ? "#e05a4a" : "var(--gold)"}`,
+        borderLeft: `3px solid ${state.type === "error" ? "#e05a4a" : "var(--green)"}`,
         borderRadius: "var(--radius-lg)",
         fontFamily: "var(--font-head)",
         fontSize: 11,

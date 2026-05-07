@@ -38,7 +38,7 @@ export default function ApiKeyModal({ open, onClose, onConfirm }) {
       }}>
         <div style={{
           position: "absolute", top: 0, left: 48, right: 48, height: 1,
-          background: "linear-gradient(90deg, transparent, var(--gold), transparent)",
+          background: "linear-gradient(90deg, transparent, var(--green), transparent)",
           opacity: 0.45,
         }} />
         <button
@@ -58,7 +58,7 @@ export default function ApiKeyModal({ open, onClose, onConfirm }) {
         >✕</button>
 
         <h3 style={{ fontFamily: "var(--font-head)", fontSize: 18, fontWeight: 400, letterSpacing: "0.12em", marginBottom: 30 }}>
-          <small style={{ display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--gold)", marginBottom: 8 }}>Autenticazione</small>
+          <small style={{ display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--green)", marginBottom: 8 }}>Autenticazione</small>
           API Key
         </h3>
 
@@ -97,7 +97,7 @@ export default function ApiKeyModal({ open, onClose, onConfirm }) {
           style={{
             width: "100%",
             padding: 13,
-            background: "var(--gold)",
+            background: "var(--green)",
             color: "#0d0d0d",
             border: "none",
             borderRadius: "var(--radius)",
@@ -114,15 +114,15 @@ export default function ApiKeyModal({ open, onClose, onConfirm }) {
           padding: 14,
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
-          borderLeft: "2px solid var(--gold)",
+          borderLeft: "2px solid var(--green)",
           borderRadius: "var(--radius)",
           fontSize: 11,
           letterSpacing: "0.04em",
           color: "var(--text-dim)",
           lineHeight: 1.9,
         }}>
-          <strong style={{ fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em", color: "var(--gold)" }}>INFO</strong><br />
-          Inviata come header <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--gold)", padding: "1px 6px", borderRadius: 2, fontFamily: "monospace" }}>X-API-Key</code> tramite proxy Vite su <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--gold)", padding: "1px 6px", borderRadius: 2, fontFamily: "monospace" }}>/api</code>.<br />
+          <strong style={{ fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em", color: "var(--green)" }}>INFO</strong><br />
+          Inviata come header <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--green)", padding: "1px 6px", borderRadius: 2, fontFamily: "monospace" }}>X-API-Key</code> tramite proxy Vite su <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--green)", padding: "1px 6px", borderRadius: 2, fontFamily: "monospace" }}>/api</code>.<br />
           Non viene persistita oltre la sessione.
         </div>
       </div>

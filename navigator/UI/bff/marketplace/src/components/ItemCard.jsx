@@ -93,8 +93,8 @@ export default function ItemCard({
           )}
           {(oggetto.connessi || []).slice(0, 2).map((c) => (
             <span key={c} style={{
-              background: "var(--gold-dim)",
-              color: "var(--gold)",
+              background: "var(--green-dim)",
+              color: "var(--green)",
               border: "1px solid rgba(92,191,128,0.18)",
               padding: "3px 9px",
               borderRadius: 2,
@@ -106,7 +106,7 @@ export default function ItemCard({
           ))}
           {nC > 2 && (
             <span style={{
-              background: "var(--gold-dim)", color: "var(--gold)",
+              background: "var(--green-dim)", color: "var(--green)",
               border: "1px solid rgba(92,191,128,0.18)",
               padding: "3px 9px", borderRadius: 2, fontSize: 9,
               letterSpacing: "0.14em", textTransform: "uppercase",
@@ -119,7 +119,7 @@ export default function ItemCard({
       <div style={{ padding: "10px 22px 18px", display: "grid", gap: 8 }}>
         {!isTextObject && (
           <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            Prezzo fisso: <span style={{ color: "var(--gold)" }}>{fixedPriceLabel || "—"}</span>
+            Prezzo fisso: <span style={{ color: "var(--green)" }}>{fixedPriceLabel || "—"}</span>
           </div>
         )}
         <div style={{ display: "grid", gap: 8, gridTemplateColumns: isTextObject ? "1fr" : "1fr 1fr" }}>
@@ -136,7 +136,7 @@ export default function ItemCard({
               fontSize: 9,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: "var(--gold)",
+              color: "var(--green)",
               transition: "all 0.2s",
             }}
           >
@@ -149,7 +149,7 @@ export default function ItemCard({
               style={{
                 width: "100%",
                 padding: "8px 10px",
-                background: "var(--gold-dim)",
+                background: "var(--green-dim)",
                 border: "1px solid rgba(92,191,128,0.3)",
                 borderRadius: "var(--radius)",
                 cursor: purchaseDisabled ? "not-allowed" : "pointer",
@@ -157,7 +157,7 @@ export default function ItemCard({
                 fontSize: 9,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "var(--gold)",
+                color: "var(--green)",
                 opacity: purchaseDisabled ? 0.7 : 1,
               }}
             >

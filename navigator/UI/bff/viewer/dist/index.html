@@ -19,9 +19,9 @@
       --bg2:       #111009;
       --surface:   #161410;
       --border:    rgba(92,191,128,0.18);
-      --gold:      #5cbf80;
-      --gold-dim:  rgba(92,191,128,0.45);
-      --gold-soft: rgba(92,191,128,0.08);
+      --green:      #5cbf80;
+      --green-dim:  rgba(92,191,128,0.45);
+      --green-soft: rgba(92,191,128,0.08);
       --text:      #f0ead8;
       --text-dim:  rgba(240,234,216,0.55);
       --overlay-bg:rgba(10,9,7,0.92);
@@ -40,7 +40,7 @@
       overflow-x: hidden;
       cursor: default;
     }
-    ::selection { background: var(--gold); color: var(--bg); }
+    ::selection { background: var(--green); color: var(--bg); }
 
     /* ── GRAIN OVERLAY ─────────────────────────────── */
     body::before {
@@ -84,7 +84,7 @@
     .nav-logo em {
       font-style: normal;
       font-weight: 600;
-      color: var(--gold);
+      color: var(--green);
       letter-spacing: .08em;
     }
 
@@ -108,7 +108,7 @@
       position: absolute;
       bottom: -3px; left: 0; right: 100%;
       height: 1px;
-      background: var(--gold);
+      background: var(--green);
       transition: right .3s var(--ease);
     }
     .nav-links a:hover { color: var(--text); }
@@ -131,7 +131,7 @@
       position: absolute;
       bottom: -3px; left: 0; right: 100%;
       height: 1px;
-      background: var(--gold);
+      background: var(--green);
       transition: right .3s var(--ease);
     }
     .nav-links .auth-btn:hover {
@@ -195,7 +195,7 @@
     .hamburger span {
       display: block;
       width: 26px; height: 1.5px;
-      background: var(--gold);
+      background: var(--green);
       transition: transform .35s var(--ease), opacity .25s, width .35s var(--ease);
       transform-origin: center;
     }
@@ -233,7 +233,7 @@
       text-transform: uppercase;
       transition: color .25s;
     }
-    .mobile-menu a:hover { color: var(--gold); }
+    .mobile-menu a:hover { color: var(--green); }
     .mobile-menu .auth-btn {
       background: transparent;
       border: none;
@@ -255,11 +255,11 @@
       position: absolute;
       bottom: -8px; left: 0; right: 100%;
       height: 1px;
-      background: var(--gold);
+      background: var(--green);
       transition: right .3s var(--ease);
     }
     .mobile-menu .auth-btn:hover {
-      color: var(--gold);
+      color: var(--green);
     }
     .mobile-menu .auth-btn:hover::after { right: 0; }
 
@@ -280,7 +280,7 @@
       display: block;
       width: 24px;
       height: 1.5px;
-      background: var(--gold);
+      background: var(--green);
       transition: transform .35s var(--ease);
     }
     .mobile-menu-close span:nth-child(1) {
@@ -328,8 +328,8 @@
       inset: 0;
       opacity: .06;
       background-image:
-        linear-gradient(var(--gold) 1px, transparent 1px),
-        linear-gradient(90deg, var(--gold) 1px, transparent 1px);
+        linear-gradient(var(--green) 1px, transparent 1px),
+        linear-gradient(90deg, var(--green) 1px, transparent 1px);
       background-size: 80px 80px;
       mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 80%);
     }
@@ -382,7 +382,7 @@
       font-size: .7rem;
       letter-spacing: .4em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
       opacity: 0;
       transform: translateY(12px);
       animation: fadeUp .8s .3s var(--ease) forwards;
@@ -405,7 +405,7 @@
     .hero-title em {
       font-style: normal;
       font-weight: 400;
-      color: var(--gold);
+      color: var(--green);
       letter-spacing: .08em;
     }
 
@@ -431,11 +431,11 @@
       content: '';
       flex: 1;
       height: 1px;
-      background: var(--gold-dim);
+      background: var(--green-dim);
     }
     .hero-divider-diamond {
       width: 6px; height: 6px;
-      background: var(--gold);
+      background: var(--green);
       transform: rotate(45deg);
       flex-shrink: 0;
     }
@@ -468,15 +468,15 @@
     }
     .scroll-arrow i {
       width: 1px;
-      background: var(--gold-dim);
+      background: var(--green-dim);
       animation: scrollLine 1.8s ease-in-out infinite;
     }
     .scroll-arrow i:nth-child(1) { height: 20px; animation-delay: 0s; }
     .scroll-arrow i:nth-child(2) { height: 12px; animation-delay: .15s; }
     .chevron-down {
       width: 10px; height: 10px;
-      border-right: 1.5px solid var(--gold);
-      border-bottom: 1.5px solid var(--gold);
+      border-right: 1.5px solid var(--green);
+      border-bottom: 1.5px solid var(--green);
       transform: rotate(45deg);
       margin-top: 2px;
       animation: bounce 1.8s ease-in-out infinite;
@@ -509,7 +509,7 @@
       font-size: .65rem;
       letter-spacing: .45em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
       margin-bottom: 1.2rem;
     }
     .about-heading {
@@ -520,7 +520,7 @@
       color: var(--text);
       margin-bottom: 1.5rem;
     }
-    .about-heading strong { font-weight: 600; font-style: normal; color: var(--gold); }
+    .about-heading strong { font-weight: 600; font-style: normal; color: var(--green); }
     .about-body {
       font-size: .92rem;
       line-height: 1.85;
@@ -536,7 +536,7 @@
       padding: 3rem;
       border: 1px solid var(--border);
       position: relative;
-      background: var(--gold-soft);
+      background: var(--green-soft);
       transition: border-color .3s;
     }
     .cta-box::before {
@@ -544,15 +544,15 @@
       position: absolute;
       top: -1px; left: 2rem; right: 2rem;
       height: 2px;
-      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
     }
-    .cta-box:hover { border-color: var(--gold-dim); }
+    .cta-box:hover { border-color: var(--green-dim); }
 
     .cta-label {
       font-size: .65rem;
       letter-spacing: .4em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
     }
     .cta-heading {
       font-family: 'Cinzel', serif;
@@ -619,13 +619,13 @@
       padding-right: 2.5rem;
       transition: border-color .25s, background-color .25s;
     }
-    .museum-select:focus { border-color: var(--gold-dim); background-color: rgba(92,191,128,.06); }
+    .museum-select:focus { border-color: var(--green-dim); background-color: rgba(92,191,128,.06); }
     .museum-select:disabled { opacity: .5; cursor: not-allowed; }
     .museum-select option { background: #161410; }
 
     .btn-primary {
       padding: .75rem 1.6rem;
-      background: var(--gold);
+      background: var(--green);
       color: var(--bg);
       border: none;
       font-family: 'Raleway', sans-serif;
@@ -704,7 +704,7 @@
       position: absolute;
       top: -1px; left: 3rem; right: 3rem;
       height: 2px;
-      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
     }
 
     .overlay-close {
@@ -725,7 +725,7 @@
       font-size: .65rem;
       letter-spacing: .4em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
       margin-bottom: .5rem;
     }
     .overlay-title {
@@ -759,13 +759,13 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: var(--gold-soft);
+      background: var(--green-soft);
       opacity: 0;
       transition: opacity .25s;
     }
-    .choice-card:hover { border-color: var(--gold-dim); }
+    .choice-card:hover { border-color: var(--green-dim); }
     .choice-card:hover::before { opacity: 1; }
-    .choice-card.selected { border-color: var(--gold); background: var(--gold-soft); }
+    .choice-card.selected { border-color: var(--green); background: var(--green-soft); }
 
     .choice-icon {
       width: 40px; height: 40px;
@@ -779,7 +779,7 @@
       z-index: 1;
       transition: border-color .25s;
     }
-    .choice-card:hover .choice-icon, .choice-card.selected .choice-icon { border-color: var(--gold); }
+    .choice-card:hover .choice-icon, .choice-card.selected .choice-icon { border-color: var(--green); }
 
     .choice-name {
       font-size: .8rem;
@@ -826,7 +826,7 @@
     .route-spinner {
       width: 13px; height: 13px;
       border: 1.5px solid var(--border);
-      border-top-color: var(--gold);
+      border-top-color: var(--green);
       border-radius: 50%;
       animation: spin .7s linear infinite;
       flex-shrink: 0;
@@ -862,7 +862,7 @@
       width: 100%;
       transition: border-color .25s;
     }
-    .route-select:focus { border-color: var(--gold-dim); }
+    .route-select:focus { border-color: var(--green-dim); }
     .route-select:disabled { opacity: .4; cursor: not-allowed; }
     .route-select option { background: #161410; }
 
@@ -880,7 +880,7 @@
       transition: border-color .25s, color .25s;
       flex: 1;
     }
-    .btn-secondary:hover { border-color: var(--gold-dim); color: var(--gold); }
+    .btn-secondary:hover { border-color: var(--green-dim); color: var(--green); }
 
     .overlay-actions {
       display: flex;
@@ -930,8 +930,8 @@
       cursor: pointer;
     }
     .auth-switch button.active {
-      border-color: var(--gold);
-      color: var(--gold);
+      border-color: var(--green);
+      color: var(--green);
     }
     .auth-interests {
       display: flex;
@@ -950,9 +950,9 @@
       transition: border-color .2s, background .2s, color .2s;
     }
     .auth-interests .interest-chip.active {
-      border-color: var(--gold);
-      background: var(--gold-soft);
-      color: var(--gold);
+      border-color: var(--green);
+      background: var(--green-soft);
+      color: var(--green);
     }
     .auth-interest-title {
       font-size: .68rem;
@@ -968,7 +968,7 @@
       grid-column: 1 / -1;
       margin-top: 0;
       padding: .6rem .75rem;
-      background: var(--gold-soft);
+      background: var(--green-soft);
       border: 1px solid var(--border);
       border-radius: var(--radius);
     }
@@ -989,7 +989,7 @@
       font-size: .68rem;
       text-transform: uppercase;
       letter-spacing: .06em;
-      color: var(--gold);
+      color: var(--green);
       font-weight: 500;
     }
     .auth-code-field input {
@@ -1007,7 +1007,7 @@
     }
     .auth-code-field input:focus {
       outline: none;
-      border-color: var(--gold);
+      border-color: var(--green);
       box-shadow: 0 0 0 2px rgba(92,191,128,0.15);
     }
     .auth-status {
@@ -1016,7 +1016,7 @@
       font-size: .73rem;
     }
     .auth-status.success {
-      color: var(--gold);
+      color: var(--green);
     }
     .auth-hidden { display: none !important; }
     #profileOverlay .overlay-panel {
@@ -1056,9 +1056,9 @@
       transition: border-color .2s, background .2s, color .2s;
     }
     #profileOverlay .auth-interests .interest-chip.active {
-      border-color: var(--gold);
-      background: var(--gold-soft);
-      color: var(--gold);
+      border-color: var(--green);
+      background: var(--green-soft);
+      color: var(--green);
     }
     @media (max-width: 640px) {
       .auth-grid {
@@ -1116,7 +1116,7 @@
       position: absolute;
       top: -1px; left: 4rem; right: 4rem;
       height: 2px;
-      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
     }
 
     .project-image-col {
@@ -1153,7 +1153,7 @@
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.5rem;
-      color: var(--gold-dim);
+      color: var(--green-dim);
     }
     .placeholder-text {
       font-size: .7rem;
@@ -1195,9 +1195,9 @@
       font-size: .65rem;
       letter-spacing: .35em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
     }
-    .project-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); }
+    .project-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
 
     .project-title {
       font-family: 'Cinzel', serif;
@@ -1206,7 +1206,7 @@
       line-height: 1.2;
       color: var(--text);
     }
-    .project-title em { font-style: normal; color: var(--gold); font-weight: 400; }
+    .project-title em { font-style: normal; color: var(--green); font-weight: 400; }
 
     .project-desc { font-size: .88rem; line-height: 1.85; color: var(--text-dim); }
 
@@ -1228,7 +1228,7 @@
     .project-feature-dot {
       width: 4px; height: 4px;
       border-radius: 50%;
-      background: var(--gold);
+      background: var(--green);
       margin-top: .55rem;
       flex-shrink: 0;
     }
@@ -1240,7 +1240,7 @@
       font-size: .78rem;
       letter-spacing: .15em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: var(--green);
       text-decoration: none;
       margin-top: .5rem;
       transition: gap .25s;
@@ -1272,7 +1272,7 @@
       font-size: 1.1rem;
       font-weight: 600;
       letter-spacing: .3em;
-      color: var(--gold);
+      color: var(--green);
       text-transform: uppercase;
     }
     .footer-copy { font-size: .7rem; letter-spacing: .12em; color: var(--text-dim); }

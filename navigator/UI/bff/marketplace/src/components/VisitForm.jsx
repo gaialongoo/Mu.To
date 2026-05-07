@@ -48,9 +48,9 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
       background: "var(--bg-card)", border: "1px solid var(--border)",
       borderRadius: "var(--radius-lg)", padding: isMobile ? 16 : 46, maxWidth: 780, margin: isMobile ? "0 0 26px" : "0 auto 40px", position: "relative",
     }}>
-      <div style={{ position: "absolute", top: 0, left: 48, right: 48, height: 1, background: "linear-gradient(90deg, transparent, var(--gold), transparent)", opacity: 0.45 }} />
+      <div style={{ position: "absolute", top: 0, left: 48, right: 48, height: 1, background: "linear-gradient(90deg, transparent, var(--green), transparent)", opacity: 0.45 }} />
       <h3 style={{ fontFamily: "var(--font-head)", fontSize: 19, fontWeight: 400, letterSpacing: "0.12em", color: "var(--text)", marginBottom: 34 }}>
-        <small style={{ display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--gold)", marginBottom: 8 }}>Gestione Percorsi</small>
+        <small style={{ display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--green)", marginBottom: 8 }}>Gestione Percorsi</small>
         Crea Percorso Statico
       </h3>
       <form onSubmit={handleSubmit}>
@@ -86,14 +86,14 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
                 : visitOggetti.map((n, i) => (
                   <span key={i} style={{
                     display: "inline-flex", alignItems: "center", gap: 6,
-                    background: "var(--gold-dim)", color: "var(--gold)",
+                    background: "var(--green-dim)", color: "var(--green)",
                     border: "1px solid rgba(92,191,128,0.2)",
                     padding: "5px 10px", borderRadius: 2,
                     fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.1em",
                   }}>
                     <span style={{ color: "var(--text-faint)", fontSize: 9 }}>{i + 1}.</span>
                     {n}
-                    <button type="button" onClick={() => removeOggetto(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gold)", fontSize: 14 }}>×</button>
+                    <button type="button" onClick={() => removeOggetto(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--green)", fontSize: 14 }}>×</button>
                   </span>
                 ))
               }
@@ -111,7 +111,7 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
               <button type="button" onClick={addOggetto} style={{
                 padding: "8px 16px",
                 width: isMobile ? "100%" : "auto",
-                background: "var(--gold-dim)", color: "var(--gold)",
+                background: "var(--green-dim)", color: "var(--green)",
                 border: "1px solid rgba(92,191,128,0.3)", borderRadius: "var(--radius)",
                 cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase",
               }}>Aggiungi</button>
@@ -122,7 +122,7 @@ export default function VisitForm({ museo, allOggetti, onSaved, onCancel, toast 
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexDirection: isMobile ? "column" : "row", marginTop: 36, paddingTop: 28, borderTop: "1px solid var(--border)" }}>
           <button type="button" onClick={onCancel} style={{ padding: "10px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>Annulla</button>
-          <button type="submit" disabled={saving} style={{ padding: "10px 22px", width: isMobile ? "100%" : "auto", background: "var(--gold)", color: "#0d0d0d", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{saving ? "Salvataggio..." : "Salva Percorso"}</button>
+          <button type="submit" disabled={saving} style={{ padding: "10px 22px", width: isMobile ? "100%" : "auto", background: "var(--green)", color: "#0d0d0d", border: "none", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{saving ? "Salvataggio..." : "Salva Percorso"}</button>
         </div>
       </form>
     </div>

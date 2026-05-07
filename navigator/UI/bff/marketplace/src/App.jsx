@@ -71,8 +71,8 @@ function Pagination({ total, current, onChange }) {
       {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
         <button key={p} onClick={() => onChange(p)} style={{
           padding: "8px 13px",
-          border: `1px solid ${p === current ? "var(--gold)" : "var(--border)"}`,
-          background: p === current ? "var(--gold)" : "var(--bg-card)",
+          border: `1px solid ${p === current ? "var(--green)" : "var(--border)"}`,
+          background: p === current ? "var(--green)" : "var(--bg-card)",
           borderRadius: "var(--radius)",
           cursor: "pointer",
           fontFamily: "var(--font-head)",
@@ -234,13 +234,13 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
         <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)" }}>{(percorso.oggetti || []).length} {mp("worksCount")}</div>
-          <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--gold)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo, mp)}</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--green)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo, mp)}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {(percorso.oggetti || []).slice(0, 3).map((n) => (
-            <span key={n} style={{ background: "var(--gold-dim)", color: "var(--gold)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{n}</span>
+            <span key={n} style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{n}</span>
           ))}
-          {percorso.oggetti?.length > 3 && <span style={{ background: "var(--gold-dim)", color: "var(--gold)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", fontFamily: "var(--font-head)" }}>+{percorso.oggetti.length - 3}</span>}
+          {percorso.oggetti?.length > 3 && <span style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", fontFamily: "var(--font-head)" }}>+{percorso.oggetti.length - 3}</span>}
         </div>
       </div>
       <div style={{ padding: "10px 22px 18px" }}>
@@ -259,7 +259,7 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
             fontSize: 9,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-            color: canView ? "var(--gold)" : "var(--text-faint)",
+            color: canView ? "var(--green)" : "var(--text-faint)",
             transition: "all 0.2s",
             opacity: canView ? 1 : 0.7,
           }}
@@ -272,8 +272,8 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
             style={{
               flex: 1,
               padding: "8px 10px",
-              background: canStart ? "var(--gold)" : "transparent",
-              border: `1px solid ${canStart ? "var(--gold)" : "rgba(255,255,255,0.08)"}`,
+              background: canStart ? "var(--green)" : "transparent",
+              border: `1px solid ${canStart ? "var(--green)" : "rgba(255,255,255,0.08)"}`,
               borderRadius: "var(--radius)",
               cursor: canStart ? "pointer" : "not-allowed",
               fontFamily: "var(--font-head)",
@@ -294,7 +294,7 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
               style={{
                 flex: 1,
                 padding: "8px 10px",
-                background: "var(--gold-dim)",
+                background: "var(--green-dim)",
                 border: "1px solid rgba(92,191,128,0.3)",
                 borderRadius: "var(--radius)",
                 cursor: disabled ? "not-allowed" : "pointer",
@@ -302,7 +302,7 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
                 fontSize: 9,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: "var(--gold)",
+                color: "var(--green)",
                 opacity: disabled ? 0.7 : 1,
               }}
             >
@@ -1321,7 +1321,7 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
         <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>{mp("noMuseo")}</p>
-        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("backHome")}</a>
+        <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("backHome")}</a>
       </div>
     );
   }
@@ -1342,12 +1342,12 @@ export default function App() {
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             </div>
-            <span style={{ color: "var(--gold)", fontWeight: 600, letterSpacing: "0.18em" }}>{mp("marketplaceTitle")}</span>
+            <span style={{ color: "var(--green)", fontWeight: 600, letterSpacing: "0.18em" }}>{mp("marketplaceTitle")}</span>
           </div>
 
           {/* Center */}
           <div style={{ textAlign: "center", gridColumn: isMobile ? "1 / -1" : undefined, order: isMobile ? -1 : 0 }}>
-            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 8 : 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 5 }}>{mp("selectedMuseum")}</p>
+            <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 8 : 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--green)", marginBottom: 5 }}>{mp("selectedMuseum")}</p>
             <p style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 14 : 17, fontWeight: 400, letterSpacing: isMobile ? "0.06em" : "0.1em", color: "var(--text)", overflowWrap: "anywhere" }}>{MUSEO}</p>
           </div>
 
@@ -1356,7 +1356,7 @@ export default function App() {
             <button onClick={openProfile} style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none", textTransform: "uppercase", cursor: "pointer" }}>
               {mp("profile")}
             </button>
-            <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("home")}</a>
+            <a href="/" style={{ padding: isMobile ? "9px 14px" : "10px 22px", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("home")}</a>
             {apiKeyActive && (
               <>
                 <span style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--text-dim)" }}>{mp("keyActive")}</span>
@@ -1375,7 +1375,7 @@ export default function App() {
             ].map((tab) => (
               <button key={tab.id} onClick={() => switchSection(tab.id)} style={{
                 padding: isMobile ? "11px 12px" : "12px 18px",
-                background: currentSection === tab.id ? "var(--gold)" : "transparent",
+                background: currentSection === tab.id ? "var(--green)" : "transparent",
                 border: "none", borderRadius: 5, cursor: "pointer",
                 fontFamily: "var(--font-head)", fontSize: 10, fontWeight: 500,
                 letterSpacing: "0.13em", textTransform: "uppercase",
@@ -1404,7 +1404,7 @@ export default function App() {
                 setTeacherDashboardLink("");
                 setTeacherBuilderOpen(true);
               }}
-              style={{ padding: "11px 16px", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", width: isMobile ? "100%" : "auto" }}
+              style={{ padding: "11px 16px", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", width: isMobile ? "100%" : "auto" }}
             >
               {mp("createClassPath")}
             </button>
@@ -1484,7 +1484,7 @@ export default function App() {
               setAppliedYearFromEra(yearFromEra);
               setAppliedYearToEra(yearToEra);
               setItemPage(1);
-            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>{mp("filter")}</button>
+            }} style={{ padding: "11px 22px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>{mp("filter")}</button>
             <button onClick={() => {
               setSearch("");
               setStanzaFilter("");
@@ -1546,7 +1546,7 @@ export default function App() {
         {activeTab === "visits" && (
           <>
             <div style={{ marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)" }}>
-              <p style={{ margin: "0 0 6px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("aiRouteTitle")}</p>
+              <p style={{ margin: "0 0 6px", color: "var(--green)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("aiRouteTitle")}</p>
               <p style={{ margin: "0 0 10px", color: "var(--text-dim)", fontSize: 12 }}>{mp("aiRouteHint")}</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <select value={aiLengthPreset} onChange={(e) => setAiLengthPreset(e.target.value)} style={{ padding: "10px 12px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
@@ -1558,7 +1558,7 @@ export default function App() {
                   type="button"
                   onClick={() => setShowAiGenerateModal(true)}
                   disabled={generatingAiRoute}
-                  style={{ padding: "10px 14px", border: "1px solid var(--gold)", borderRadius: 8, background: "transparent", color: "var(--gold)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}
+                  style={{ padding: "10px 14px", border: "1px solid var(--green)", borderRadius: 8, background: "transparent", color: "var(--green)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}
                 >
                   {generatingAiRoute ? mp("aiRouteGenerating") : mp("aiRouteGenerate")}
                 </button>
@@ -1577,7 +1577,7 @@ export default function App() {
             </div>
             {isProfessor && teacherSavedVisits.length > 0 && (
               <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-card)" }}>
-                <p style={{ margin: "0 0 8px", color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("myGuidedTours")}</p>
+                <p style={{ margin: "0 0 8px", color: "var(--green)", fontFamily: "var(--font-head)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase" }}>{mp("myGuidedTours")}</p>
                 <div style={{ display: "grid", gap: 6 }}>
                   {teacherSavedVisits.slice(0, 6).map((visit) => {
                     const studentLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=student`;
@@ -1596,7 +1596,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => window.open(dashboardLink, "_blank", "noopener,noreferrer")}
-                            style={{ padding: "6px 10px", border: "1px solid var(--gold)", background: "transparent", borderRadius: 6, color: "var(--gold)", cursor: "pointer" }}
+                            style={{ padding: "6px 10px", border: "1px solid var(--green)", background: "transparent", borderRadius: 6, color: "var(--green)", cursor: "pointer" }}
                           >
                             {mp("startVisit")}
                           </button>
@@ -1657,7 +1657,7 @@ export default function App() {
         >
           <div style={{ width: isMobile ? "min(620px, 100%)" : "min(620px, 90vw)", maxHeight: isMobile ? "calc(100vh - 32px)" : "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: isMobile ? 18 : 12 }}>
             <button onClick={closeProfile} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("account")}</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--green)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("account")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{mp("profileTitle")}</h3>
             <form onSubmit={saveProfile} style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
@@ -1715,9 +1715,9 @@ export default function App() {
                         style={{
                           padding: "8px 12px",
                           borderRadius: 999,
-                          border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`,
-                          background: active ? "var(--gold-dim)" : "transparent",
-                          color: active ? "var(--gold)" : "var(--text-dim)",
+                          border: `1px solid ${active ? "var(--green)" : "var(--border)"}`,
+                          background: active ? "var(--green-dim)" : "transparent",
+                          color: active ? "var(--green)" : "var(--text-dim)",
                           cursor: "pointer",
                           fontSize: 11,
                           letterSpacing: "0.05em",
@@ -1733,7 +1733,7 @@ export default function App() {
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
                 <button type="button" onClick={closeProfile} style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("close")}</button>
-                <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("saveProfile")}</button>
+                <button type="submit" style={{ padding: "11px 16px", width: isMobile ? "100%" : "auto", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" }}>{mp("saveProfile")}</button>
               </div>
             </form>
           </div>
@@ -1744,7 +1744,7 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closeItemModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(760px, 100%)" : "min(980px, 96vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closeItemModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("itemLabel")}</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--green)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("itemLabel")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{selectedItem.nome}</h3>
             {String(selectedItem?.objectType || "").toLowerCase() !== "text" && (
               <div style={{ marginBottom: 14 }}>
@@ -1759,7 +1759,7 @@ export default function App() {
                       disabled={isBusy || requestUi.disabled}
                       style={{
                         padding: "8px 12px",
-                        background: "var(--gold-dim)",
+                        background: "var(--green-dim)",
                         border: "1px solid rgba(92,191,128,0.35)",
                         borderRadius: "var(--radius)",
                         cursor: isBusy || requestUi.disabled ? "not-allowed" : "pointer",
@@ -1767,7 +1767,7 @@ export default function App() {
                         fontSize: 10,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: "var(--gold)",
+                        color: "var(--green)",
                         opacity: isBusy || requestUi.disabled ? 0.7 : 1,
                       }}
                     >
@@ -1780,7 +1780,7 @@ export default function App() {
             <div style={{ display: "grid", gap: 14 }}>
               {String(selectedItem?.objectType || "").toLowerCase() !== "text" && (
                 <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("details")}</p>
+                  <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("details")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px, 1fr) minmax(0, 2fr)", gap: 12 }}>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("room")}</strong> {(selectedItem.stanza && displayStanzaName(selectedItem.stanza)) || mp("nd")}</p>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>{mp("connected")}</strong> {(selectedItem.connessi || []).join(", ") || mp("none")}</p>
@@ -1792,7 +1792,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("descriptions")}</p>
+                <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("descriptions")}</p>
                 {(() => {
                   const preferred = getPreferredDescription(selectedItem);
                   return (
@@ -1819,7 +1819,7 @@ export default function App() {
                           fontSize: 10,
                           letterSpacing: "0.12em",
                           textTransform: "uppercase",
-                          color: "var(--gold)",
+                          color: "var(--green)",
                         }}
                       >
                         {showAllDescriptions ? mp("hideAll") : mp("showAll")}
@@ -1830,9 +1830,9 @@ export default function App() {
                           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                             <thead>
                               <tr>
-                                <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>
+                                <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--green)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>
                                 {DESCRIPTION_LENGTHS.map((len) => (
-                                  <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
+                                  <th key={len} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--green)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)", whiteSpace: isMobile ? "normal" : "nowrap" }}>
                                     {len}
                                   </th>
                                 ))}
@@ -1877,7 +1877,7 @@ export default function App() {
                 const activeImage = galleryImages[safeIndex] || null;
                 return (
                   <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                    <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("imageGallery")}</p>
+                    <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", marginBottom: 8, fontFamily: "var(--font-head)" }}>{mp("imageGallery")}</p>
                     <div style={{ display: "grid", gap: 10 }}>
                       <img
                         src={activeImage.url.startsWith("/api") ? activeImage.url : `/api${activeImage.url}`}
@@ -1899,7 +1899,7 @@ export default function App() {
                               type="button"
                               onClick={() => setSelectedGalleryIndex(index)}
                               style={{
-                                border: index === safeIndex ? "1px solid var(--gold)" : "1px solid var(--border)",
+                                border: index === safeIndex ? "1px solid var(--green)" : "1px solid var(--border)",
                                 padding: 0,
                                 borderRadius: 12,
                                 overflow: "hidden",
@@ -1937,11 +1937,11 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closePathModal(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 710, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(720px, 100%)" : "min(900px, 92vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closePathModal} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("pathLabel")}</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--green)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("pathLabel")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 18 }}>{displayPercorsoNome(selectedPath.nome)}</h3>
-            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>{mp("price")} <span style={{ color: "var(--gold)", fontFamily: "var(--font-head)" }}>{formatPrezzo(selectedPath.prezzo, mp)}</span></p>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>{mp("price")} <span style={{ color: "var(--green)", fontFamily: "var(--font-head)" }}>{formatPrezzo(selectedPath.prezzo, mp)}</span></p>
             <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
-              <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10, fontFamily: "var(--font-head)" }}>{mp("pathWorksOrder")}</p>
+              <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", marginBottom: 10, fontFamily: "var(--font-head)" }}>{mp("pathWorksOrder")}</p>
               <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10 }}>
                 {(selectedPath.oggetti || []).map((name) => {
                   const oggetto = allOggetti.find((item) => item.nome === name);
@@ -1964,7 +1964,7 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) closeTeacherBuilder(); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(12px)", zIndex: 720, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(760px, 100%)" : "min(860px, 94vw)", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: isMobile ? "18px 14px" : "28px", position: "relative", borderRadius: 18 }}>
             <button onClick={closeTeacherBuilder} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 22 }}>×</button>
-            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("professor")}</p>
+            <p style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--green)", marginBottom: 6, fontFamily: "var(--font-head)" }}>{mp("professor")}</p>
             <h3 style={{ fontFamily: "var(--font-head)", fontSize: isMobile ? 22 : 28, fontWeight: 400, marginBottom: 16 }}>
               {teacherEditingVisitId ? mp("editGuidedClass") : mp("createGuidedClass")}
             </h3>
@@ -2003,7 +2003,7 @@ export default function App() {
                     type="button"
                     key={obj.nome}
                     onClick={() => toggleTeacherObject(obj.nome)}
-                    style={{ textAlign: "left", padding: "10px 12px", border: `1px solid ${checked ? "var(--gold)" : "var(--border)"}`, background: checked ? "var(--gold-dim)" : "var(--bg-card)", color: checked ? "var(--gold)" : "var(--text-dim)", borderRadius: 8, cursor: "pointer" }}
+                    style={{ textAlign: "left", padding: "10px 12px", border: `1px solid ${checked ? "var(--green)" : "var(--border)"}`, background: checked ? "var(--green-dim)" : "var(--bg-card)", color: checked ? "var(--green)" : "var(--text-dim)", borderRadius: 8, cursor: "pointer" }}
                   >
                     {obj.nome}
                   </button>
@@ -2017,7 +2017,7 @@ export default function App() {
                 {teacherSelectedObjects.map((objName) => (
                   <div key={`desc-${objName}`} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                      <strong style={{ color: "var(--gold)", fontFamily: "var(--font-head)", fontSize: 12 }}>{objName}</strong>
+                      <strong style={{ color: "var(--green)", fontFamily: "var(--font-head)", fontSize: 12 }}>{objName}</strong>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button type="button" onClick={() => moveTeacherObject(objName, -1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("up")}</button>
                         <button type="button" onClick={() => moveTeacherObject(objName, 1)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("down")}</button>
@@ -2073,7 +2073,7 @@ export default function App() {
                 placeholder={mp("phTextItemBody")}
                 style={{ width: "100%", minHeight: 70, padding: "8px 10px", marginBottom: 8, background: "#111", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
               />
-              <button type="button" onClick={addTeacherTextItem} style={{ padding: "8px 12px", border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer" }}>
+              <button type="button" onClick={addTeacherTextItem} style={{ padding: "8px 12px", border: "1px solid var(--green)", background: "transparent", color: "var(--green)", borderRadius: 6, cursor: "pointer" }}>
                 {teacherEditingTextItemId ? mp("saveTextItem") : mp("addTextItem")}
               </button>
               {teacherTextItems.length > 0 && (
@@ -2102,7 +2102,7 @@ export default function App() {
               {teacherQuizQuestions.map((question, qIdx) => (
                 <div key={question.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "8px", background: "#111" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ color: "var(--gold)", fontSize: 12 }}>{mp("questionLabel")} {qIdx + 1}</span>
+                    <span style={{ color: "var(--green)", fontSize: 12 }}>{mp("questionLabel")} {qIdx + 1}</span>
                     <button type="button" onClick={() => removeQuizQuestion(question.id)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", borderRadius: 6, cursor: "pointer", padding: "4px 8px" }}>{mp("remove")}</button>
                   </div>
                   <input
@@ -2163,7 +2163,7 @@ export default function App() {
                   </div>
                 </div>
               ))}
-              <button type="button" onClick={addQuizQuestion} style={{ border: "1px solid var(--gold)", background: "transparent", color: "var(--gold)", borderRadius: 6, cursor: "pointer", padding: "8px 10px" }}>{mp("addQuestion")}</button>
+              <button type="button" onClick={addQuizQuestion} style={{ border: "1px solid var(--green)", background: "transparent", color: "var(--green)", borderRadius: 6, cursor: "pointer", padding: "8px 10px" }}>{mp("addQuestion")}</button>
             </div>
 
             <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
@@ -2174,7 +2174,7 @@ export default function App() {
 
             {teacherOptimizedOrder.length > 0 && (
               <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-                {mp("visitFlowFinal")} <span style={{ color: "var(--gold)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
+                {mp("visitFlowFinal")} <span style={{ color: "var(--green)" }}>{teacherOptimizedOrder.join(" -> ")}</span>
               </p>
             )}
             {teacherStudentLink && (
@@ -2191,7 +2191,7 @@ export default function App() {
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowAiGenerateModal(false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(10px)", zIndex: 730, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ width: isMobile ? "min(560px, 100%)" : "min(560px, 92vw)", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 14, padding: isMobile ? "16px 12px" : "20px 18px", position: "relative" }}>
             <button onClick={() => setShowAiGenerateModal(false)} style={{ position: "absolute", top: 10, right: 10, width: 30, height: 30, border: "none", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
-            <p style={{ margin: "0 0 6px", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--gold)", fontFamily: "var(--font-head)" }}>{mp("aiRouteTitle")}</p>
+            <p style={{ margin: "0 0 6px", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", fontFamily: "var(--font-head)" }}>{mp("aiRouteTitle")}</p>
             <h3 style={{ margin: "0 0 12px", fontFamily: "var(--font-head)", fontWeight: 400 }}>{mp("aiRouteGenerate")}</h3>
             <input
               value={aiRouteNameDraft}
@@ -2206,7 +2206,7 @@ export default function App() {
             </select>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setShowAiGenerateModal(false)} style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "transparent", color: "var(--text-dim)", cursor: "pointer" }}>Annulla</button>
-              <button onClick={generateAiRoute} disabled={generatingAiRoute} style={{ padding: "9px 12px", border: "1px solid var(--gold)", borderRadius: 8, background: "transparent", color: "var(--gold)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}>
+              <button onClick={generateAiRoute} disabled={generatingAiRoute} style={{ padding: "9px 12px", border: "1px solid var(--green)", borderRadius: 8, background: "transparent", color: "var(--green)", cursor: generatingAiRoute ? "not-allowed" : "pointer", opacity: generatingAiRoute ? 0.7 : 1 }}>
                 {generatingAiRoute ? `${mp("aiRouteGenerating")} ⏳` : mp("aiRouteGenerate")}
               </button>
             </div>

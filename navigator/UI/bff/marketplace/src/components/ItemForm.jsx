@@ -306,7 +306,7 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
               {DURATE.map((d) => (
                 <div key={d} style={{
                   fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
-                  textTransform: "uppercase", color: "var(--gold)",
+                  textTransform: "uppercase", color: "var(--green)",
                   padding: "10px 8px", textAlign: "center",
                   borderBottom: "1px solid var(--border)",
                 }}>{d}</div>
@@ -319,7 +319,7 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
             <React.Fragment key={livello}>
               <div style={{
                 fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.2em",
-                textTransform: "uppercase", color: "var(--gold)",
+                textTransform: "uppercase", color: "var(--green)",
                 padding: "10px 8px", textAlign: "center",
                 borderRight: isMobile ? "none" : "1px solid var(--border)",
                 borderBottom: isMobile ? "1px solid var(--border)" : "none",
@@ -340,7 +340,7 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                         fontSize: 9,
                         letterSpacing: "0.16em",
                         textTransform: "uppercase",
-                        color: "var(--gold)",
+                        color: "var(--green)",
                       }}>
                         {durata}
                       </div>
@@ -383,7 +383,7 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                 <div key={img.tipo} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", background: "var(--bg-panel)" }}>
                   <img src={`/api${img.url}`} alt={img.tipo} style={{ width: "100%", height: 110, objectFit: "cover", display: "block" }} />
                   <div style={{ padding: 8 }}>
-                    <div style={{ fontSize: 10, color: "var(--gold)", marginBottom: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>{img.tipo}</div>
+                    <div style={{ fontSize: 10, color: "var(--green)", marginBottom: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>{img.tipo}</div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <label style={{ ...miniBtnStyle, flex: 1, textAlign: "center", cursor: uploadingTipo === img.tipo || deletingTipo === img.tipo ? "default" : "pointer" }}>
                         {uploadingTipo === img.tipo ? "Upload..." : "Sostituisci"}
@@ -420,9 +420,9 @@ export default function ItemForm({ museo, oggetto, onSaved, onCancel, toast }) {
                     onClick={() => setNewTipo(tipo)}
                     style={{
                       ...miniBtnStyle,
-                      background: newTipo === tipo ? "var(--gold)" : "transparent",
+                      background: newTipo === tipo ? "var(--green)" : "transparent",
                       color: newTipo === tipo ? "#0d0d0d" : "var(--text-dim)",
-                      borderColor: newTipo === tipo ? "var(--gold)" : "var(--border)",
+                      borderColor: newTipo === tipo ? "var(--green)" : "var(--border)",
                     }}
                   >
                     {tipo}
@@ -491,7 +491,7 @@ function Divider({ label }) {
 }
 
 function Code({ children }) {
-  return <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--gold)", padding: "1px 6px", borderRadius: 2, fontSize: 11, fontFamily: "monospace" }}>{children}</code>;
+  return <code style={{ background: "rgba(92,191,128,0.1)", color: "var(--green)", padding: "1px 6px", borderRadius: 2, fontSize: 11, fontFamily: "monospace" }}>{children}</code>;
 }
 
 const formContainerStyle = {
@@ -505,11 +505,11 @@ const formContainerStyle = {
 };
 const topLineStyle = {
   position: "absolute", top: 0, left: 48, right: 48, height: 1,
-  background: "linear-gradient(90deg, transparent, var(--gold), transparent)",
+  background: "linear-gradient(90deg, transparent, var(--green), transparent)",
   opacity: 0.45,
 };
 const h3Style = { fontFamily: "var(--font-head)", fontSize: 19, fontWeight: 400, letterSpacing: "0.12em", color: "var(--text)", marginBottom: 34 };
-const smallStyle = { display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--gold)", marginBottom: 8 };
+const smallStyle = { display: "block", fontSize: 9, letterSpacing: "0.3em", color: "var(--green)", marginBottom: 8 };
 export const inputStyle = {
   width: "100%", padding: "13px 15px",
   background: "var(--bg-panel)", border: "1px solid var(--border)",
@@ -519,12 +519,12 @@ export const inputStyle = {
 };
 const tagStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
-  background: "var(--gold-dim)", color: "var(--gold)",
+  background: "var(--green-dim)", color: "var(--green)",
   border: "1px solid rgba(92,191,128,0.2)",
   padding: "3px 8px", borderRadius: 2,
   fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.1em",
 };
-const tagBtnStyle = { background: "none", border: "none", cursor: "pointer", color: "var(--gold)", fontSize: 13, lineHeight: 1, padding: 0 };
+const tagBtnStyle = { background: "none", border: "none", cursor: "pointer", color: "var(--green)", fontSize: 13, lineHeight: 1, padding: 0 };
 const miniBtnStyle = {
   padding: "7px 9px",
   background: "transparent",
@@ -535,7 +535,7 @@ const miniBtnStyle = {
   cursor: "pointer",
 };
 const saveBtnStyle = {
-  padding: "10px 22px", background: "var(--gold)", color: "#0d0d0d",
+  padding: "10px 22px", background: "var(--green)", color: "#0d0d0d",
   border: "none", borderRadius: "var(--radius)", cursor: "pointer",
   fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase",
 };
