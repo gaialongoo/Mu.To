@@ -75,6 +75,8 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiNoAnswer: "Non ho una risposta disponibile adesso.",
     aiRequestFail: "Richiesta AI fallita",
     aiUnknownError: "impossibile ottenere la risposta.",
+    listen: "Ascolta",
+    stop: "Stop",
   },
   en: {
     loading: "Loading…",
@@ -144,6 +146,8 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiNoAnswer: "I don’t have an answer right now.",
     aiRequestFail: "AI request failed",
     aiUnknownError: "could not get a reply.",
+    listen: "Listen",
+    stop: "Stop",
   },
   fr: {
     loading: "Chargement…",
@@ -213,5 +217,7 @@ export const VIEWER_STRINGS: Record<NavLang, Record<string, string>> = {
     aiNoAnswer: "Je n’ai pas de réponse pour le moment.",
     aiRequestFail: "Échec de la requête IA",
     aiUnknownError: "impossible d’obtenir une réponse.",
+    listen: "Écouter",
+    stop: "Stop",
   },
 };

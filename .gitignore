@@ -3,3 +3,7 @@ venv/
 *.pyc
 node_modules/
 dist/
+**/viewer/public/vosk-model-*.tar.gz
+.env
+# secrets
+server/openAPI/.env

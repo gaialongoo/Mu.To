@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getStoredNavLang, useNavLang } from "../i18n/NavLangContext";
+import { createModel, type Model, type KaldiRecognizer } from "vosk-browser";
 
 declare global {
   interface Window {
@@ -2575,6 +2576,26 @@ function ObjectOverlay({
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [sttRecording, setSttRecording] = useState(false);
+  const [sttStarting, setSttStarting] = useState(false);
+  const [sttLoadingModel, setSttLoadingModel] = useState(false);
+  const [sttError, setSttError] = useState<string | null>(null);
+  const [_sttPreview, setSttPreview] = useState<string>("");
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsBusyKey, setTtsBusyKey] = useState<string | null>(null);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voskModelRef = useRef<Model | null>(null);
+  const voskModelLangRef = useRef<string>("");
+  const recognizerRef = useRef<KaldiRecognizer | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const zeroGainRef = useRef<GainNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const lastSttTextRef = useRef<string>("");
+  const lastPartialRef = useRef<string>("");
+  const silenceTimerRef = useRef<number | null>(null);
+  const hasSpeechRef = useRef(false);
+  const sttRecordingRef = useRef(false);
   const [fetchedObjectType, setFetchedObjectType] = useState<string | null>(null);
   const [preloadedPersonalizedDescMap, setPreloadedPersonalizedDescMap] = useState<Record<string, string>>({});
   const percorso = Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
@@ -2753,7 +2774,328 @@ function ObjectOverlay({
     setChatMessages([]);
     setChatInput("");
     setChatLoading(false);
+    setSttRecording(false);
+    sttRecordingRef.current = false;
+    setSttError(null);
+    setSttPreview("");
+    setTtsError(null);
+    try {
+      processorRef.current?.disconnect();
+    } catch {}
+    processorRef.current = null;
+    try { mediaStreamRef.current?.getTracks()?.forEach((t) => t.stop()); } catch {}
+    mediaStreamRef.current = null;
+    try { audioContextRef.current?.close?.(); } catch {}
+    audioContextRef.current = null;
+    zeroGainRef.current = null;
+    try { recognizerRef.current?.remove?.(); } catch {}
+    recognizerRef.current = null;
+    lastSttTextRef.current = "";
+    lastPartialRef.current = "";
+    hasSpeechRef.current = false;
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    try {
+      window.speechSynthesis?.cancel?.();
+    } catch {}
+    try {
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.src = "";
+      }
+    } catch {}
+    setTtsBusyKey(null);
   }, [nome]);
+
+  const waitForVoices = async () => {
+    try {
+      if (typeof window === "undefined") return;
+      if (!("speechSynthesis" in window)) return;
+      const synth = window.speechSynthesis;
+      const existing = synth.getVoices?.() || [];
+      if (existing.length > 0) return;
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          try { synth.removeEventListener("voiceschanged", onChange as any); } catch {}
+          resolve();
+        };
+        const onChange = () => finish();
+        try { synth.addEventListener("voiceschanged", onChange as any); } catch {}
+        setTimeout(() => finish(), 600);
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const stopTts = () => {
+    try { window.speechSynthesis?.cancel?.(); } catch {}
+    try {
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.src = "";
+      }
+    } catch {}
+    setTtsBusyKey(null);
+  };
+
+  const speakText = async (text: string, key: string) => {
+    const clean = String(text || "").trim();
+    if (!clean) return;
+    if (ttsBusyKey === key) {
+      stopTts();
+      return;
+    }
+    stopTts();
+    setTtsError(null);
+    setTtsBusyKey(key);
+
+    // Browser TTS if available
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
+        await waitForVoices();
+        const synth = window.speechSynthesis;
+        const voicesNow = synth.getVoices?.() || [];
+        if (voicesNow.length === 0) {
+          setTtsBusyKey(null);
+          setTtsError("Sintesi vocale non disponibile: nessuna voce installata nel browser.");
+          return;
+        }
+        const desiredLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
+        const u = new SpeechSynthesisUtterance(clean);
+        u.lang = desiredLang;
+        try {
+          const v =
+            voicesNow.find((vv) => String(vv?.lang || "").toLowerCase().startsWith(`${desiredLang}-`)) ||
+            voicesNow.find((vv) => String(vv?.lang || "").toLowerCase() === desiredLang) ||
+            null;
+          if (v) u.voice = v as any;
+        } catch {}
+        // Alcuni browser triggerano end/error subito se non hanno voci pronte.
+        let started = false;
+        u.onstart = () => { started = true; };
+        u.onend = () => setTtsBusyKey(null);
+        u.onerror = () => {
+          setTtsBusyKey(null);
+          setTtsError("Sintesi vocale non disponibile in questo browser.");
+        };
+        synth.cancel();
+        synth.speak(u);
+        // Se non parte davvero entro poco, consideriamo “non supportato”.
+        setTimeout(() => {
+          try {
+            const active = started || synth.speaking || synth.pending;
+            if (!active) {
+              setTtsBusyKey(null);
+              setTtsError("Sintesi vocale non disponibile in questo browser.");
+            }
+          } catch {
+            if (!started) {
+              setTtsBusyKey(null);
+              setTtsError("Sintesi vocale non disponibile in questo browser.");
+            }
+          }
+        }, 500);
+        return;
+      }
+    } catch {
+      // no-op
+    }
+    // Se TTS non supportato, torniamo “idle”
+    setTtsBusyKey(null);
+    setTtsError("Sintesi vocale non disponibile in questo browser.");
+  };
+
+  const ensureVoskModel = async (): Promise<Model> => {
+    const currentLang = (lang === "en" || lang === "fr" || lang === "it") ? lang : "it";
+    const modelUrl = currentLang === "fr"
+      ? "/vosk-model-fr.tar.gz"
+      : currentLang === "en"
+        ? "/vosk-model-en.tar.gz"
+        : "/vosk-model-it.tar.gz";
+
+    if (voskModelRef.current && voskModelLangRef.current === modelUrl) {
+      return voskModelRef.current;
+    }
+    try { voskModelRef.current?.terminate?.(); } catch {}
+    voskModelRef.current = null;
+    voskModelLangRef.current = modelUrl;
+    setSttLoadingModel(true);
+    try {
+      // Chrome può “appendersi” se worker/wasm è bloccato: mettiamo timeout + hint.
+      const m = await Promise.race([
+        createModel(modelUrl, -1),
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 12000)
+        ),
+      ]);
+      voskModelRef.current = m;
+      return m;
+    } catch (e: any) {
+      const msg = e?.message || "Impossibile caricare il modello STT";
+      const isIso = typeof window !== "undefined" ? (window as any).crossOriginIsolated : false;
+      const hint =
+        msg === "timeout"
+          ? `Caricamento STT bloccato (Chrome). Prova a ricaricare la pagina. Se persiste: abilita COOP/COEP (crossOriginIsolated=${isIso ? "true" : "false"}).`
+          : `Controlla che esista ${modelUrl} in public/.`;
+      setSttError(`${msg === "timeout" ? "STT timeout" : msg}. ${hint}`);
+      throw e;
+    } finally {
+      setSttLoadingModel(false);
+    }
+  };
+
+  // Precarica il modello STT appena apri overlay (riduce i ~10s su iPhone).
+  useEffect(() => {
+    if (!showObjectChat) return;
+    // non prefetch se già caricato
+    ensureVoskModel().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showObjectChat, lang]);
+
+  const stopRecording = async ({ autoSend }: { autoSend: boolean }) => {
+    setSttRecording(false);
+    sttRecordingRef.current = false;
+    try { processorRef.current?.disconnect(); } catch {}
+    processorRef.current = null;
+    try { zeroGainRef.current?.disconnect(); } catch {}
+    zeroGainRef.current = null;
+    try { mediaStreamRef.current?.getTracks()?.forEach((t) => t.stop()); } catch {}
+    mediaStreamRef.current = null;
+    try { await audioContextRef.current?.close?.(); } catch {}
+    audioContextRef.current = null;
+
+    try {
+      recognizerRef.current?.retrieveFinalResult?.();
+    } catch {}
+
+    // attendi un attimo che arrivi l'ultimo "result"
+    setTimeout(() => {
+      const finalText = String(lastSttTextRef.current || lastPartialRef.current || "").trim();
+      if (finalText) {
+        if (autoSend) {
+          setChatInput("");
+          setSttPreview("");
+          sendObjectQuestion(finalText);
+        } else {
+          setChatInput(finalText);
+          setSttPreview("");
+        }
+      }
+      try { recognizerRef.current?.remove?.(); } catch {}
+      recognizerRef.current = null;
+      lastSttTextRef.current = "";
+      lastPartialRef.current = "";
+      hasSpeechRef.current = false;
+    }, 150);
+  };
+
+  const toggleRecording = async () => {
+    if (sttRecording) {
+      if (silenceTimerRef.current) {
+        window.clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      await stopRecording({ autoSend: false });
+      return;
+    }
+    setSttStarting(true);
+    setSttError(null);
+    lastSttTextRef.current = "";
+    lastPartialRef.current = "";
+    hasSpeechRef.current = false;
+    setSttPreview("");
+    try {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        throw new Error("Microfono richiede HTTPS (o localhost)");
+      }
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error("Microfono non supportato in questo browser (mediaDevices assente)");
+      }
+      const model = await ensureVoskModel();
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+        },
+      });
+      mediaStreamRef.current = mediaStream;
+
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      try { await audioContext.resume(); } catch {}
+      const recognizer = new model.KaldiRecognizer(audioContext.sampleRate);
+      recognizerRef.current = recognizer;
+      const resetSilenceTimer = () => {
+        if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = window.setTimeout(() => {
+          const hasSomeText = String(lastSttTextRef.current || lastPartialRef.current || "").trim().length > 0;
+          if (!hasSpeechRef.current || !hasSomeText) return;
+          stopRecording({ autoSend: true }).catch(() => {});
+        }, 1200);
+      };
+      recognizer.on("result", (m: any) => {
+        const text = String(m?.result?.text || "").trim();
+        if (text) {
+          lastSttTextRef.current = text;
+          hasSpeechRef.current = true;
+          resetSilenceTimer();
+        }
+      });
+      recognizer.on("partialresult", (m: any) => {
+        const partial = String(m?.result?.partial || "").trim();
+        if (partial) {
+          lastPartialRef.current = partial;
+          hasSpeechRef.current = true;
+          setSttPreview(partial);
+          // preview live dentro l'input mentre stai parlando
+          if (sttRecordingRef.current) setChatInput(partial);
+          resetSilenceTimer();
+        }
+      });
+      recognizer.on("error", (m: any) => {
+        const err = String(m?.error || "STT error");
+        setSttError(err);
+      });
+
+      const src = audioContext.createMediaStreamSource(mediaStream);
+      const proc = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = proc;
+      proc.onaudioprocess = (event) => {
+        try {
+          recognizer.acceptWaveform(event.inputBuffer);
+        } catch {
+          // ignore
+        }
+      };
+      src.connect(proc);
+      // Important: ScriptProcessorNode processa solo se collegato nel grafo.
+      // Colleghiamo a destination con gain=0 per evitare eco.
+      const g = audioContext.createGain();
+      g.gain.value = 0;
+      zeroGainRef.current = g;
+      proc.connect(g);
+      g.connect(audioContext.destination);
+
+      setSttRecording(true);
+      sttRecordingRef.current = true;
+      resetSilenceTimer();
+    } catch (e: any) {
+      setSttRecording(false);
+      sttRecordingRef.current = false;
+      setSttError(e?.message || "Permesso microfono negato");
+      try { await stopRecording({ autoSend: false }); } catch {}
+    } finally {
+      setSttStarting(false);
+    }
+  };
 
   useEffect(() => {
     const percorso = session.percorso;
@@ -2967,7 +3309,7 @@ function ObjectOverlay({
         }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d?.error || t("aiRequestFail"));
+      if (!r.ok) throw new Error(d?.detail || d?.error || t("aiRequestFail"));
       const answer = String(d?.answer || "").trim() || t("aiNoAnswer");
       setChatMessages((prev) => [...prev, { role: "assistant", text: answer }]);
     } catch (err: any) {
@@ -3139,7 +3481,45 @@ function ObjectOverlay({
             </div>
           )}
           {descrizione
-            ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
+            ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>{descrizione}</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); speakText(descrizione, "desc"); }}
+                    style={{
+                      border: "1px solid #cfd8e3",
+                      background: ttsBusyKey === "desc" ? "#185FA5" : "#fff",
+                      color: ttsBusyKey === "desc" ? "#fff" : "#185FA5",
+                      borderRadius: 10,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {ttsBusyKey === "desc" ? t("stop") : t("listen")}
+                  </button>
+                  {ttsBusyKey && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); stopTts(); }}
+                      style={{
+                        border: "1px solid #e1e6ee",
+                        background: "#fff",
+                        color: "#6b7c8c",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {t("stop")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
             : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>{t("loadingDesc")}</p>
           }
 
@@ -3234,7 +3614,28 @@ function ObjectOverlay({
                         border: msg.role === "user" ? "none" : "1px solid #e4eaf2",
                       }}
                     >
-                      {msg.text}
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <div>{msg.text}</div>
+                        {msg.role === "assistant" && (
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); speakText(msg.text, `msg:${idx}`); }}
+                              style={{
+                                border: "1px solid #cfd8e3",
+                                background: ttsBusyKey === `msg:${idx}` ? "#185FA5" : "#fff",
+                                color: ttsBusyKey === `msg:${idx}` ? "#fff" : "#185FA5",
+                                borderRadius: 10,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {ttsBusyKey === `msg:${idx}` ? t("stop") : t("listen")}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -3256,6 +3657,24 @@ function ObjectOverlay({
               }}
               style={{ display: "flex", gap: 8, alignItems: "stretch" }}
             >
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleRecording(); }}
+                disabled={chatLoading || sttLoadingModel || sttStarting}
+                aria-label="Microfono"
+                style={{
+                  border: "1px solid #cfd8e3",
+                  borderRadius: 10,
+                  padding: "0 12px",
+                  background: sttRecording ? "#c32020" : "#fff",
+                  color: sttRecording ? "#fff" : "#185FA5",
+                  cursor: chatLoading || sttLoadingModel || sttStarting ? "not-allowed" : "pointer",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {sttStarting || sttLoadingModel ? "…" : (sttRecording ? "■" : "🎙")}
+              </button>
               <input
                 type="text"
                 inputMode="text"
@@ -3265,6 +3684,7 @@ function ObjectOverlay({
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={t("questionPlaceholder")}
+                disabled={sttRecording}
                 style={{
                   flex: 1,
                   border: "1px solid #cfd8e3",
@@ -3273,7 +3693,7 @@ function ObjectOverlay({
                   fontSize: 16,
                   lineHeight: 1.35,
                   outline: "none",
-                  background: "#fff",
+                  background: sttRecording ? "#f3f6fa" : "#fff",
                   touchAction: "manipulation",
                 }}
               />
@@ -3295,6 +3715,36 @@ function ObjectOverlay({
                 {t("send")}
               </button>
             </form>
+            {sttError && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#c32020" }}>
+                {sttError}
+              </p>
+            )}
+            {!sttError && !sttRecording && typeof window !== "undefined" && !window.isSecureContext && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+                Microfono: serve HTTPS (su iPhone/Chrome) oppure localhost.
+              </p>
+            )}
+            {ttsError && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#c32020" }}>
+                {ttsError}
+              </p>
+            )}
+            {sttLoadingModel && !sttError && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+                Caricamento riconoscimento vocale…
+              </p>
+            )}
+            {sttStarting && !sttError && !sttLoadingModel && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+                Avvio microfono…
+              </p>
+            )}
+            {sttRecording && !sttError && !sttLoadingModel && (
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+                Sto ascoltando… premi ■ per fermare
+              </p>
+            )}
           </div>
           )}
         </div>

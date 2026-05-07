@@ -1294,8 +1294,8 @@
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
   </style>
-  <script type="module" crossorigin src="/assets/index-CDsOQQvu.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BXcMfQ6S.css">
+  <script type="module" crossorigin src="/assets/index-DI9_vw38.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BjAZ4g_1.css">
 </head>
 <body>
 
@@ -1955,6 +1955,50 @@
         if (e.key === "mu_nav_lang") applyHomeI18n();
       });
     }
+
+    // Preload STT model for selected UI language (only one).
+    // IMPORTANT: models are big (~40-50MB). Over ngrok/slow networks this can stall the page.
+    // Strategy: do it only when idle and connection looks ok; otherwise defer until user needs mic.
+    const shouldPreloadStt = () => {
+      try {
+        const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!c) return true; // unknown: allow but idle
+        if (c.saveData) return false;
+        const type = String(c.effectiveType || "").toLowerCase();
+        // Skip on slow connections.
+        if (type === "slow-2g" || type === "2g") return false;
+        return true;
+      } catch {
+        return true;
+      }
+    };
+    const sttModelUrlForLang = (nl) => {
+      const lang = normalizeNavLang(nl);
+      return lang === "fr" ? "/vosk-model-fr.tar.gz"
+        : lang === "en" ? "/vosk-model-en.tar.gz"
+        : "/vosk-model-it.tar.gz";
+    };
+    const preloadSttModelForLang = (nl) => {
+      if (!shouldPreloadStt()) return;
+      const url = sttModelUrlForLang(nl);
+      const run = async () => {
+        try {
+          // Low-impact fetch: let browser schedule; cached by BFF immutable headers.
+          await fetch(url, { cache: "force-cache" });
+        } catch {}
+      };
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(() => run(), { timeout: 4000 });
+      } else {
+        setTimeout(() => run(), 1200);
+      }
+    };
+    // initial preload (idle) + preload when user changes language
+    preloadSttModelForLang(getHomeLang());
+    window.addEventListener("mu-nav-lang-changed", (e) => {
+      try { preloadSttModelForLang(e?.detail || getHomeLang()); } catch {}
+    });
+
     renderInterestCheckboxes("interestList", []);
     renderInterestCheckboxes("profileStandaloneInterestList", []);
     await refreshCurrentUser();

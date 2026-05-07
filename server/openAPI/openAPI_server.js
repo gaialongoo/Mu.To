@@ -25,6 +25,8 @@ const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCa
 const AI_API_KEY = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || "";
 const AI_MODEL = process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 const AI_ALLOW_NO_AUTH = String(process.env.AI_ALLOW_NO_AUTH || "").trim().toLowerCase() === "true";
+/** Se true, le route AI falliscono (5xx) invece di degradare a fallback locale */
+const AI_STRICT = String(process.env.AI_STRICT || "").trim().toLowerCase() === "true";
 const AI_BASE_URL = String(
   process.env.AI_BASE_URL ||
   (AI_PROVIDER === "openai"
@@ -1069,7 +1071,7 @@ function buildFallbackObjectAnswer({ question, oggetto, museo, userPrefs }) {
   const preferenceHint = [livello ? `Livello: ${livello}.` : "", durata ? `Durata: ${durata}.` : ""].filter(Boolean).join(" ");
 
   return [
-    `Al momento sto rispondendo in modalita locale (chiave AI non configurata).`,
+    `Al momento sto rispondendo in modalita locale (risposta AI non disponibile).`,
     `Domanda: "${question}"`,
     `Opera: ${oggetto?.nome || "N/D"} - Museo: ${museo?.nome || "N/D"}.`,
     autore ? `Autore: ${autore}.` : "",
@@ -1079,6 +1081,23 @@ function buildFallbackObjectAnswer({ question, oggetto, museo, userPrefs }) {
     interesseHint,
     preferenceHint,
   ].filter(Boolean).join(" ");
+}
+
+function extractChatCompletionText(data) {
+  const c0 = data?.choices?.[0];
+  const msg = c0?.message;
+  const content = msg?.content;
+  if (typeof content === "string") return content;
+  // Alcuni provider OpenAI-compatible possono restituire content come array di parti.
+  if (Array.isArray(content)) {
+    const joined = content
+      .map((p) => (typeof p === "string" ? p : (p && typeof p.text === "string" ? p.text : "")))
+      .join("");
+    return joined;
+  }
+  // Fallback legacy
+  if (typeof c0?.text === "string") return c0.text;
+  return "";
 }
 
 function resolveAiAuthHeader() {
@@ -1262,21 +1281,35 @@ async function askObjectAI({ question, museo, oggetto, userPrefs, immaginiOggett
   };
   if (authHeader) headers.Authorization = authHeader;
 
-  const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    throw new Error(`AI upstream error (${response.status}): ${errText || "unknown"}`);
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`AI upstream error (${response.status}): ${errText || "unknown"}`);
+    }
+
+    const data = await response.json();
+    const answer = String(extractChatCompletionText(data) || "").trim();
+    if (!answer) {
+      const finishReason = String(data?.choices?.[0]?.finish_reason || "").trim();
+      const hasToolCalls = Array.isArray(data?.choices?.[0]?.message?.tool_calls) && data.choices[0].message.tool_calls.length > 0;
+      const hint = [
+        finishReason ? `finish_reason=${finishReason}` : "",
+        hasToolCalls ? "tool_calls=1" : "",
+      ].filter(Boolean).join(" ");
+      throw new Error(`Risposta AI vuota${hint ? ` (${hint})` : ""}`);
+    }
+    return answer;
+  } catch (err) {
+    if (AI_STRICT) throw err;
+    const msg = err instanceof Error ? err.message : "unknown";
+    return `${buildFallbackObjectAnswer({ question: cleanQuestion, museo, oggetto, userPrefs })} (Nota tecnica: ${msg})`;
   }
-
-  const data = await response.json();
-  const answer = String(data?.choices?.[0]?.message?.content || "").trim();
-  if (!answer) throw new Error("Risposta AI vuota");
-  return answer;
 }
 
 async function withUsersDb(run) {
@@ -2400,10 +2433,17 @@ async function startServer(cliOptions) {
 
       res.json({ answer: aiAnswer, source: aiUpstreamReady() ? AI_PROVIDER : "fallback" });
     } catch (err) {
-      console.error("Errore object chat AI:", err.message);
-      res.status(500).json({ error: "errore chat IA oggetto" });
+      const msg = err instanceof Error ? err.message : String(err || "unknown");
+      console.error("Errore object chat AI:", msg);
+      // In dev: restituiamo anche dettagli per capire subito se è 401/429/quota/timeout.
+      res.status(502).json({
+        error: "errore chat IA oggetto",
+        detail: msg,
+      });
     }
   });
+
+  // (STT/TTS disabilitati: versione "solo JS" usa STT client-side e TTS browser)
 
   // ==========================================================
   // ROUTE — GUIDED VISITS (PROFESSORI / STUDENTI)

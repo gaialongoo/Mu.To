@@ -99,6 +99,25 @@ const dispatcher = new Agent({
 // ============================================================
 const app = express();
 
+// ------------------------------------------------------------
+// COOP/COEP headers for WASM workers (Chrome STT)
+// ------------------------------------------------------------
+app.use((req, res, next) => {
+  const p = req.path || req.originalUrl || "";
+  // Non applicare a proxy o altre SPA per evitare side effects inutili.
+  const skip =
+    p.startsWith("/api") ||
+    p.startsWith("/svg") ||
+    p.startsWith("/editor") ||
+    p.startsWith("/marketplace") ||
+    p.startsWith("/health");
+  if (!skip) {
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
@@ -202,7 +221,18 @@ app.use(
 );
 
 app.use(
-  express.static(path.join(__dirname, "viewer/dist"), { index: false })
+  express.static(path.join(__dirname, "viewer/dist"), {
+    index: false,
+    setHeaders: (res, filePath) => {
+      // Cache aggressiva per modelli STT (file grandi) e asset fingerprintati.
+      if (filePath.endsWith(".tar.gz") && filePath.includes("vosk-model-")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+      if (filePath.includes("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  })
 );
 
 // ============================================================

@@ -217,11 +217,12 @@ function extractDefaultDescription(oggetto) {
 }
 
 // ─── Visit card ──────────────────────────────────────────────────────────────
-function VisitCard({ percorso, canView, onView, onBuy, buying, delay, mp, displayNome }) {
+function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, mp, displayNome }) {
   const prezzo = Number(percorso.prezzo || 0);
   const included = prezzo <= 0;
   const disabled = !included && !canView && buying;
   const title = displayNome || percorso.nome;
+  const canStart = included || canView;
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
@@ -264,6 +265,27 @@ function VisitCard({ percorso, canView, onView, onBuy, buying, delay, mp, displa
           }}
           >
             {mp("view")}
+          </button>
+          <button
+            onClick={() => onStart?.(percorso)}
+            disabled={!canStart}
+            style={{
+              flex: 1,
+              padding: "8px 10px",
+              background: canStart ? "var(--gold)" : "transparent",
+              border: `1px solid ${canStart ? "var(--gold)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: "var(--radius)",
+              cursor: canStart ? "pointer" : "not-allowed",
+              fontFamily: "var(--font-head)",
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: canStart ? "#0d0d0d" : "var(--text-faint)",
+              transition: "all 0.2s",
+              opacity: canStart ? 1 : 0.7,
+            }}
+          >
+            {mp("startRoute")}
           </button>
           {!included && !canView && (
             <button
@@ -1084,6 +1106,68 @@ export default function App() {
   const makePurchaseKey = (percorso) => `${MUSEO}::${percorso.nome}`;
   const canAccessPath = (percorso) => Number(percorso?.prezzo || 0) <= 0 || purchasedKeys.has(makePurchaseKey(percorso));
 
+  const setMuseoSessionCookie = (sessionObj) => {
+    try {
+      const maxAgeSec = 24 * 60 * 60;
+      document.cookie = `museo_session=${encodeURIComponent(JSON.stringify(sessionObj))}; Path=/; SameSite=Lax; Max-Age=${maxAgeSec}`;
+    } catch {
+      // ignore
+    }
+  };
+
+  const startNavigatorForRoute = (percorso) => {
+    if (!MUSEO) return;
+    if (generatingAiRoute) {
+      showToast("Attendi la fine della generazione IA prima di avviare il navigator", "error");
+      return;
+    }
+    if (!canAccessPath(percorso)) {
+      showToast("Acquista il percorso per avviarlo", "error");
+      return;
+    }
+
+    const isPersonalized = !!percorso?.isPersonalized || percorso?.source === "ai_personalized" || !!percorso?.id;
+    if (isPersonalized) {
+      const objectNodes = Array.isArray(percorso?.flowNodes) && percorso.flowNodes.length > 0
+        ? percorso.flowNodes
+        : (Array.isArray(percorso?.objectNodes) && percorso.objectNodes.length > 0
+          ? percorso.objectNodes
+          : (Array.isArray(percorso?.oggetti) ? percorso.oggetti : []));
+      const firstNode = objectNodes[0];
+      if (!firstNode) {
+        showToast("Percorso IA vuoto", "error");
+        return;
+      }
+      const personalizedRouteId = String(percorso?.id || "").trim();
+      if (!personalizedRouteId) {
+        showToast("ID percorso IA mancante", "error");
+        return;
+      }
+      setMuseoSessionCookie({
+        museo: MUSEO,
+        percorso: ["IN", "OUT"],
+        createdAt: Date.now(),
+        personalizedRouteId,
+      });
+      window.location.href = `/?stanza=${encodeURIComponent("IN")}/path/${encodeURIComponent("IN")}/${encodeURIComponent(firstNode)}`;
+      return;
+    }
+
+    const oggetti = Array.isArray(percorso?.oggetti) ? percorso.oggetti : [];
+    const firstObj = oggetti[0];
+    if (!firstObj) {
+      showToast("Percorso vuoto", "error");
+      return;
+    }
+    const percorsoArr = ["IN", ...oggetti, "OUT"];
+    setMuseoSessionCookie({
+      museo: MUSEO,
+      percorso: percorsoArr,
+      createdAt: Date.now(),
+    });
+    window.location.href = `/?stanza=${encodeURIComponent("IN")}/path/${encodeURIComponent("IN")}/${encodeURIComponent(firstObj)}`;
+  };
+
   const makeObjectRequestKey = useCallback(
     (obj) => `${String(obj?.nome || "").trim()}::${String(obj?.stanza || "").trim()}`,
     []
@@ -1550,6 +1634,7 @@ export default function App() {
                       percorso={p}
                       canView={canAccessPath(p)}
                       onView={openPathDetails}
+                      onStart={startNavigatorForRoute}
                       onBuy={buyPath}
                       buying={buyingPath === p.nome}
                       delay={i * 0.06}
