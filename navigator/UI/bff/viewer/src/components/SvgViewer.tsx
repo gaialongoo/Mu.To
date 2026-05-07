@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getStoredNavLang, useNavLang } from "../i18n/NavLangContext";
 import { createModel, type Model, type KaldiRecognizer } from "vosk-browser";
 
@@ -166,6 +166,51 @@ export default function SvgViewer() {
     wc: false,
     out: false,
   });
+  const [uiToast, setUiToast] = useState<null | { msg: string; type?: "success" | "error" }>(null);
+  const [uiModal, setUiModal] = useState<
+    | null
+    | {
+        kind: "alert" | "prompt";
+        title?: string;
+        message: string;
+        defaultValue?: string;
+        resolve: (value: string | null) => void;
+      }
+  >(null);
+
+  const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
+    setUiToast({ msg, type });
+    window.setTimeout(() => setUiToast(null), 3200);
+  }, []);
+
+  const showAlert = useCallback(
+    async (message: string, title?: string) => {
+      return await new Promise<void>((resolve) => {
+        setUiModal({
+          kind: "alert",
+          title,
+          message,
+          resolve: () => resolve(),
+        });
+      });
+    },
+    []
+  );
+
+  const showPrompt = useCallback(
+    async (message: string, defaultValue = "", title?: string) => {
+      return await new Promise<string | null>((resolve) => {
+        setUiModal({
+          kind: "prompt",
+          title,
+          message,
+          defaultValue,
+          resolve,
+        });
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -195,6 +240,7 @@ export default function SvgViewer() {
   });
   const freeExploreRef = useRef(freeExplore);
   freeExploreRef.current = freeExplore;
+  const promptInputRef = useRef<HTMLInputElement | null>(null);
   const [currentStanzaLabel, setCurrentStanzaLabel] = useState<string | null>(null);
   const [currentStanzaParam, setCurrentStanzaParam] = useState<string | null>(null);
   const [svgLoadTick, setSvgLoadTick] = useState(0);
@@ -814,7 +860,7 @@ export default function SvgViewer() {
   const handleExitConfirm = () => {
     if (isGuidedStudent && guidedQuizRequired && !guidedQuizSubmitted) {
       setExitConfirmOpen(false);
-      alert(t("quizBlockExit"));
+      void showAlert(t("quizBlockExit"));
       return;
     }
     clearSessionCookies();
@@ -900,11 +946,11 @@ export default function SvgViewer() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || t("quizSubmitFail"));
-      alert(`${t("quizScoreIntro")}${d.grade}/100`);
+      await showAlert(`${t("quizScoreIntro")}${d.grade}/100`, t("quizTitle") || undefined);
       setGuidedQuizSubmitted(true);
       setGuidedQuizState(null);
     } catch (err: any) {
-      alert(err?.message || t("quizSubmitFail"));
+      showToast(err?.message || t("quizSubmitFail"), "error");
     } finally {
       setGuidedQuizSubmitting(false);
     }
@@ -936,7 +982,11 @@ export default function SvgViewer() {
   };
   const teacherStartQuiz = async () => {
     if (!session?.guidedVisitId) return;
-    const secRaw = prompt(t("quizPromptSeconds"), String(teacherVisitState?.quiz?.timeLimitSec || 120));
+    const secRaw = await showPrompt(
+      t("quizPromptSeconds"),
+      String(teacherVisitState?.quiz?.timeLimitSec || 120),
+      t("quizTitle") || undefined
+    );
     const sec = Number(secRaw);
     await teacherPost(`/guided-visits/${encodeURIComponent(session.guidedVisitId)}/quiz/start`, Number.isFinite(sec) ? { timeLimitSec: sec } : {});
   };
@@ -980,16 +1030,18 @@ export default function SvgViewer() {
             top: 16,
             right: 16,
             zIndex: 1001,
-            border: "none",
+            border: "1px solid rgba(224,90,74,0.35)",
             borderRadius: 10,
-            background: "rgba(200, 32, 32, 0.9)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: "0.05em",
+            background: "rgba(224,90,74,0.14)",
+            color: "#e05a4a",
+            fontFamily: "var(--font-head)",
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
             padding: "8px 12px",
             cursor: "pointer",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
             ...blockMapChromeWhileObjectOpen,
@@ -1044,20 +1096,21 @@ export default function SvgViewer() {
           width: 44,
           height: 44,
           borderRadius: "50%",
-          border: "none",
-          background: freeExplore ? "rgba(15,110,86,0.90)" : "rgba(24,95,165,0.90)",
-          color: "#fff",
+          border: "1px solid rgba(92,191,128,0.35)",
+          background: freeExplore ? "var(--green)" : "var(--green-dim)",
+          color: freeExplore ? "#0d0d0d" : "var(--green)",
           fontSize: 20,
           lineHeight: "44px",
           textAlign: "center",
           cursor: "pointer",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
+          boxShadow: freeExplore
+            ? "0 18px 60px rgba(92,191,128,0.22)"
+            : "0 12px 40px rgba(0,0,0,0.5)",
           transition: "background 0.2s ease, transform 0.15s ease",
           userSelect: "none",
           padding: 0,
           ...blockMapChromeWhileObjectOpen,
+          opacity: normalize(currentStanzaLabel ?? "") === "home" ? 0.55 : 1,
         }}
         onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
         onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
@@ -1073,19 +1126,21 @@ export default function SvgViewer() {
             top: 16,
             left: 16,
             zIndex: 1000,
-            background: "rgba(15,110,86,0.88)",
+            background: "color-mix(in srgb, var(--green) 28%, rgba(0,0,0,0.9))",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
-            color: "#fff",
-            fontSize: 12,
-            fontWeight: 500,
+            color: "var(--text)",
+            fontSize: 11,
+            fontWeight: 600,
             lineHeight: 1.5,
             padding: "8px 12px",
             borderRadius: 10,
             maxWidth: 180,
-            boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+            border: "1px solid var(--border)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
             pointerEvents: "none",
             userSelect: "none",
+            letterSpacing: "0.04em",
           }}
         >
           {t("dragHint")}<br />
@@ -1102,11 +1157,12 @@ export default function SvgViewer() {
             zIndex: 1000,
             display: "flex",
             gap: 8,
-            background: "rgba(0,0,0,0.45)",
+            background: "rgba(0,0,0,0.55)",
             padding: "8px 10px",
             borderRadius: 10,
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
+            border: "1px solid var(--border)",
             ...blockMapChromeWhileObjectOpen,
           }}
         >
@@ -1122,15 +1178,19 @@ export default function SvgViewer() {
                 onClick={() => enabled && !isGuidedStudent && handleQuickRoomNavigate(item.label)}
                 disabled={!enabled || isGuidedStudent}
                 style={{
-                  border: "1px solid rgba(255,255,255,0.28)",
-                  background: enabled ? "rgba(24,95,165,0.9)" : "rgba(90,90,90,0.4)",
-                  color: "#fff",
+                  border: `1px solid ${enabled ? "rgba(92,191,128,0.35)" : "var(--border)"}`,
+                  background: enabled ? "var(--green-dim)" : "rgba(255,255,255,0.03)",
+                  color: enabled ? "var(--green)" : "var(--text-faint)",
                   borderRadius: 8,
                   padding: "7px 10px",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.06em",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  letterSpacing: "0.12em",
                   cursor: enabled && !isGuidedStudent ? "pointer" : "not-allowed",
+                  textTransform: "uppercase",
+                  transition: "all 0.2s",
+                  opacity: enabled && !isGuidedStudent ? 1 : 0.75,
                 }}
               >
                 {item.label}
@@ -1187,37 +1247,48 @@ export default function SvgViewer() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "rgba(0,0,0,0.72)",
+            backdropFilter: "blur(4px)",
             zIndex: 9000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            padding: 16,
           }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: "#fff",
-              padding: "24px 28px",
-              borderRadius: 14,
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              padding: "22px 22px",
+              borderRadius: "var(--radius-lg)",
               minWidth: 280,
               maxWidth: 360,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+              boxShadow: "0 40px 100px rgba(0,0,0,0.7)",
             }}
           >
-            <p style={{ margin: "0 0 6px", fontSize: 13, color: "#666" }}>
+            <p style={{ margin: "0 0 6px", fontSize: 11, letterSpacing: "0.04em", color: "var(--text-dim)" }}>
               {t("roomConfirmIntro")}
             </p>
-            <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
+            <h3 style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.1em" }}>
               {roomConfirm}
             </h3>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => handleRoomConfirm(roomConfirm)}
                 style={{
-                  flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
-                  background: "#185FA5", color: "#fff", fontWeight: 600,
-                  fontSize: 14, cursor: "pointer",
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--green)",
+                  background: "var(--green)",
+                  color: "#0d0d0d",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.13em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
                 }}
               >
                 {t("roomGo")}
@@ -1225,9 +1296,17 @@ export default function SvgViewer() {
               <button
                 onClick={() => setRoomConfirm(null)}
                 style={{
-                  flex: 1, padding: "9px 0", borderRadius: 8,
-                  border: "1.5px solid #ccc", background: "transparent",
-                  fontWeight: 600, fontSize: 14, cursor: "pointer",
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-dim)",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.13em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
                 }}
               >
                 {t("cancel")}
@@ -1243,37 +1322,54 @@ export default function SvgViewer() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "transparent",
             zIndex: 9001,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            padding: 16,
           }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: "#fff",
-              padding: "24px 28px",
-              borderRadius: 14,
+              background: "var(--surface)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              padding: "22px 22px",
+              borderRadius: 18,
               minWidth: 280,
               maxWidth: 360,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+              boxShadow: "0 40px 100px rgba(0,0,0,0.7), 0 0 40px rgba(92,191,128,0.10)",
             }}
           >
-            <p style={{ margin: "0 0 8px", fontSize: 13, color: "#666" }}>
+            <div style={{
+              height: 1,
+              background: "linear-gradient(90deg, transparent, var(--green), transparent)",
+              opacity: 0.55,
+              margin: "-6px 8px 14px",
+            }} />
+            <p style={{ margin: "0 0 8px", fontSize: 11, letterSpacing: "0.04em", color: "var(--text-dim)" }}>
               {t("exitConfirmTitle")}
             </p>
-            <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
+            <h3 style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>
               {t("exitConfirmBody")}
             </h3>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={handleExitConfirm}
                 style={{
-                  flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
-                  background: "#C72020", color: "#fff", fontWeight: 600,
-                  fontSize: 14, cursor: "pointer",
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid rgba(224,90,74,0.35)",
+                  background: "rgba(224,90,74,0.14)",
+                  color: "#e05a4a",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.13em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
                 }}
               >
                 {t("exitYes")}
@@ -1281,9 +1377,17 @@ export default function SvgViewer() {
               <button
                 onClick={() => setExitConfirmOpen(false)}
                 style={{
-                  flex: 1, padding: "9px 0", borderRadius: 8,
-                  border: "1.5px solid #ccc", background: "transparent",
-                  fontWeight: 600, fontSize: 14, cursor: "pointer",
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-dim)",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.13em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
                 }}
               >
                 {t("cancel")}
@@ -1309,30 +1413,40 @@ export default function SvgViewer() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "min(920px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", color: "#111", borderRadius: 14, padding: "16px 18px" }}
+            style={{
+              width: "min(920px, 96vw)",
+              maxHeight: "92vh",
+              overflowY: "auto",
+              background: "var(--bg-card)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "16px 18px",
+              boxShadow: "0 40px 100px rgba(0,0,0,0.7)",
+            }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>{t("teacherDashboardTitle")}</h3>
-              <button onClick={() => setTeacherPanelOpen(false)} style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer" }}>×</button>
+              <h3 style={{ margin: 0, fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.08em" }}>{t("teacherDashboardTitle")}</h3>
+              <button onClick={() => setTeacherPanelOpen(false)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", width: 28, height: 28, borderRadius: "50%", fontSize: 16, cursor: "pointer" }}>✕</button>
             </div>
-            <p style={{ marginTop: 0, color: "#555", marginBottom: 12 }}>
+            <p style={{ marginTop: 0, color: "var(--text-dim)", marginBottom: 12, fontSize: 12, letterSpacing: "0.03em" }}>
               {teacherVisitState?.nome || "Visita"} - {teacherVisitState?.museo || ""}
             </p>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-              <button onClick={() => teacherAcceptAll().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#f8f8f8", cursor: "pointer" }}>
+              <button onClick={() => teacherAcceptAll().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {t("teacherAcceptAll")}
               </button>
-              <button onClick={() => teacherStartQuiz().catch((e) => alert(e.message))} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #185FA5", background: "#185FA5", color: "#fff", cursor: "pointer" }}>
+              <button onClick={() => teacherStartQuiz().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--green)", background: "var(--green)", color: "#0d0d0d", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {t("teacherStartQuiz")}
               </button>
-              <button onClick={() => setTeacherShowResults((v) => !v)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>
+              <button onClick={() => setTeacherShowResults((v) => !v)} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {teacherShowResults ? t("teacherHideResults") : t("teacherShowResults")}
               </button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
+              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
                 <strong>{t("teacherWaiting")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
@@ -1341,14 +1455,14 @@ export default function SvgViewer() {
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{p.displayName}</span>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => teacherAccept(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #2f8f4e", background: "#e9fff0", borderRadius: 6, cursor: "pointer" }}>{t("teacherAccept")}</button>
-                          <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>{t("teacherReject")}</button>
+                          <button onClick={() => teacherAccept(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(92,191,128,0.35)", background: "var(--green-dim)", color: "var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherAccept")}</button>
+                          <button onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherReject")}</button>
                         </div>
                       </div>
                     ))}
                 </div>
               </div>
-              <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10, background: "#fafafa" }}>
+              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
                 <strong>{t("teacherInside")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
@@ -1356,7 +1470,7 @@ export default function SvgViewer() {
                     .map((p: any, idx: number) => (
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{idx + 1}. {p.displayName}</span>
-                        <button onClick={() => teacherRemove(p.id).catch((e) => alert(e.message))} style={{ border: "1px solid #a33", background: "#ffecec", borderRadius: 6, cursor: "pointer" }}>{t("teacherRemove")}</button>
+                        <button onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherRemove")}</button>
                       </div>
                     ))}
                 </div>
@@ -1364,11 +1478,11 @@ export default function SvgViewer() {
             </div>
 
             {teacherShowResults && (
-              <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
+              <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
                 <strong>{t("teacherQuizResults")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {teacherQuizResults.length < 1
-                    ? <span style={{ color: "#666" }}>{t("teacherNoResults")}</span>
+                    ? <span style={{ color: "var(--text-dim)" }}>{t("teacherNoResults")}</span>
                     : teacherQuizResults
                         .slice()
                         .sort((a, b) => (Number(b.grade) || -1) - (Number(a.grade) || -1))
@@ -1445,6 +1559,156 @@ export default function SvgViewer() {
           showNav={!isGuidedStudent}
           domDataObjectType={readDomDataObjectType(focusedObject)}
         />
+      )}
+
+      {uiToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 32,
+            right: 32,
+            padding: "14px 22px",
+            background: "var(--bg-card)",
+            border: `1px solid ${uiToast.type === "error" ? "rgba(224,90,74,0.35)" : "var(--border)"}`,
+            borderLeft: `3px solid ${uiToast.type === "error" ? "#e05a4a" : "var(--green)"}`,
+            borderRadius: "var(--radius-lg)",
+            fontFamily: "var(--font-head)",
+            fontSize: 11,
+            letterSpacing: "0.1em",
+            color: "var(--text)",
+            zIndex: 10000,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+            pointerEvents: "none",
+          }}
+        >
+          {uiToast.msg}
+        </div>
+      )}
+
+      {uiModal && (
+        <div
+          onClick={() => {
+            const resolve = uiModal.resolve;
+            setUiModal(null);
+            resolve(uiModal.kind === "prompt" ? null : "");
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.72)",
+            backdropFilter: "blur(4px)",
+            zIndex: 11000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: 22,
+              width: "min(420px, 92vw)",
+              boxShadow: "0 40px 100px rgba(0,0,0,0.7)",
+            }}
+          >
+            {uiModal.title && (
+              <div style={{ fontFamily: "var(--font-head)", fontSize: 12, letterSpacing: "0.14em", color: "var(--green)", marginBottom: 10, textTransform: "uppercase" }}>
+                {uiModal.title}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: uiModal.kind === "prompt" ? 14 : 18 }}>
+              {uiModal.message}
+            </div>
+
+            {uiModal.kind === "prompt" && (
+              <input
+                autoFocus
+                ref={promptInputRef}
+                defaultValue={uiModal.defaultValue ?? ""}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const v = (e.currentTarget as HTMLInputElement).value;
+                    const resolve = uiModal.resolve;
+                    setUiModal(null);
+                    resolve(v);
+                  }
+                  if (e.key === "Escape") {
+                    const resolve = uiModal.resolve;
+                    setUiModal(null);
+                    resolve(null);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 13px",
+                  background: "var(--bg-panel)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius)",
+                  color: "var(--text)",
+                  fontFamily: "var(--font-body)",
+                  fontSize: 14,
+                  outline: "none",
+                  marginBottom: 16,
+                }}
+              />
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {uiModal.kind === "prompt" && (
+                <button
+                  onClick={() => {
+                    const resolve = uiModal.resolve;
+                    setUiModal(null);
+                    resolve(null);
+                  }}
+                  style={{
+                    padding: "9px 14px",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text-dim)",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-head)",
+                    fontSize: 10,
+                    letterSpacing: "0.13em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t("cancel")}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  const resolve = uiModal.resolve;
+                  setUiModal(null);
+                  if (uiModal.kind === "prompt") {
+                    resolve(promptInputRef.current?.value ?? "");
+                  } else {
+                    resolve("");
+                  }
+                }}
+                style={{
+                  padding: "9px 14px",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--green)",
+                  background: "var(--green)",
+                  color: "#0d0d0d",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  letterSpacing: "0.13em",
+                  textTransform: "uppercase",
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -3593,9 +3857,10 @@ function ObjectOverlay({
       onClick={onClose}
       style={{
         position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.75)",
-        zIndex: 9999,
+        background: "transparent",
+        zIndex: 10050,
         display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
         overscrollBehavior: "contain",
         touchAction: "none",
       }}
@@ -3604,8 +3869,10 @@ function ObjectOverlay({
         onClick={e => e.stopPropagation()}
         style={{
           position: "relative",
-          background: "#fff",
-          borderRadius: 14,
+          background: "var(--bg)",
+          color: "var(--text)",
+          border: "1px solid rgba(92,191,128,0.18)",
+          borderRadius: 22,
           minWidth: 300,
           maxWidth: 420,
           width: "90vw",
@@ -3614,11 +3881,23 @@ function ObjectOverlay({
           flexDirection: "column",
           minHeight: 0,
           overflow: "hidden",
-          boxShadow: "0 12px 48px rgba(0,0,0,0.35)",
+          boxShadow: "0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset, 0 0 40px rgba(92,191,128,0.10)",
           overscrollBehavior: "contain",
           touchAction: "pan-y",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 22,
+            right: 22,
+            height: 1,
+            background: "linear-gradient(90deg, transparent, var(--green), transparent)",
+            opacity: 0.55,
+            pointerEvents: "none",
+          }}
+        />
         <button
           type="button"
           aria-label={t("closeSheet")}
@@ -3634,25 +3913,25 @@ function ObjectOverlay({
             width: 28,
             height: 28,
             borderRadius: "50%",
-            border: "none",
+            border: "1px solid var(--border)",
             padding: 0,
-            background: "rgba(255,255,255,0.97)",
-            color: "#c72020",
-            fontSize: 18,
+            background: "transparent",
+            color: "var(--text-dim)",
+            fontSize: 14,
             lineHeight: 1,
-            fontWeight: 700,
+            fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 1px 6px rgba(0,0,0,0.2)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
           }}
         >
-          ×
+          ✕
         </button>
         {/* ── Slider immagini ── */}
         {immagini.length > 0 && (
-          <div style={{ position: "relative", background: "#111", flexShrink: 0 }}>
+          <div style={{ position: "relative", background: "var(--bg-panel)", flexShrink: 0 }}>
             <img
               src={`${API_BASE}${immagini[slideIdx].url}`}
               alt={immagini[slideIdx].tipo}
@@ -3738,18 +4017,18 @@ function ObjectOverlay({
             overscrollBehavior: "contain",
           }}
         >
-          <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700 }}>{objectTitle}</h2>
+          <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 500, fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>{objectTitle}</h2>
           {showObjectChat && (
             <div style={{ marginBottom: 10, display: "grid", gap: 2 }}>
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("author")}</strong> {autore || t("nd")}</p>
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("year")}</strong> {anno || t("nd")}</p>
-              {correnteArtistica && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "#666" }}><strong>{t("movement")}</strong> {correnteArtistica}</p>}
+              <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)", letterSpacing: "0.02em" }}><strong style={{ color: "var(--green)", fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 10 }}>{t("author")}</strong> {autore || t("nd")}</p>
+              <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)", letterSpacing: "0.02em" }}><strong style={{ color: "var(--green)", fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 10 }}>{t("year")}</strong> {anno || t("nd")}</p>
+              {correnteArtistica && <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)", letterSpacing: "0.02em" }}><strong style={{ color: "var(--green)", fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 10 }}>{t("movement")}</strong> {correnteArtistica}</p>}
             </div>
           )}
           {descrizione
             ? (
               <div style={{ display: "grid", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#444" }}>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.8, color: "var(--text)" }}>
                   {renderHighlightedText(descrizione, "desc")}
                 </p>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -3757,12 +4036,15 @@ function ObjectOverlay({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); speakText(descrizione, "desc"); }}
                     style={{
-                      border: "1px solid #cfd8e3",
-                      background: ttsBusyKey === "desc" ? "#185FA5" : "#fff",
-                      color: ttsBusyKey === "desc" ? "#fff" : "#185FA5",
-                      borderRadius: 10,
+                      border: `1px solid ${ttsBusyKey === "desc" ? "var(--green)" : "rgba(92,191,128,0.25)"}`,
+                      background: ttsBusyKey === "desc" ? "var(--green)" : "var(--green-dim)",
+                      color: ttsBusyKey === "desc" ? "#0d0d0d" : "var(--green)",
+                      borderRadius: 14,
                       padding: "6px 10px",
-                      fontSize: 12,
+                      fontFamily: "var(--font-head)",
+                      fontSize: 10,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
                       cursor: "pointer",
                     }}
                   >
@@ -3773,12 +4055,15 @@ function ObjectOverlay({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); pauseTts(); }}
                       style={{
-                        border: "1px solid #e1e6ee",
-                        background: "#fff",
-                        color: "#6b7c8c",
-                        borderRadius: 10,
+                        border: "1px solid var(--border)",
+                        background: "transparent",
+                        color: "var(--text-dim)",
+                        borderRadius: 14,
                         padding: "6px 10px",
-                        fontSize: 12,
+                        fontFamily: "var(--font-head)",
+                        fontSize: 10,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
                         cursor: "pointer",
                       }}
                     >
@@ -3790,12 +4075,15 @@ function ObjectOverlay({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); resumeTts(); }}
                       style={{
-                        border: "1px solid #e1e6ee",
-                        background: "#fff",
-                        color: "#6b7c8c",
-                        borderRadius: 10,
+                        border: "1px solid var(--border)",
+                        background: "transparent",
+                        color: "var(--text-dim)",
+                        borderRadius: 14,
                         padding: "6px 10px",
-                        fontSize: 12,
+                        fontFamily: "var(--font-head)",
+                        fontSize: 10,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
                         cursor: "pointer",
                       }}
                     >
@@ -3807,12 +4095,15 @@ function ObjectOverlay({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); stopTts(); }}
                       style={{
-                        border: "1px solid #e1e6ee",
-                        background: "#fff",
-                        color: "#6b7c8c",
-                        borderRadius: 10,
+                        border: "1px solid rgba(224,90,74,0.35)",
+                        background: "rgba(224,90,74,0.14)",
+                        color: "#e05a4a",
+                        borderRadius: 14,
                         padding: "6px 10px",
-                        fontSize: 12,
+                        fontFamily: "var(--font-head)",
+                        fontSize: 10,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
                         cursor: "pointer",
                       }}
                     >
@@ -3821,10 +4112,10 @@ function ObjectOverlay({
                   )}
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: "#6b7c8c" }}>
+                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
                     {t("ttsEta")}: ~{estimateTtsSeconds(descrizione, ttsRate)}s
                   </span>
-                  <label style={{ fontSize: 11, color: "#6b7c8c", display: "flex", gap: 6, alignItems: "center" }}>
+                  <label style={{ fontSize: 11, color: "var(--text-dim)", display: "flex", gap: 6, alignItems: "center" }}>
                     {t("ttsRate")}
                     <input
                       type="range"
@@ -3847,11 +4138,11 @@ function ObjectOverlay({
             style={{
               marginTop: 20,
               paddingTop: 16,
-              borderTop: "1px solid #e8ecf1",
+              borderTop: "1px solid var(--border)",
             }}
           >
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "#1a2b3c", textTransform: "uppercase" }}>
+              <p style={{ margin: 0, fontSize: 10, fontWeight: 500, letterSpacing: "0.18em", color: "var(--green)", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>
                 {t("aiQuestions")}
               </p>
             </div>
@@ -3872,16 +4163,19 @@ function ObjectOverlay({
                     disabled={chatLoading}
                     onClick={() => sendObjectQuestion(q)}
                     style={{
-                      border: "1px solid #c5d8ed",
-                      background: "linear-gradient(180deg, #fff 0%, #f5f9fd 100%)",
-                      color: "#1a4d7a",
+                      border: "1px solid rgba(92,191,128,0.25)",
+                      background: "var(--green-dim)",
+                      color: "var(--green)",
                       borderRadius: 999,
                       padding: "7px 12px",
-                      fontSize: 11,
+                      fontFamily: "var(--font-head)",
+                      fontSize: 9,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
                       lineHeight: 1.35,
                       textAlign: "left",
                       cursor: chatLoading ? "not-allowed" : "pointer",
-                      boxShadow: "0 1px 2px rgba(24,95,165,0.06)",
+                      boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
                       transition: "border-color 0.15s, box-shadow 0.15s",
                     }}
                   >
@@ -3896,10 +4190,10 @@ function ObjectOverlay({
                 style={{
                   maxHeight: 200,
                   overflowY: "auto",
-                  borderRadius: 12,
+                  borderRadius: 16,
                   padding: 10,
-                  background: "#eef2f7",
-                  border: "1px solid #dce4ee",
+                  background: "var(--bg-panel)",
+                  border: "1px solid var(--border)",
                   marginBottom: 10,
                   touchAction: "pan-y",
                   WebkitOverflowScrolling: "touch",
@@ -3907,7 +4201,7 @@ function ObjectOverlay({
                 }}
               >
                 {chatMessages.length > 0 && !chatLoading && (
-                  <p style={{ margin: "0 0 8px", color: "#6b7c8c", fontSize: 11, lineHeight: 1.4 }}>
+                  <p style={{ margin: "0 0 8px", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
                     {t("aiHelpFollow")}
                   </p>
                 )}
@@ -3927,10 +4221,10 @@ function ObjectOverlay({
                         borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
                         fontSize: 12,
                         lineHeight: 1.5,
-                        background: msg.role === "user" ? "#185FA5" : "#fff",
-                        color: msg.role === "user" ? "#fff" : "#2c3e50",
-                        boxShadow: msg.role === "user" ? "0 2px 8px rgba(24,95,165,0.25)" : "0 1px 3px rgba(0,0,0,0.06)",
-                        border: msg.role === "user" ? "none" : "1px solid #e4eaf2",
+                        background: msg.role === "user" ? "var(--green)" : "var(--bg-card)",
+                        color: msg.role === "user" ? "#0d0d0d" : "var(--text)",
+                        boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
+                        border: msg.role === "user" ? "1px solid rgba(92,191,128,0.35)" : "1px solid var(--border)",
                       }}
                     >
                       <div style={{ display: "grid", gap: 6 }}>
@@ -3941,12 +4235,15 @@ function ObjectOverlay({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); speakText(msg.text, `msg:${idx}`); }}
                               style={{
-                                border: "1px solid #cfd8e3",
-                                background: ttsBusyKey === `msg:${idx}` ? "#185FA5" : "#fff",
-                                color: ttsBusyKey === `msg:${idx}` ? "#fff" : "#185FA5",
-                                borderRadius: 10,
+                                border: `1px solid ${ttsBusyKey === `msg:${idx}` ? "var(--green)" : "rgba(92,191,128,0.25)"}`,
+                                background: ttsBusyKey === `msg:${idx}` ? "var(--green)" : "var(--green-dim)",
+                                color: ttsBusyKey === `msg:${idx}` ? "#0d0d0d" : "var(--green)",
+                                borderRadius: 14,
                                 padding: "4px 8px",
-                                fontSize: 11,
+                                fontFamily: "var(--font-head)",
+                                fontSize: 9,
+                                letterSpacing: "0.12em",
+                                textTransform: "uppercase",
                                 cursor: "pointer",
                               }}
                             >
@@ -3957,12 +4254,15 @@ function ObjectOverlay({
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); pauseTts(); }}
                                 style={{
-                                  border: "1px solid #e1e6ee",
-                                  background: "#fff",
-                                  color: "#6b7c8c",
-                                  borderRadius: 10,
+                                  border: "1px solid var(--border)",
+                                  background: "transparent",
+                                  color: "var(--text-dim)",
+                                  borderRadius: 14,
                                   padding: "4px 8px",
-                                  fontSize: 11,
+                                  fontFamily: "var(--font-head)",
+                                  fontSize: 9,
+                                  letterSpacing: "0.12em",
+                                  textTransform: "uppercase",
                                   cursor: "pointer",
                                 }}
                               >
@@ -3974,19 +4274,22 @@ function ObjectOverlay({
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); resumeTts(); }}
                                 style={{
-                                  border: "1px solid #e1e6ee",
-                                  background: "#fff",
-                                  color: "#6b7c8c",
-                                  borderRadius: 10,
+                                  border: "1px solid var(--border)",
+                                  background: "transparent",
+                                  color: "var(--text-dim)",
+                                  borderRadius: 14,
                                   padding: "4px 8px",
-                                  fontSize: 11,
+                                  fontFamily: "var(--font-head)",
+                                  fontSize: 9,
+                                  letterSpacing: "0.12em",
+                                  textTransform: "uppercase",
                                   cursor: "pointer",
                                 }}
                               >
                                 {t("resume")}
                               </button>
                             )}
-                            <span style={{ fontSize: 10, color: "#6b7c8c", alignSelf: "center" }}>
+                            <span style={{ fontSize: 10, color: "var(--text-dim)", alignSelf: "center" }}>
                               ~{estimateTtsSeconds(msg.text, ttsRate)}s
                             </span>
                           </div>
@@ -3996,7 +4299,7 @@ function ObjectOverlay({
                   </div>
                 ))}
                 {chatLoading && (
-                  <p style={{ margin: 0, fontSize: 11, color: "#185FA5", fontStyle: "italic" }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--green)", fontStyle: "italic" }}>
                     {t("aiThinking")}
                   </p>
                 )}
@@ -4019,17 +4322,35 @@ function ObjectOverlay({
                 disabled={chatLoading || sttLoadingModel || sttStarting}
                 aria-label="Microfono"
                 style={{
-                  border: "1px solid #cfd8e3",
-                  borderRadius: 10,
+                  border: "1px solid rgba(92,191,128,0.35)",
+                  borderRadius: 999,
                   padding: "0 12px",
-                  background: sttRecording ? "#c32020" : "#fff",
-                  color: sttRecording ? "#fff" : "#185FA5",
+                  background: sttRecording ? "rgba(224,90,74,0.14)" : "var(--green-dim)",
+                  color: sttRecording ? "#e05a4a" : "var(--green)",
                   cursor: chatLoading || sttLoadingModel || sttStarting ? "not-allowed" : "pointer",
-                  fontSize: 14,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 42,
+                  height: 36,
+                  fontSize: 0,
                   fontWeight: 700,
                 }}
               >
-                {sttStarting || sttLoadingModel ? "…" : (sttRecording ? "■" : "🎙")}
+                {sttStarting || sttLoadingModel ? (
+                  <span style={{ fontSize: 14, lineHeight: 1, color: "currentColor" }}>…</span>
+                ) : sttRecording ? (
+                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <rect x="4" y="4" width="8" height="8" rx="2" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      fill="currentColor"
+                      d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.08A7 7 0 0 0 19 11Z"
+                    />
+                  </svg>
+                )}
               </button>
               <input
                 type="text"
@@ -4043,13 +4364,14 @@ function ObjectOverlay({
                 disabled={sttRecording}
                 style={{
                   flex: 1,
-                  border: "1px solid #cfd8e3",
-                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  borderRadius: 14,
                   padding: "10px 12px",
-                  fontSize: 16,
+                  fontSize: 14,
                   lineHeight: 1.35,
                   outline: "none",
-                  background: sttRecording ? "#f3f6fa" : "#fff",
+                  background: "var(--bg-panel)",
+                  color: "var(--text)",
                   touchAction: "manipulation",
                 }}
               />
@@ -4057,13 +4379,16 @@ function ObjectOverlay({
                 type="submit"
                 disabled={chatLoading || !chatInput.trim()}
                 style={{
-                  border: "none",
-                  borderRadius: 10,
-                  background: chatLoading || !chatInput.trim() ? "#9db4cc" : "#185FA5",
-                  color: "#fff",
+                  border: `1px solid ${chatLoading || !chatInput.trim() ? "rgba(255,255,255,0.08)" : "var(--green)"}`,
+                  borderRadius: 14,
+                  background: chatLoading || !chatInput.trim() ? "rgba(255,255,255,0.06)" : "var(--green)",
+                  color: chatLoading || !chatInput.trim() ? "var(--text-faint)" : "#0d0d0d",
                   padding: "0 16px",
-                  fontSize: 13,
-                  fontWeight: 600,
+                  fontFamily: "var(--font-head)",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
                   cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer",
                   whiteSpace: "nowrap",
                 }}
@@ -4077,7 +4402,7 @@ function ObjectOverlay({
               </p>
             )}
             {!sttError && !sttRecording && typeof window !== "undefined" && !window.isSecureContext && (
-              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--text-dim)" }}>
                 Microfono: serve HTTPS (su iPhone/Chrome) oppure localhost.
               </p>
             )}
@@ -4087,17 +4412,17 @@ function ObjectOverlay({
               </p>
             )}
             {sttLoadingModel && !sttError && (
-              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--text-dim)" }}>
                 Caricamento riconoscimento vocale…
               </p>
             )}
             {sttStarting && !sttError && !sttLoadingModel && (
-              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--text-dim)" }}>
                 Avvio microfono…
               </p>
             )}
             {sttRecording && !sttError && !sttLoadingModel && (
-              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#6b7c8c" }}>
+              <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--text-dim)" }}>
                 Sto ascoltando… premi ■ per fermare
               </p>
             )}
@@ -4109,25 +4434,50 @@ function ObjectOverlay({
         {showNav && isObjectInPath && !isGuidedVirtualTextItem && (
           <div style={{
             display: "flex", justifyContent: "space-between",
-            padding: "12px 24px", borderTop: "1px solid #eee", flexShrink: 0,
-            background: "#fff", position: "sticky", bottom: 0, zIndex: 1,
+            padding: "12px 18px",
+            borderTop: "1px solid var(--border)",
+            flexShrink: 0,
+            background: "var(--bg-panel)",
+            position: "sticky",
+            bottom: 0,
+            zIndex: 1,
           }}>
             <button
               onClick={handlePrev}
               style={{
-                padding: "8px 20px", borderRadius: 8,
-                border: "1.5px solid #ccc", background: "transparent",
-                fontWeight: 600, fontSize: 14, cursor: "pointer",
+                padding: "10px 14px",
+                borderRadius: 14,
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-dim)",
+                fontFamily: "var(--font-head)",
+                fontWeight: 500,
+                fontSize: 10,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                cursor: "pointer",
               }}
-            >{t("prev")}</button>
+            >
+              ← {t("prev")}
+            </button>
             <button
               onClick={handleNext}
               style={{
-                padding: "8px 20px", borderRadius: 8,
-                border: "none", background: "#185FA5", color: "#fff",
-                fontWeight: 600, fontSize: 14, cursor: "pointer",
+                padding: "10px 14px",
+                borderRadius: 14,
+                border: "1px solid var(--green)",
+                background: "var(--green)",
+                color: "#0d0d0d",
+                fontFamily: "var(--font-head)",
+                fontWeight: 500,
+                fontSize: 10,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                cursor: "pointer",
               }}
-            >{t("next")}</button>
+            >
+              {t("next")} →
+            </button>
           </div>
         )}
       </div>
