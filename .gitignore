@@ -6,9 +6,11 @@ dist/
 .env
 # secrets
 server/openAPI/.env
-<<<<<<< HEAD
-=======
 
-# secrets
-server/openAPI/.env
->>>>>>> cceb6bf (wip)
+# QR code dumps (asset stampabili specifici del deploy)
+qr_dump/
+server/openAPI/qr_dump/
+
+# TLS keys (cert pubblici si possono committare, le chiavi mai)
+*.key
+navigator/UI/bff/cert/bff.key

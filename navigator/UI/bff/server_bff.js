@@ -13,6 +13,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import http from "http";
+import https from "https";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { Agent, fetch } from "undici";
@@ -342,14 +344,61 @@ app.use((err, req, res, next) => {
 
 // ============================================================
 // AVVIO + GRACEFUL SHUTDOWN
+//
+// Cert dedicato al BFF in cert/bff.{crt,key}: serve a far funzionare la
+// fotocamera (QR-gate) da iPhone Safari, che richiede HTTPS valido. Il
+// cert dell'OpenAPI (server/openAPI/cert/) NON viene toccato.
+//
+// Override via .env:
+//   BFF_TLS_CERT, BFF_TLS_KEY  → path espliciti
+//   BFF_FORCE_HTTP=true        → forza HTTP anche se i cert ci sono
 // ============================================================
-const server = app.listen(BFF_PORT, BFF_HOST, () => {
-  console.log(`\n✅ BFF in ascolto su http://${BFF_HOST}:${BFF_PORT}`);
-  console.log(`   🗺️  Viewer:      http://${BFF_HOST}:${BFF_PORT}/`);
-  console.log(`   ✏️  Editor:      http://${BFF_HOST}:${BFF_PORT}/editor`);
-  console.log(`   🛒 Marketplace: http://${BFF_HOST}:${BFF_PORT}/marketplace`);
+function loadTlsOptions() {
+  if (String(process.env.BFF_FORCE_HTTP || "").trim().toLowerCase() === "true") {
+    return null;
+  }
+  const candidates = [];
+  const certEnv = String(process.env.BFF_TLS_CERT || "").trim();
+  const keyEnv  = String(process.env.BFF_TLS_KEY  || "").trim();
+  if (certEnv && keyEnv) {
+    candidates.push({ cert: certEnv, key: keyEnv });
+  }
+  candidates.push({
+    cert: path.resolve(__dirname, "cert/bff.crt"),
+    key:  path.resolve(__dirname, "cert/bff.key"),
+  });
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c.cert) && fs.existsSync(c.key)) {
+        return {
+          cert: fs.readFileSync(c.cert),
+          key:  fs.readFileSync(c.key),
+        };
+      }
+    } catch (_) { /* prova il prossimo */ }
+  }
+  return null;
+}
+
+const tlsOptions = loadTlsOptions();
+const useTls = !!tlsOptions;
+const proto = useTls ? "https" : "http";
+const server = useTls
+  ? https.createServer(tlsOptions, app)
+  : http.createServer(app);
+
+server.listen(BFF_PORT, BFF_HOST, () => {
+  console.log(`\n✅ BFF in ascolto su ${proto}://${BFF_HOST}:${BFF_PORT}${useTls ? " (TLS)" : ""}`);
+  console.log(`   🗺️  Viewer:      ${proto}://${BFF_HOST}:${BFF_PORT}/`);
+  console.log(`   ✏️  Editor:      ${proto}://${BFF_HOST}:${BFF_PORT}/editor`);
+  console.log(`   🛒 Marketplace: ${proto}://${BFF_HOST}:${BFF_PORT}/marketplace`);
   console.log(`   📡 Proxy API:   /api/* → ${API_BASE}/*`);
-  console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*\n`);
+  console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*`);
+  if (!useTls) {
+    console.log("   ⚠️  TLS disattivato: la fotocamera (QR-gate) non funziona su iPhone via http://");
+    console.log("       Genera cert/bff.{crt,key} oppure imposta BFF_TLS_CERT / BFF_TLS_KEY in .env.");
+  }
+  console.log("");
 });
 
 const shutdown = (signal) => {

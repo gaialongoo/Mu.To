@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getStoredNavLang, useNavLang } from "../i18n/NavLangContext";
 import { createModel, type Model, type KaldiRecognizer } from "vosk-browser";
+import QrGate from "./QrGate";
+import {
+  isMobileDevice,
+  isObjectUnlocked,
+  markObjectUnlocked,
+} from "../utils/qrUnlock";
 
 declare global {
   interface Window {
@@ -67,6 +73,86 @@ const MOBILE_BREAKPOINT = 768;
 // Nota: vosk-browser richiede un tar.gz con cartella `model/` interna (non zip).
 const VOSK_MODEL_BASE_URL =
   "https://raw.githubusercontent.com/gaialongoo/Mu.To/main/navigator/UI/bff/viewer/public";
+
+/**
+ * Cache modulo del modello Vosk: cosi' apriamo la scheda di un oggetto
+ * (e quindi rimontiamo ObjectOverlay) il modello e' gia' pronto e non
+ * mostriamo piu' "Caricamento riconoscimento vocale...". E' anche un
+ * dedup degli inflight: se due overlay si aprono in rapida successione
+ * (es. utente che cambia oggetto), aspettano la stessa promise.
+ */
+type VoskModelCache = { lang: string; model: Model };
+let voskModelCache: VoskModelCache | null = null;
+let voskModelInflight: Promise<Model> | null = null;
+let voskModelInflightLang: string | null = null;
+
+function voskUrlFor(lang: string): string {
+  if (lang === "fr") return `${VOSK_MODEL_BASE_URL}/vosk-model-fr.tar.gz`;
+  if (lang === "en") return `${VOSK_MODEL_BASE_URL}/vosk-model-en.tar.gz`;
+  return `${VOSK_MODEL_BASE_URL}/vosk-model-it.tar.gz`;
+}
+function voskLocalUrlFor(lang: string): string {
+  if (lang === "fr") return "/vosk-model-fr.tar.gz";
+  if (lang === "en") return "/vosk-model-en.tar.gz";
+  return "/vosk-model-it.tar.gz";
+}
+
+/**
+ * Carica il modello Vosk una sola volta per lingua (modulo-level).
+ * Tornano subito tutti i chiamanti se gia' cached o in volo.
+ * `onLoading` permette al chiamante di riflettere lo stato in UI;
+ * non viene chiamato se la cache e' calda.
+ */
+async function loadVoskModelOnce(
+  lang: string,
+  onLoading?: (loading: boolean) => void
+): Promise<Model> {
+  const remoteUrl = voskUrlFor(lang);
+  const localUrl = voskLocalUrlFor(lang);
+  if (voskModelCache && voskModelCache.lang === remoteUrl) {
+    return voskModelCache.model;
+  }
+  if (voskModelInflight && voskModelInflightLang === remoteUrl) {
+    return voskModelInflight;
+  }
+  // Lingua diversa: invalida la cache precedente per liberare memoria.
+  if (voskModelCache && voskModelCache.lang !== remoteUrl) {
+    try { (voskModelCache.model as any)?.terminate?.(); } catch { /* noop */ }
+    voskModelCache = null;
+  }
+  voskModelInflightLang = remoteUrl;
+  onLoading?.(true);
+  voskModelInflight = (async () => {
+    try {
+      const m = await Promise.race([
+        createModel(remoteUrl, -1),
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 12000)
+        ),
+      ]);
+      voskModelCache = { lang: remoteUrl, model: m };
+      return m;
+    } catch (errRemote) {
+      try {
+        const m2 = await Promise.race([
+          createModel(localUrl, -1),
+          new Promise<never>((_resolve, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 12000)
+          ),
+        ]);
+        voskModelCache = { lang: remoteUrl, model: m2 };
+        return m2;
+      } catch {
+        throw errRemote;
+      }
+    } finally {
+      voskModelInflight = null;
+      voskModelInflightLang = null;
+      onLoading?.(false);
+    }
+  })();
+  return voskModelInflight;
+}
 
 /* ===================== STANZA / PATH LOGIC ===================== */
 
@@ -160,6 +246,14 @@ export default function SvgViewer() {
     return () => window.removeEventListener("mu-nav-lang-changed", clearPrefs);
   }, []);
 
+  // Preload del modello STT in background appena il viewer monta.
+  // Cosi' quando l'utente apre la prima scheda oggetto la cache e' gia'
+  // calda e non vede mai "Caricamento riconoscimento vocale...".
+  useEffect(() => {
+    const l = (lang === "en" || lang === "fr" || lang === "it") ? lang : "it";
+    void loadVoskModelOnce(l).catch(() => { /* offline / errore: silenzioso */ });
+  }, [lang]);
+
   const [session, setSession] = useState<Session | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(() => {
     try {
@@ -241,11 +335,24 @@ export default function SvgViewer() {
   }, []);
 
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
+  const [qrGate, setQrGate] = useState<{ museo: string; oggetto: string } | null>(null);
   // Mobile: default delock (freeExplore=true). Desktop: default lock (freeExplore=false).
   const [freeExplore, setFreeExplore] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.innerWidth <= MOBILE_BREAKPOINT;
   });
+
+  // Listener QR-gate: i click sugli oggetti su mobile dispatchano "mu-qr-gate-open"
+  // (vedi requestOpenObject). Quando arriva, mostriamo il <QrGate>.
+  useEffect(() => {
+    const onOpen = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ museo: string; oggetto: string }>).detail;
+      if (!detail || !detail.museo || !detail.oggetto) return;
+      setQrGate({ museo: detail.museo, oggetto: detail.oggetto });
+    };
+    window.addEventListener("mu-qr-gate-open", onOpen);
+    return () => window.removeEventListener("mu-qr-gate-open", onOpen);
+  }, []);
   const freeExploreRef = useRef(freeExplore);
   freeExploreRef.current = freeExplore;
   const promptInputRef = useRef<HTMLInputElement | null>(null);
@@ -1080,17 +1187,20 @@ export default function SvgViewer() {
                   setTutorialOpen(false);
                 }}
                 style={{
-                  width: 30,
-                  height: 30,
+                  width: 32,
+                  height: 32,
                   borderRadius: "50%",
-                  border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--text-dim)",
+                  border: "1px solid rgba(224, 65, 56, 0.65)",
+                  background: "rgba(224, 65, 56, 0.18)",
+                  color: "#ff5b4f",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontWeight: 700,
+                  fontSize: 16,
+                  lineHeight: 1,
+                  boxShadow: "0 8px 24px rgba(224, 65, 56, 0.35), 0 0 0 1px rgba(255,255,255,0.04) inset",
                 }}
                 aria-label="Chiudi tutorial"
               >
@@ -1706,6 +1816,21 @@ export default function SvgViewer() {
           onClose={closeObjectFocus}
           showNav={!isGuidedStudent}
           domDataObjectType={readDomDataObjectType(focusedObject)}
+        />
+      )}
+
+      {qrGate && (
+        <QrGate
+          museo={qrGate.museo}
+          oggetto={qrGate.oggetto}
+          objectTitle={qrGate.oggetto}
+          onSuccess={() => {
+            const { museo, oggetto } = qrGate;
+            markObjectUnlocked(museo, oggetto);
+            setQrGate(null);
+            openObjectFocus(oggetto);
+          }}
+          onClose={() => setQrGate(null)}
         />
       )}
 
@@ -2690,7 +2815,7 @@ function replaceCircleWithImage(
     imgEl.style.cursor = "pointer";
     imgEl.addEventListener("click", (e) => {
       e.stopPropagation();
-      openObjectFocus(nome);
+      requestOpenObject(nome, museo, objectType);
     });
 
     // Label <text> è sempre il nextElementSibling del cerchio
@@ -2927,6 +3052,45 @@ function openObjectFocus(nome: string) {
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
+type QrGateRequestDetail = {
+  museo: string;
+  oggetto: string;
+};
+
+/**
+ * Click su un oggetto: su mobile attiva il QR-gate prima di aprire la scheda,
+ * su desktop apre direttamente. Bypassano sempre il gate:
+ *   - item virtuali / testo guidato / stanze speciali
+ *   - sessioni di visita guidata (teacher o student): in classe non e'
+ *     pratico far scansionare il QR a tutti gli studenti; il professore ha
+ *     gia' validato la presenza fisica.
+ */
+function requestOpenObject(nome: string, museo: string, dataType: string) {
+  const safeName = String(nome || "").trim();
+  if (!safeName) return;
+  const isVirtualText =
+    safeName.startsWith("__text__") ||
+    String(dataType || "").toLowerCase() === "text" ||
+    isSpecialRouteNode(safeName);
+  const session = getSession();
+  const isGuidedVisit = !!(session && (session.guideRole || session.guidedVisitId));
+  if (
+    !isMobileDevice() ||
+    isVirtualText ||
+    isGuidedVisit ||
+    !museo ||
+    isObjectUnlocked(museo, safeName)
+  ) {
+    openObjectFocus(safeName);
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent<QrGateRequestDetail>("mu-qr-gate-open", {
+      detail: { museo, oggetto: safeName },
+    })
+  );
+}
+
 function closeObjectFocus() {
   const url = new URL(window.location.href);
   url.searchParams.delete("oggetto");
@@ -2953,7 +3117,7 @@ function bindObjectClicks(svg: SVGSVGElement, session: Session) {
     // ← era pointerdown + preventDefault: su Android richiedeva tap lungo
     circle.addEventListener("click", e => {
       e.stopPropagation();
-      openObjectFocus(nome);
+      requestOpenObject(nome, session.museo, dataType);
     });
 
     replaceCircleWithImage(svg, circle, nome, session.museo, dataType);
@@ -3003,6 +3167,9 @@ function ObjectOverlay({
   const [ttsPaused, setTtsPaused] = useState(false);
   const [ttsRate, setTtsRate] = useState(1);
   const [ttsRange, setTtsRange] = useState<{ start: number; end: number } | null>(null);
+  const ttsRateRef = useRef(1);
+  const ttsPausedRef = useRef(false);
+  const ttsLiveRestartTimerRef = useRef<number | null>(null);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const ttsKeyRef = useRef<string | null>(null);
@@ -3347,7 +3514,7 @@ function ObjectOverlay({
         if (ttsFallbackStartedRef.current && ttsWordRangesRef.current.length > 0 && !ttsFallbackTimerRef.current) {
           ttsFallbackStartTsRef.current = Date.now();
           ttsFallbackTimerRef.current = window.setInterval(() => {
-            const rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+            const rate = Math.max(0.6, Math.min(1.6, Number(ttsRateRef.current) || 1));
             const wps = 2.5 * rate;
             const elapsedMs = ttsFallbackElapsedBeforePauseRef.current + Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
             const wordIdx = Math.floor((elapsedMs / 1000) * wps);
@@ -3392,7 +3559,7 @@ function ObjectOverlay({
       ttsFallbackTimerRef.current = null;
     }
     ttsFallbackTimerRef.current = window.setInterval(() => {
-      const rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+      const rate = Math.max(0.6, Math.min(1.6, Number(ttsRateRef.current) || 1));
       const wps = 2.5 * rate;
       const elapsedMs = ttsFallbackElapsedBeforePauseRef.current + Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
       const wordIdx = Math.floor((elapsedMs / 1000) * wps);
@@ -3421,7 +3588,7 @@ function ObjectOverlay({
     const desiredLang = lang === "en" || lang === "fr" || lang === "it" ? lang : "it";
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = desiredLang;
-    u.rate = Math.max(0.6, Math.min(1.6, Number(ttsRate) || 1));
+    u.rate = Math.max(0.6, Math.min(1.6, Number(ttsRateRef.current) || 1));
     try {
       const v =
         voicesNow.find((vv) => String(vv?.lang || "").toLowerCase().startsWith(`${desiredLang}-`)) ||
@@ -3447,6 +3614,10 @@ function ObjectOverlay({
     };
 
     u.onstart = () => {
+      // La nuova utterance e' partita: gli onend/onerror dell'utterance precedente
+      // (cancellata) sono gia' stati assorbiti, quindi possiamo riabilitare il
+      // normale teardown di onend.
+      ttsPausingRef.current = false;
       // Fallback highlight: se non arrivano boundary dopo un attimo, evidenziamo “a tempo”.
       setTimeout(() => {
         if (!gotBoundary && ttsKeyRef.current === key) startTtsHighlightFallback(ttsFullTextRef.current);
@@ -3473,7 +3644,14 @@ function ObjectOverlay({
       ttsCharIndexRef.current = 0;
       ttsManualRemainingRef.current = "";
     };
-    u.onerror = () => {
+    u.onerror = (ev: any) => {
+      // Se la cancel l'abbiamo provocata noi (pausa / live-rate restart) o
+      // l'errore e' un "interrupted/canceled" causato da cancel(), non e' un
+      // vero errore: non mostrare il toast e non azzerare lo stato.
+      const errType = String(ev?.error || "").toLowerCase();
+      if (ttsPausingRef.current || errType === "interrupted" || errType === "canceled") {
+        return;
+      }
       setTtsBusyKey(null);
       ttsKeyRef.current = null;
       setTtsError("Sintesi vocale non disponibile in questo browser.");
@@ -3570,68 +3748,107 @@ function ObjectOverlay({
     setTtsError("Sintesi vocale non disponibile in questo browser.");
   };
 
+  // Mantieni i ref allineati allo stato dello slider e del pause.
+  useEffect(() => { ttsRateRef.current = ttsRate; }, [ttsRate]);
+  useEffect(() => { ttsPausedRef.current = ttsPaused; }, [ttsPaused]);
+
+  // Live update della velocita TTS: l'API speechSynthesis non permette di
+  // cambiare rate su un'utterance gia in corso. Quando lo slider cambia
+  // mentre stiamo parlando (e non siamo in pausa), facciamo un soft-restart:
+  // cancelliamo l'utterance corrente e ripartiamo dal char index attuale
+  // con la nuova velocita. L'effetto e' percettivamente un cambio "live".
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const key = ttsKeyRef.current;
+    if (!key) return;             // niente in playback
+    if (ttsPausedRef.current) return; // se in pausa, la nuova rate verra' usata al resume
+    const fullText = String(ttsFullTextRef.current || "");
+    const idxFromRange = ttsRange?.end != null ? Number(ttsRange.end) : 0;
+    const charIdx = Math.max(
+      0,
+      Math.min(
+        fullText.length,
+        Math.max(ttsCharIndexRef.current || 0, Number.isFinite(idxFromRange) ? idxFromRange : 0)
+      )
+    );
+    const remaining = fullText.slice(charIdx).trimStart();
+    if (!remaining) return;
+
+    // Dedup: se c'e' gia' un restart pendente (drag rapido dello slider), annulla
+    // quello vecchio. Poi marca il flag perche' onerror/onend ignorino la cancel.
+    if (ttsLiveRestartTimerRef.current) {
+      try { window.clearTimeout(ttsLiveRestartTimerRef.current); } catch {}
+      ttsLiveRestartTimerRef.current = null;
+    }
+    ttsPausingRef.current = true;
+    try { window.speechSynthesis.cancel(); } catch {}
+    if (ttsFallbackTimerRef.current) {
+      try { window.clearInterval(ttsFallbackTimerRef.current); } catch {}
+      ttsFallbackTimerRef.current = null;
+    }
+    if (ttsFallbackStartedRef.current) {
+      const elapsed = Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
+      ttsFallbackElapsedBeforePauseRef.current += elapsed;
+    }
+
+    // Lascio piu' tempo (~120ms) tra cancel e speak: Chrome a volte
+    // emette onerror sull'utterance cancellata se ricomincio troppo presto.
+    ttsLiveRestartTimerRef.current = window.setTimeout(() => {
+      ttsLiveRestartTimerRef.current = null;
+      // Se nel frattempo l'utente ha pausato/stoppato, abbandona.
+      if (!ttsKeyRef.current || ttsPausedRef.current) {
+        ttsPausingRef.current = false;
+        return;
+      }
+      void startUtterance(remaining, key, { isResume: true });
+    }, 120);
+
+    return () => {
+      if (ttsLiveRestartTimerRef.current) {
+        try { window.clearTimeout(ttsLiveRestartTimerRef.current); } catch {}
+        ttsLiveRestartTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsRate]);
+
   const ensureVoskModel = async (): Promise<Model> => {
     const currentLang = (lang === "en" || lang === "fr" || lang === "it") ? lang : "it";
-    const remoteModelUrl = currentLang === "fr"
-      ? `${VOSK_MODEL_BASE_URL}/vosk-model-fr.tar.gz`
-      : currentLang === "en"
-        ? `${VOSK_MODEL_BASE_URL}/vosk-model-en.tar.gz`
-        : `${VOSK_MODEL_BASE_URL}/vosk-model-it.tar.gz`;
-    // Fallback locale (se disponibile nello stesso host)
-    const localModelUrl = currentLang === "fr"
-      ? "/vosk-model-fr.tar.gz"
-      : currentLang === "en"
-        ? "/vosk-model-en.tar.gz"
-        : "/vosk-model-it.tar.gz";
-    const modelUrl = remoteModelUrl;
-
-    if (voskModelRef.current && voskModelLangRef.current === modelUrl) {
-      return voskModelRef.current;
-    }
-    try { voskModelRef.current?.terminate?.(); } catch {}
-    voskModelRef.current = null;
-    voskModelLangRef.current = modelUrl;
-    setSttLoadingModel(true);
+    const remoteModelUrl = voskUrlFor(currentLang);
+    const localModelUrl = voskLocalUrlFor(currentLang);
     try {
-      // Chrome può “appendersi” se worker/wasm è bloccato: mettiamo timeout + hint.
-      const m = await Promise.race([
-        createModel(modelUrl, -1),
-        new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 12000)
-        ),
-      ]);
+      const m = await loadVoskModelOnce(currentLang, (loading) => {
+        // Lo spinner appare solo quando la cache e' davvero fredda.
+        setSttLoadingModel(loading);
+      });
       voskModelRef.current = m;
+      voskModelLangRef.current = remoteModelUrl;
       return m;
     } catch (e: any) {
-      // Prova fallback locale (utile in sviluppo o se raw GitHub è bloccato).
-      try {
-        const m2 = await Promise.race([
-          createModel(localModelUrl, -1),
-          new Promise<never>((_resolve, reject) =>
-            setTimeout(() => reject(new Error("timeout")), 12000)
-          ),
-        ]);
-        voskModelRef.current = m2;
-        voskModelLangRef.current = localModelUrl;
-        return m2;
-      } catch {}
       const msg = e?.message || "Impossibile caricare il modello STT";
       const isIso = typeof window !== "undefined" ? (window as any).crossOriginIsolated : false;
       const hint =
         msg === "timeout"
           ? `Caricamento STT bloccato (Chrome). Prova a ricaricare la pagina. Se persiste: abilita COOP/COEP (crossOriginIsolated=${isIso ? "true" : "false"}).`
-          : `Controlla URL modello: ${modelUrl} (o fallback ${localModelUrl}).`;
+          : `Controlla URL modello: ${remoteModelUrl} (o fallback ${localModelUrl}).`;
       setSttError(`${msg === "timeout" ? "STT timeout" : msg}. ${hint}`);
       throw e;
-    } finally {
-      setSttLoadingModel(false);
     }
   };
 
-  // Precarica il modello STT appena apri overlay (riduce i ~10s su iPhone).
+  // Precarica il modello STT in background appena la chat e' visibile.
+  // Grazie alla cache modulo-level, dalla 2a apertura in poi non si vede
+  // piu' il messaggio "Caricamento riconoscimento vocale..." perche' il
+  // modello e' gia' pronto e onLoading non viene chiamato.
   useEffect(() => {
     if (!showObjectChat) return;
-    // non prefetch se già caricato
+    const currentLang = (lang === "en" || lang === "fr" || lang === "it") ? lang : "it";
+    if (voskModelCache && voskModelCache.lang === voskUrlFor(currentLang)) {
+      // Cache calda: niente UI di loading, mantieni solo il ref locale.
+      voskModelRef.current = voskModelCache.model;
+      voskModelLangRef.current = voskModelCache.lang;
+      return;
+    }
     ensureVoskModel().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showObjectChat, lang]);
@@ -4058,34 +4275,47 @@ function ObjectOverlay({
             top: 8,
             right: 8,
             zIndex: 20,
-            width: 28,
-            height: 28,
+            width: 32,
+            height: 32,
             borderRadius: "50%",
-            border: "1px solid var(--border)",
+            border: "1px solid rgba(224, 65, 56, 0.65)",
             padding: 0,
-            background: "transparent",
-            color: "var(--text-dim)",
-            fontSize: 14,
+            background: "rgba(224, 65, 56, 0.18)",
+            color: "#ff5b4f",
+            fontSize: 16,
             lineHeight: 1,
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+            boxShadow: "0 8px 24px rgba(224, 65, 56, 0.35), 0 0 0 1px rgba(255,255,255,0.04) inset",
           }}
         >
           ✕
         </button>
+        {/* ── Scroll unico: galleria + testo. La galleria scrolla insieme
+             al testo invece di restare ancorata: su mobile evita che occupi
+             sempre meta del popup. ── */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            touchAction: "pan-y",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
+          }}
+        >
         {/* ── Slider immagini ── */}
         {immagini.length > 0 && (
-          <div style={{ position: "relative", background: "var(--bg-panel)", flexShrink: 0 }}>
+          <div style={{ position: "relative", background: "var(--bg-panel)" }}>
             <img
               src={`${API_BASE}${immagini[slideIdx].url}`}
               alt={immagini[slideIdx].tipo}
               style={{
                 width: "100%",
-                maxHeight: 260,
+                maxHeight: "clamp(140px, 30vh, 260px)",
                 objectFit: "contain",
                 display: "block",
               }}
@@ -4141,14 +4371,20 @@ function ObjectOverlay({
               </>
             )}
 
-            {/* etichetta tipo */}
+            {/* etichetta tipo — spostata a sinistra per non sovrapporsi alla X di chiusura */}
             <div style={{
-              position: "absolute", top: 8, right: 8,
+              position: "absolute", top: 8, left: 8,
               background: "rgba(0,0,0,0.5)", color: "#fff",
               fontSize: 11, padding: "2px 8px", borderRadius: 10,
               backdropFilter: "blur(4px)",
+              maxWidth: "calc(100% - 60px)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}>
-              {immagini[slideIdx].tipo}
+              {immagini.length > 1
+                ? `${slideIdx + 1}/${immagini.length} · ${immagini[slideIdx].tipo}`
+                : immagini[slideIdx].tipo}
             </div>
           </div>
         )}
@@ -4157,12 +4393,6 @@ function ObjectOverlay({
         <div
           style={{
             padding: "20px 24px",
-            overflowY: "auto",
-            flex: 1,
-            minHeight: 0,
-            touchAction: "pan-y",
-            WebkitOverflowScrolling: "touch",
-            overscrollBehavior: "contain",
           }}
         >
           <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 500, fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>{objectTitle}</h2>
@@ -4259,22 +4489,34 @@ function ObjectOverlay({
                     </button>
                   )}
                 </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                    {t("ttsEta")}: ~{estimateTtsSeconds(descrizione, ttsRate)}s
-                  </span>
-                  <label style={{ fontSize: 11, color: "var(--text-dim)", display: "flex", gap: 6, alignItems: "center" }}>
-                    {t("ttsRate")}
-                    <input
-                      type="range"
-                      min="0.8"
-                      max="1.4"
-                      step="0.05"
-                      value={ttsRate}
-                      onChange={(e) => setTtsRate(Number(e.target.value))}
-                    />
-                    <span style={{ minWidth: 34, textAlign: "right" }}>{ttsRate.toFixed(2)}×</span>
-                  </label>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 6,
+                    padding: "10px 12px",
+                    background: "var(--bg-panel)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 11, color: "var(--text-dim)" }}>
+                    <span style={{ fontFamily: "var(--font-head)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 10, color: "var(--green)" }}>
+                      {t("ttsRate")}
+                    </span>
+                    <span>
+                      {ttsRate.toFixed(2)}× · ~{estimateTtsSeconds(descrizione, ttsRate)}s
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.8"
+                    max="1.4"
+                    step="0.05"
+                    value={ttsRate}
+                    onChange={(e) => setTtsRate(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--green)" }}
+                    aria-label={t("ttsRate")}
+                  />
                 </div>
               </div>
             )
@@ -4336,10 +4578,10 @@ function ObjectOverlay({
             {(chatMessages.length > 0 || chatLoading) && (
               <div
                 style={{
-                  maxHeight: 200,
+                  maxHeight: "min(55vh, 460px)",
                   overflowY: "auto",
                   borderRadius: 16,
-                  padding: 10,
+                  padding: 12,
                   background: "var(--bg-panel)",
                   border: "1px solid var(--border)",
                   marginBottom: 10,
@@ -4348,11 +4590,6 @@ function ObjectOverlay({
                   overscrollBehavior: "contain",
                 }}
               >
-                {chatMessages.length > 0 && !chatLoading && (
-                  <p style={{ margin: "0 0 8px", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
-                    {t("aiHelpFollow")}
-                  </p>
-                )}
                 {chatMessages.map((msg, idx) => (
                   <div
                     key={`${msg.role}-${idx}`}
@@ -4365,14 +4602,14 @@ function ObjectOverlay({
                     <div
                       style={{
                         maxWidth: "92%",
-                        padding: "8px 11px",
-                        borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        background: msg.role === "user" ? "var(--green)" : "var(--bg-card)",
+                        padding: "10px 12px",
+                        borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+                        fontSize: 12.5,
+                        lineHeight: 1.55,
+                        background: msg.role === "user" ? "var(--green)" : "rgba(92,191,128,0.08)",
                         color: msg.role === "user" ? "#0d0d0d" : "var(--text)",
-                        boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
-                        border: msg.role === "user" ? "1px solid rgba(92,191,128,0.35)" : "1px solid var(--border)",
+                        boxShadow: msg.role === "user" ? "0 12px 30px rgba(0,0,0,0.25)" : "0 6px 18px rgba(0,0,0,0.18)",
+                        border: msg.role === "user" ? "1px solid rgba(92,191,128,0.35)" : "1px solid rgba(92,191,128,0.18)",
                       }}
                     >
                       <div style={{ display: "grid", gap: 6 }}>
@@ -4438,7 +4675,7 @@ function ObjectOverlay({
                               </button>
                             )}
                             <span style={{ fontSize: 10, color: "var(--text-dim)", alignSelf: "center" }}>
-                              ~{estimateTtsSeconds(msg.text, ttsRate)}s
+                              {estimateTtsSeconds(msg.text, ttsRate)}s
                             </span>
                           </div>
                         )}
@@ -4576,6 +4813,7 @@ function ObjectOverlay({
             )}
           </div>
           )}
+        </div>
         </div>
 
         {/* ── Navigazione percorso ── */}

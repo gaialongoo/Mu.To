@@ -1943,6 +1943,17 @@
     updateAuthButtons();
     closeProfileOverlay();
     setAuthMode("login");
+    try {
+      // Pulizia QR sblocchi (vedi src/utils/qrUnlock.ts: prefisso "muto_qr_unlocked_")
+      const keysToDrop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("muto_qr_unlocked_") === 0) keysToDrop.push(k);
+      }
+      keysToDrop.forEach(k => localStorage.removeItem(k));
+    } catch (_) {
+      /* ignora storage non disponibile */
+    }
   }
 
   async function initAuthUi() {

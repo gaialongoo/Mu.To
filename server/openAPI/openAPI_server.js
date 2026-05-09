@@ -55,6 +55,7 @@ const SESSIONS_COLLECTION = "sessions";
 const PROFESSOR_CODES_COLLECTION = "professor_codes";
 const GUIDED_VISITS_COLLECTION = "guided_visits";
 const MARKETPLACE_OBJECT_REQUESTS_COLLECTION = "marketplace_object_requests";
+const QR_CODES_COLLECTION = "qr_codes";
 const SESSION_COOKIE_NAME = "muto_auth";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const MARKETPLACE_OBJECT_FIXED_PRICE = normalizePrezzo(process.env.MARKETPLACE_OBJECT_FIXED_PRICE || 25);
@@ -177,6 +178,10 @@ function verifyPassword(password, encoded) {
 }
 
 function hashProfessorCode(code) {
+  return crypto.createHash("sha256").update(String(code || "").trim()).digest("hex");
+}
+
+function hashQrCode(code) {
   return crypto.createHash("sha256").update(String(code || "").trim()).digest("hex");
 }
 
@@ -1351,6 +1356,19 @@ async function ensureUserIndexes() {
   });
 }
 
+async function ensureMuseiIndexes() {
+  const client = new MongoClient(MONGO_URI);
+  try {
+    await client.connect();
+    const col = client.db(DB_NAME).collection(QR_CODES_COLLECTION);
+    await col.createIndex({ hash: 1 }, { unique: true });
+    await col.createIndex({ museo: 1, oggetto: 1 });
+    await col.createIndex({ enabled: 1 });
+  } finally {
+    await client.close();
+  }
+}
+
 function parseCliArgs(argv) {
   const args = { bootstrapMode: "disk-override", help: false, version: false };
   for (let i = 0; i < argv.length; i++) {
@@ -1491,6 +1509,8 @@ async function startServer(cliOptions) {
   }
   await ensureUserIndexes();
   console.log("✅ Indici utenti/sessioni pronti");
+  await ensureMuseiIndexes();
+  console.log("✅ Indici musei/QR pronti");
 
   // --- Caricamento dati bootstrap ---
   let sistema;
@@ -3135,6 +3155,38 @@ async function startServer(cliOptions) {
       percorsi: museo.percorsi || [],
       labelI18n,
     });
+  });
+
+  // ==========================================================
+  // ROUTE — QR validate
+  // ==========================================================
+  app.post("/qr/validate", async (req, res) => {
+    const codice = String(req.body?.codice || "").trim();
+    const museo = String(req.body?.museo || "").trim();
+    const oggetto = String(req.body?.oggetto || "").trim();
+    if (!codice || !museo || !oggetto) {
+      return res.status(400).json({ error: "Parametri mancanti (codice, museo, oggetto)" });
+    }
+    const hash = hashQrCode(codice);
+    const client = new MongoClient(MONGO_URI);
+    try {
+      await client.connect();
+      const doc = await client
+        .db(DB_NAME)
+        .collection(QR_CODES_COLLECTION)
+        .findOne({ hash, museo, oggetto, enabled: true });
+      if (!doc) {
+        console.log(`QR validate KO museo='${museo}' oggetto='${oggetto}'`);
+        return res.status(404).json({ error: "Codice QR non valido per quest'opera" });
+      }
+      console.log(`QR validate OK museo='${museo}' oggetto='${oggetto}'`);
+      return res.json({ ok: true, museo, oggetto });
+    } catch (err) {
+      console.error("QR validate ERROR:", err?.message || err);
+      return res.status(500).json({ error: "Errore validazione QR" });
+    } finally {
+      await client.close();
+    }
   });
 
   // 3️⃣ Singolo oggetto

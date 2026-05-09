@@ -185,9 +185,71 @@ Note:
 
 ---
 
+## Codici QR oggetti
+
+Ogni oggetto del museo puo' avere un proprio codice QR fisico (stampato e affisso accanto all'opera). Lato **mobile** (touch + viewport <= 900px) il viewer richiede di inquadrare il QR specifico dell'oggetto **prima** di mostrare la scheda con descrizione/chat. Da desktop il comportamento e' invariato (apertura immediata).
+
+- **Per-oggetto**: 1 QR <-> 1 coppia `(museo, oggetto)`. Inquadrare il QR di un'altra opera produce errore.
+- **Hash only**: il QR contiene un secret in chiaro `<prefix>-<museo>-<oggetto>-<random>`; su MongoDB e' salvato **solo** `sha256(secret)` nella collection `musei.qr_codes`.
+- **Sblocco persistito**: una volta validato, l'oggetto resta sbloccato in `localStorage` (`muto_qr_unlocked_<museo>`) finche' l'utente non fa logout (la `logoutUser()` del viewer ripulisce queste chiavi).
+- **Item esenti dal gate**: stanze speciali (`in/out/shop/wc`), nodi virtuali di testo (`__text__...`) e oggetti `objectType="text"` aprono direttamente la scheda anche da mobile.
+- **Visite guidate esenti dal gate**: se la sessione ha `guideRole` (teacher/student) o `guidedVisitId`, il QR-gate viene saltato. Motivo: in classe non e' pratico far scansionare il QR a tutti gli studenti; il professore ha gia' validato la presenza fisica.
+
+### Endpoint
+
+```
+POST /qr/validate
+Headers: X-API-Key: <API_KEY>
+Body:    { "codice": "<contenuto QR>", "museo": "<nome>", "oggetto": "<nome>" }
+
+200 -> { "ok": true, "museo": "...", "oggetto": "..." }
+404 -> { "error": "Codice QR non valido per quest'opera" }
+400 -> parametri mancanti
+```
+
+### Generare i QR (CLI)
+
+Lo script crea i secret, fa upsert dei soli hash su MongoDB e genera i PNG dei QR in una cartella di dump (un file per oggetto + un `manifest.json`).
+
+```bash
+cd server/openAPI
+npm run gen:qr -- --museo Uffizi
+```
+
+Opzioni:
+
+```bash
+node scripts/generate_qr_codes.js   --museo Uffizi   --oggetti statua,dipinto,anfora   --out ./qr_dump/Uffizi   --length 24   --prefix MUTO   --regenerate
+```
+
+- `--museo` (obbligatorio) — nome del museo cosi' come compare in `musei.json`.
+- `--oggetti` — lista separata da virgola; default = tutti gli oggetti del museo letti da `musei.json` **escludendo gli item di solo testo** (`objectType="text"`, per cui il viewer non chiede mai il QR).
+- `--out` — cartella di output (default `server/openAPI/qr_dump/<museo>/`).
+- `--length` — lunghezza parte random del secret (default 24, range 8..64).
+- `--prefix` — prefisso del secret (default `MUTO`).
+- `--regenerate` — rimuove i QR precedenti per gli oggetti specificati prima di reinserirli (utile se devi ristampare).
+
+Output:
+
+```
+qr_dump/Uffizi/
+  statua.png
+  dipinto.png
+  anfora.png
+  manifest.json
+```
+
+Note:
+- I secret in chiaro vengono **stampati una sola volta** dallo script: salvali subito se ti servono, perche su Mongo e' memorizzato solo l'hash. Per riemettere il QR di un oggetto basta rilanciare lo script con `--regenerate --oggetti <nome>`.
+- La cartella `qr_dump/` e' ignorata da git (vedi `.gitignore`).
+- Collection: `musei.qr_codes` (campi: `hash`, `museo`, `oggetto`, `enabled`, `createdAt`).
+
+---
+
 ## Troubleshooting rapido
 
 - **401 / 403 API key**: verifica `X-API-Key` e `API_KEY` nel `.env`
 - **Mongo non raggiungibile**: controlla `MONGO_URI` e servizio Mongo attivo
 - **Viewer con mappa vuota/piccola**: verifica che esista il layout (`GET /musei/<nome>/layout`)
 - **Certificato HTTPS locale**: usa `curl -k` in ambiente sviluppo
+- **QR non valido su mobile**: controlla che il QR provenga dal museo+oggetto giusto e che il record sia presente con `enabled: true` nella collection `musei.qr_codes`. Per saltare il gate in dev, apri il viewer da desktop o disabilita il match `(pointer: coarse) and (max-width: 900px)`.
