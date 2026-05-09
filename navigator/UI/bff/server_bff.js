@@ -18,6 +18,7 @@ import https from "https";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { Agent, fetch } from "undici";
+import { startInternalServers, stopInternalServers } from "./lib/childServers.js";
 
 // ============================================================
 // PATH
@@ -387,27 +388,79 @@ const server = useTls
   ? https.createServer(tlsOptions, app)
   : http.createServer(app);
 
-server.listen(BFF_PORT, BFF_HOST, () => {
-  console.log(`\n✅ BFF in ascolto su ${proto}://${BFF_HOST}:${BFF_PORT}${useTls ? " (TLS)" : ""}`);
-  console.log(`   🗺️  Viewer:      ${proto}://${BFF_HOST}:${BFF_PORT}/`);
-  console.log(`   ✏️  Editor:      ${proto}://${BFF_HOST}:${BFF_PORT}/editor`);
-  console.log(`   🛒 Marketplace: ${proto}://${BFF_HOST}:${BFF_PORT}/marketplace`);
-  console.log(`   📡 Proxy API:   /api/* → ${API_BASE}/*`);
-  console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*`);
-  if (!useTls) {
-    console.log("   ⚠️  TLS disattivato: la fotocamera (QR-gate) non funziona su iPhone via http://");
-    console.log("       Genera cert/bff.{crt,key} oppure imposta BFF_TLS_CERT / BFF_TLS_KEY in .env.");
-  }
-  console.log("");
-});
+// ============================================================
+// Avvio orchestrato: prima i servizi interni (OpenAPI + SVG),
+// poi apriamo la porta del BFF. Disattivabile con
+// BFF_SPAWN_INTERNAL=false (es. quando li avvii a mano in dev).
+// ============================================================
+const spawnInternal =
+  String(process.env.BFF_SPAWN_INTERNAL || "true").trim().toLowerCase() !== "false";
 
-const shutdown = (signal) => {
-  console.log(`⚠️  ${signal} ricevuto, chiusura graceful...`);
-  server.close(() => {
-    console.log("✅ Server chiuso");
-    process.exit(0);
+let internalHandles = [];
+
+async function bootstrap() {
+  if (spawnInternal) {
+    try {
+      internalHandles = await startInternalServers({
+        apiHost: API_CONNECT_HOST,
+        apiPort: Number(API_PORT),
+        svgHost: SVG_CONNECT_HOST,
+        svgPort: Number(SVG_PORT),
+        apiBootstrap: process.env.BFF_API_BOOTSTRAP || "disk-override",
+      });
+    } catch (err) {
+      console.error("💥 Avvio servizi interni fallito:", err?.message || err);
+      await stopInternalServers(internalHandles).catch(() => {});
+      process.exit(1);
+    }
+  } else {
+    console.log("ℹ️  BFF_SPAWN_INTERNAL=false: OpenAPI e SVG NON vengono avviati dal BFF.");
+  }
+
+  server.listen(BFF_PORT, BFF_HOST, () => {
+    console.log(`\n✅ BFF in ascolto su ${proto}://${BFF_HOST}:${BFF_PORT}${useTls ? " (TLS)" : ""}`);
+    console.log(`   🗺️  Viewer:      ${proto}://${BFF_HOST}:${BFF_PORT}/`);
+    console.log(`   ✏️  Editor:      ${proto}://${BFF_HOST}:${BFF_PORT}/editor`);
+    console.log(`   🛒 Marketplace: ${proto}://${BFF_HOST}:${BFF_PORT}/marketplace`);
+    console.log(`   📡 Proxy API:   /api/* → ${API_BASE}/*`);
+    console.log(`   🖼️  Proxy SVG:   /svg/* → ${SVG_BASE}/*`);
+    if (spawnInternal) {
+      console.log(`   🧩 Servizi interni: OpenAPI + SVG-server gestiti dal BFF`);
+    }
+    if (!useTls) {
+      console.log("   ⚠️  TLS disattivato: la fotocamera (QR-gate) non funziona su iPhone via http://");
+      console.log("       Genera cert/bff.{crt,key} oppure imposta BFF_TLS_CERT / BFF_TLS_KEY in .env.");
+    }
+    console.log("");
   });
-};
+}
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`⚠️  ${signal} ricevuto, chiusura graceful...`);
+  // Chiusura BFF
+  await new Promise((resolve) => {
+    server.close(() => resolve());
+    // safety net se ci sono connessioni keep-alive che non si chiudono
+    setTimeout(resolve, 3500).unref();
+  });
+  console.log("✅ BFF chiuso");
+  // Chiusura figli
+  await stopInternalServers(internalHandles).catch(() => {});
+  console.log("✅ Servizi interni terminati");
+  process.exit(0);
+}
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("uncaughtException", (err) => {
+  console.error("💥 uncaughtException:", err);
+  shutdown("uncaughtException");
+});
+
+bootstrap().catch((err) => {
+  console.error("💥 Bootstrap fallito:", err);
+  process.exit(1);
+});

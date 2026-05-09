@@ -2,8 +2,11 @@ openapi: 3.0.3
 
 info:
   title: Sistema Musei API
-  description: API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi, layout grafici e immagini
-  version: 2.4.0
+  description: |
+    API completa per consultare, creare, aggiornare e cancellare musei, oggetti, percorsi,
+    layout grafici e immagini. Comprende anche utenti, marketplace, percorsi personalizzati IA,
+    chat IA (oggetto + museo), QR validation e visite guidate (professore/studenti).
+  version: 2.5.0
 
 servers:
   - url: https://localhost:3000
@@ -189,6 +192,191 @@ components:
           type: string
           format: date-time
           example: "2024-06-01T12:00:00Z"
+
+    ChatHistoryItem:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    PersonalRoute:
+      type: object
+      description: Percorso personalizzato generato dall'IA per un utente.
+      properties:
+        id: { type: string }
+        museo: { type: string }
+        nome: { type: string }
+        lengthPreset:
+          type: string
+          enum: [breve, medio, lungo]
+        targetRatio: { type: number }
+        flowNodes:
+          type: array
+          description: Sequenza ordinata di nodi (oggetti reali o `__text__N`).
+          items: { type: string }
+        objectNodes:
+          type: array
+          items: { type: string }
+        textSteps:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              room: { type: string }
+              text: { type: string }
+              insertAfterObject: { type: string }
+        customDescriptionsByObject:
+          type: object
+          description: Descrizioni custom (lingua corrente).
+          additionalProperties: { type: string }
+        customDescriptionsByObjectI18n:
+          type: object
+          description: Descrizioni custom localizzate (`it`/`en`/`fr`).
+          additionalProperties:
+            type: object
+            additionalProperties: { type: string }
+        generatedFrom:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MarketplaceObjectRequest:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        userEmail: { type: string }
+        userNome: { type: string }
+        userCognome: { type: string }
+        museo: { type: string }
+        oggetto: { type: string }
+        stanza: { type: string }
+        prezzo: { type: number }
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        note: { type: string }
+        decidedBy: { type: string }
+        decidedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt: { type: string, format: date-time }
+
+    GuidedVisitStep:
+      type: object
+      required: [type]
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [object, text]
+        room: { type: string }
+        label: { type: string }
+        objectName:
+          type: string
+          description: Solo per step `type=object`.
+        text:
+          type: string
+          description: Solo per step `type=text`.
+        customDescription:
+          type: string
+          description: Override della descrizione mostrata allo studente.
+        icon:
+          type: string
+          example: object
+
+    GuidedVisitQuestion:
+      type: object
+      required: [question, options, correctIndex]
+      properties:
+        id: { type: string }
+        question: { type: string }
+        options:
+          type: array
+          items: { type: string }
+          minItems: 2
+        correctIndex:
+          type: integer
+          minimum: 0
+
+    GuidedVisitQuiz:
+      type: object
+      properties:
+        title: { type: string }
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuidedVisitQuestion'
+        timeLimitSec:
+          type: integer
+          minimum: 10
+          default: 120
+
+    GuidedVisitQuizState:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [idle, running, ended]
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        timeLimitSec:
+          type: integer
+
+    GuidedVisitParticipant:
+      type: object
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        status:
+          type: string
+          enum: [waiting, accepted, removed]
+        grade:
+          type: integer
+          nullable: true
+        joinedAt: { type: string, format: date-time }
+
+    GuidedVisit:
+      type: object
+      properties:
+        id: { type: string }
+        museo: { type: string }
+        nome: { type: string }
+        teacherName: { type: string }
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuidedVisitStep'
+        currentStepIndex: { type: integer }
+        navigationStarted: { type: boolean }
+        navigationNode:
+          type: string
+          description: Nodo corrente (oggetto reale o speciale `IN/OUT/SHOP/WC`).
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuidedVisitParticipant'
+        quiz:
+          $ref: '#/components/schemas/GuidedVisitQuiz'
+        quizState:
+          $ref: '#/components/schemas/GuidedVisitQuizState'
+        shareToken:
+          type: string
+          description: Token shareable nel formato `gv:<id>`.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
 security:
   - ApiKeyAuth: []
@@ -1071,6 +1259,51 @@ paths:
                     $ref: '#/components/schemas/User'
         '401':
           description: Utente non autenticato
+    put:
+      summary: Aggiorna il profilo dell'utente autenticato
+      description: |
+        Modifica nome, cognome, eta, interessi, livello, durata e `navLang`.
+        L'email NON e' modificabile da questo endpoint. Anche il `ruolo` e' read-only.
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome: { type: string }
+                cognome: { type: string }
+                eta: { type: integer, minimum: 1, maximum: 120 }
+                interessi:
+                  type: array
+                  items: { type: string }
+                livello:
+                  type: string
+                  enum: [bambino, studente, esperto, avanzato]
+                durata:
+                  type: string
+                  enum: [corto, medio, lungo]
+                navLang:
+                  type: string
+                  enum: [it, en, fr]
+      responses:
+        '200':
+          description: Profilo aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Dati invalidi (eta, interessi, livello, durata)
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Tentativo di modifica del ruolo
 
   /users/me/percorsi:
     get:
@@ -1152,8 +1385,11 @@ paths:
           description: Utente non autenticato
         '404':
           description: Museo o percorso non trovato
-    put:
-      summary: Aggiorna il profilo dell'utente autenticato
+
+  /users/me/nav-lang:
+    patch:
+      summary: Aggiorna solo la lingua del navigator
+      description: Aggiornamento leggero di `navLang` (it / en / fr).
       security:
         - CookieAuth: []
       requestBody:
@@ -1162,22 +1398,14 @@ paths:
           application/json:
             schema:
               type: object
+              required: [navLang]
               properties:
-                nome: { type: string }
-                cognome: { type: string }
-                eta: { type: integer, minimum: 1, maximum: 120 }
-                interessi:
-                  type: array
-                  items: { type: string }
-                livello:
+                navLang:
                   type: string
-                  enum: [bambino, studente, esperto, avanzato]
-                durata:
-                  type: string
-                  enum: [corto, medio, lungo]
+                  enum: [it, en, fr]
       responses:
         '200':
-          description: Profilo aggiornato
+          description: Lingua aggiornata
           content:
             application/json:
               schema:
@@ -1187,3 +1415,1308 @@ paths:
                     $ref: '#/components/schemas/User'
         '401':
           description: Utente non autenticato
+
+  /users/me/percorsi/personalizzati:
+    get:
+      summary: Lista percorsi personalizzati dell'utente
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: query
+          name: museo
+          required: false
+          schema: { type: string }
+          description: Se presente, filtra i percorsi per museo.
+      responses:
+        '200':
+          description: Lista percorsi personalizzati
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsiPersonalizzati:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PersonalRoute'
+        '401':
+          description: Utente non autenticato
+
+  /users/me/percorsi/personalizzati/genera:
+    post:
+      summary: Genera un percorso personalizzato via IA
+      description: |
+        Invoca due round IA (selezione oggetti + descrizioni multilingua) basandosi
+        sul profilo utente (interessi, livello, durata, navLang). Se il provider IA
+        non e' disponibile, viene applicato un fallback locale.
+        Soggetto a rate limit per utente.
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo]
+              properties:
+                museo: { type: string }
+                lengthPreset:
+                  type: string
+                  enum: [breve, medio, lungo]
+                  default: medio
+                nome:
+                  type: string
+                  description: Nome custom del percorso (opzionale).
+      responses:
+        '201':
+          description: Percorso generato e salvato sull'utente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsoPersonalizzato:
+                    $ref: '#/components/schemas/PersonalRoute'
+        '400':
+          description: Museo mancante o senza oggetti utili
+        '401':
+          description: Utente non autenticato
+        '404':
+          description: Museo non trovato
+        '429':
+          description: Richieste troppo frequenti (rate limit)
+        '500':
+          description: Errore generazione percorso
+
+  /users/me/percorsi/personalizzati/{id}:
+    get:
+      summary: Dettagli di un percorso personalizzato
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Percorso trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsoPersonalizzato:
+                    $ref: '#/components/schemas/PersonalRoute'
+        '400':
+          description: id obbligatorio
+        '401':
+          description: Utente non autenticato
+        '404':
+          description: Percorso personalizzato non trovato
+
+    delete:
+      summary: Elimina un percorso personalizzato
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Percorso eliminato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: string }
+        '401':
+          description: Utente non autenticato
+
+  /users/me/percorsi/combined:
+    get:
+      summary: Lista combinata percorsi standard + personalizzati per museo
+      description: |
+        Ritorna i percorsi standard del museo (visibili: prezzo 0 oppure gia' acquistati)
+        unitamente ai percorsi personalizzati IA dell'utente per quel museo.
+        Ogni elemento ha un campo `source` (`standard` | `ai_personalized`).
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: query
+          name: museo
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista combinata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percorsi:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        source: { type: string, enum: [standard, ai_personalized] }
+                        museo: { type: string }
+                        nome: { type: string }
+                        oggetti:
+                          type: array
+                          items: { type: string }
+                        prezzo: { type: number, minimum: 0 }
+                        flowNodes:
+                          type: array
+                          items: { type: string }
+                        textSteps:
+                          type: array
+                          items: { type: object }
+                        customDescriptionsByObject:
+                          type: object
+                          additionalProperties: { type: string }
+                        customDescriptionsByObjectI18n:
+                          type: object
+                          additionalProperties:
+                            type: object
+                            additionalProperties: { type: string }
+                        lengthPreset: { type: string }
+                        targetRatio: { type: number }
+                        createdAt: { type: string, format: date-time }
+        '400':
+          description: museo obbligatorio
+        '401':
+          description: Utente non autenticato
+        '404':
+          description: Museo non trovato
+
+  /users/me/oggetti/richieste:
+    get:
+      summary: Lista richieste di acquisto oggetti dell'utente
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: query
+          name: museo
+          required: false
+          schema: { type: string }
+        - in: query
+          name: oggetto
+          required: false
+          schema: { type: string }
+        - in: query
+          name: stanza
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista richieste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prezzoFisso:
+                    type: number
+                    description: Prezzo fisso per richiesta (EUR).
+                  richieste:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketplaceObjectRequest'
+        '401':
+          description: Utente non autenticato
+
+  /users/me/oggetti/acquista-richiesta:
+    post:
+      summary: Crea una richiesta di acquisto per un oggetto
+      description: |
+        Lo studente/utente "prenota" l'aggiunta o l'accesso a un oggetto a un prezzo fisso.
+        Se esiste gia' una richiesta `pending`/`approved` per stessa coppia (museo,oggetto,stanza),
+        viene restituita quella senza crearne una nuova (`duplicate: true`).
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, oggetto]
+              properties:
+                museo: { type: string }
+                oggetto: { type: string }
+                stanza: { type: string }
+      responses:
+        '200':
+          description: Richiesta gia' presente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  duplicate: { type: boolean, example: true }
+                  richiesta:
+                    $ref: '#/components/schemas/MarketplaceObjectRequest'
+        '201':
+          description: Richiesta creata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  duplicate: { type: boolean, example: false }
+                  richiesta:
+                    $ref: '#/components/schemas/MarketplaceObjectRequest'
+        '400':
+          description: museo e oggetto obbligatori
+        '401':
+          description: Utente non autenticato
+        '404':
+          description: Museo o oggetto non trovato
+
+  /admin/marketplace/richieste:
+    get:
+      summary: Lista richieste marketplace (admin)
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: query
+          name: museo
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: Lista richieste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prezzoFisso: { type: number }
+                  richieste:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketplaceObjectRequest'
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo admin
+
+  /admin/marketplace/richieste/{id}:
+    patch:
+      summary: Approva o rifiuta una richiesta marketplace
+      description: |
+        Solo admin. La richiesta deve essere in stato `pending`. In caso di `approved`
+        vengono attivati i side-effect lato museo (es. abilitazione oggetto).
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Richiesta aggiornata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceObjectRequest'
+        '400':
+          description: id non valido, status non valido o richiesta gia' processata
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo admin
+        '404':
+          description: Richiesta non trovata
+
+  /ai/object-chat:
+    post:
+      summary: Chat IA su un singolo oggetto del museo
+      description: |
+        Chat "Dimmi di piu" sulla scheda oggetto. Il prompt viene costruito con
+        autore, anno, descrizioni multilivello e immagini disponibili. Le risposte
+        sono adattate al profilo utente (interessi, livello, durata, lingua).
+        Se il provider IA non risponde, ritorna `source: "fallback"`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, oggetto, question]
+              properties:
+                museo: { type: string }
+                oggetto: { type: string }
+                question: { type: string }
+                livello:
+                  type: string
+                  enum: [bambino, studente, esperto, avanzato]
+                durata:
+                  type: string
+                  enum: [corto, medio, lungo]
+                navLang:
+                  type: string
+                  enum: [it, en, fr]
+      responses:
+        '200':
+          description: Risposta IA
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer: { type: string }
+                  source: { type: string, example: "openai" }
+        '400':
+          description: museo, oggetto e question sono obbligatori
+        '404':
+          description: Museo o oggetto non trovato
+        '502':
+          description: Errore upstream IA
+
+  /ai/museum-chat:
+    post:
+      summary: Chat IA "Chiedi alla guida" — contesto museo + posizione utente
+      description: |
+        Chat generica del museo: rooms, oggetti, label tradotte, posizione corrente
+        (stanza + oggetto + tappa + percorso) e history conversazionale.
+        Pensata per domande tipo "dov'e' il bagno?", "che c'e' in questa stanza?",
+        "qual e' la prossima tappa?".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, question]
+              properties:
+                museo: { type: string }
+                question: { type: string }
+                stanzaCorrente: { type: string }
+                oggettoCorrente: { type: string }
+                tappaCorrente: { type: string }
+                percorso:
+                  type: array
+                  items: { type: string }
+                history:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ChatHistoryItem'
+                navLang:
+                  type: string
+                  enum: [it, en, fr]
+      responses:
+        '200':
+          description: Risposta IA
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer: { type: string }
+                  source: { type: string, example: "openai" }
+        '400':
+          description: museo e question sono obbligatori
+        '404':
+          description: Museo non trovato
+        '502':
+          description: Errore upstream IA
+
+  /qr/validate:
+    post:
+      summary: Valida l'hash di un QR code per una coppia (museo, oggetto)
+      description: |
+        Il viewer mobile, dopo aver scansionato un QR fisico, invia qui il contenuto
+        in chiaro. Il server calcola SHA-256 e verifica la presenza di un record
+        attivo (`enabled: true`) in `musei.qr_codes` per quella coppia museo+oggetto.
+        Per generare i QR si usa `npm run gen:qr` lato server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codice, museo, oggetto]
+              properties:
+                codice: { type: string, description: "Contenuto in chiaro del QR scansionato" }
+                museo: { type: string }
+                oggetto: { type: string }
+      responses:
+        '200':
+          description: QR valido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  museo: { type: string }
+                  oggetto: { type: string }
+        '400':
+          description: Parametri mancanti
+        '404':
+          description: Codice QR non valido per quest'opera
+        '500':
+          description: Errore validazione
+
+  /users/me/guided-visits:
+    get:
+      summary: Lista visite guidate create dal professore loggato
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Lista visite
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GuidedVisit'
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+
+  /guided-visits:
+    post:
+      summary: Crea una visita guidata
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, nome, steps]
+              properties:
+                museo: { type: string }
+                nome: { type: string }
+                steps:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/GuidedVisitStep'
+                quiz:
+                  $ref: '#/components/schemas/GuidedVisitQuiz'
+      responses:
+        '201':
+          description: Visita creata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visit:
+                    $ref: '#/components/schemas/GuidedVisit'
+        '400':
+          description: museo, nome o steps mancanti
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Museo o oggetto step non trovato
+
+  /guided-visits/{id}:
+    put:
+      summary: Aggiorna una visita guidata (solo se non avviata)
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [museo, nome, steps]
+              properties:
+                museo: { type: string }
+                nome: { type: string }
+                steps:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/GuidedVisitStep'
+                quiz:
+                  $ref: '#/components/schemas/GuidedVisitQuiz'
+      responses:
+        '200':
+          description: Visita aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visit:
+                    $ref: '#/components/schemas/GuidedVisit'
+        '400':
+          description: id non valido o dati mancanti
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+        '409':
+          description: Visita gia avviata, non piu modificabile
+
+    delete:
+      summary: Cancella una visita guidata
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Visita eliminata
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/public:
+    get:
+      summary: Info pubbliche di una visita (per landing studente)
+      description: Endpoint pubblico (richiede solo `X-API-Key`), usato dalla pagina di join.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Info pubbliche
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visit:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      museo: { type: string }
+                      nome: { type: string }
+                      teacherName: { type: string }
+                      stepsCount: { type: integer }
+                      virtualObjects:
+                        type: object
+                        description: Mappa nodi virtuali `__text__N` con stanza e testo.
+                        additionalProperties: true
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/join:
+    post:
+      summary: Ingresso studente in una visita guidata
+      description: |
+        Lo studente sceglie un displayName e riceve un `participantToken`
+        usato per i polling successivi. Lo stato iniziale e' `waiting`,
+        diventa `accepted` solo dopo un accept del professore.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                displayName: { type: string }
+      responses:
+        '201':
+          description: Iscrizione registrata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participantToken: { type: string }
+                  participantId: { type: string }
+                  status: { type: string, enum: [waiting] }
+        '400':
+          description: id non valido o displayName vuoto
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/teacher-state:
+    get:
+      summary: Stato della visita per il professore
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Stato visita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visit:
+                    $ref: '#/components/schemas/GuidedVisit'
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/student-state:
+    get:
+      summary: Stato della visita per lo studente
+      description: |
+        Endpoint di polling lato studente. Richiede solo `X-API-Key` e il
+        `participantToken` ottenuto da `/guided-visits/{id}/join`.
+        Restituisce posizione corrente, percorso, eventuali nodi virtuali
+        di solo testo, descrizioni custom per oggetto e stato del quiz.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: participantToken
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Stato studente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [waiting, accepted, removed]
+                  navigationStarted: { type: boolean }
+                  currentStepIndex: { type: integer }
+                  currentStep:
+                    oneOf:
+                      - $ref: '#/components/schemas/GuidedVisitStep'
+                      - type: 'null'
+                  currentObjectName:
+                    type: string
+                    nullable: true
+                  previousObjectName:
+                    type: string
+                    nullable: true
+                  nextObjectName:
+                    type: string
+                    nullable: true
+                  currentRoom: { type: string }
+                  percorso:
+                    type: array
+                    items: { type: string }
+                  flowNodes:
+                    type: array
+                    items: { type: string }
+                  customDescriptions:
+                    type: object
+                    additionalProperties: { type: string }
+                  virtualObjects:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        room: { type: string }
+                        label: { type: string }
+                        descrizioni:
+                          type: array
+                          items:
+                            type: array
+                            items: { type: string }
+                  textSteps:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        room: { type: string }
+                        text: { type: string }
+                  museo: { type: string }
+                  quiz:
+                    $ref: '#/components/schemas/GuidedVisitQuiz'
+                  quizState:
+                    $ref: '#/components/schemas/GuidedVisitQuizState'
+                  grade:
+                    type: integer
+                    nullable: true
+        '400':
+          description: id non valido o participantToken mancante
+        '404':
+          description: Visita o partecipante non trovato
+
+  /guided-visits/{id}/results:
+    get:
+      summary: Risultati finali della visita (voti studenti)
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista voti studenti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        displayName: { type: string }
+                        status: { type: string }
+                        grade:
+                          type: integer
+                          nullable: true
+                        quizSubmittedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/participants/{participantId}/accept:
+    post:
+      summary: Accetta un partecipante
+      description: |
+        Se la visita non era ancora avviata, accettare il primo studente
+        attiva la navigation (`navigationStarted=true`) sul primo step di tipo `object`.
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: participantId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Partecipante accettato
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+
+  /guided-visits/{id}/participants/accept-all:
+    post:
+      summary: Accetta in blocco tutti i partecipanti in attesa
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Partecipanti accettati
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/participants/{participantId}/remove:
+    post:
+      summary: Rimuove (espelle) un partecipante
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: participantId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Partecipante rimosso
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+
+  /guided-visits/{id}/navigation:
+    post:
+      summary: Aggiorna lo stepIndex corrente della visita
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stepIndex]
+              properties:
+                stepIndex: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Posizione aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  stepIndex: { type: integer }
+        '400':
+          description: stepIndex non valido
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/navigation/by-object:
+    post:
+      summary: Sposta la visita su un oggetto specifico
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectName]
+              properties:
+                objectName: { type: string }
+      responses:
+        '200':
+          description: Posizione aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  stepIndex: { type: integer }
+        '400':
+          description: objectName mancante
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita o oggetto non trovato
+
+  /guided-visits/{id}/navigation/by-node:
+    post:
+      summary: Sposta la visita su un nodo (oggetto o nodo speciale)
+      description: |
+        I nodi speciali ammessi sono `IN`, `OUT`, `SHOP`, `WC`. In alternativa
+        e' possibile passare il nome di un oggetto step della visita.
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nodeName]
+              properties:
+                nodeName: { type: string, example: "IN" }
+      responses:
+        '200':
+          description: Posizione aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  stepIndex: { type: integer }
+                  navigationNode: { type: string }
+        '400':
+          description: nodeName mancante o id non valido
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata o nodo non presente
+
+  /guided-visits/{id}/quiz/start:
+    post:
+      summary: Avvia il quiz finale della visita
+      security:
+        - CookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeLimitSec:
+                  type: integer
+                  minimum: 10
+                  description: Override del tempo limite (default da `quiz.timeLimitSec`).
+      responses:
+        '200':
+          description: Quiz avviato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  timeLimitSec: { type: integer }
+        '401':
+          description: Utente non autenticato
+        '403':
+          description: Solo professori
+        '404':
+          description: Visita non trovata
+
+  /guided-visits/{id}/quiz/submit:
+    post:
+      summary: Invia le risposte del quiz (studente)
+      description: |
+        Endpoint pubblico (richiede `X-API-Key` ma non cookie). Serve il
+        `participantToken` dello studente. Il server calcola voto e risposte
+        corrette in base a `quiz.questions[].correctIndex`.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [participantToken, answers]
+              properties:
+                participantToken: { type: string }
+                answers:
+                  type: array
+                  items: { type: integer }
+                  description: Indice della risposta scelta per ogni domanda.
+      responses:
+        '200':
+          description: Quiz registrato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grade: { type: integer, description: "0..100" }
+                  score: { type: integer }
+                  total: { type: integer }
+        '400':
+          description: id non valido o participantToken mancante
+        '403':
+          description: Partecipante non autorizzato
+        '404':
+          description: Visita o partecipante non trovato
+        '409':
+          description: Quiz gia inviato da questo partecipante
+
+  /musei/{nome_museo}/oggetti/{oggetto}/translate-descriptions:
+    post:
+      summary: Traduci automaticamente le descrizioni di un oggetto in EN/FR
+      description: |
+        Usa l'IA per tradurre la matrice `descrizioni` italiana in `descrizioniI18n.en`
+        e `descrizioniI18n.fr`, mantenendo la stessa struttura (livello x durata).
+        Aggiorna sia il file locale `musei.json` sia MongoDB.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+        - in: path
+          name: oggetto
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Traduzioni aggiornate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  descrizioniI18n:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: array
+                        items: { type: string }
+        '404':
+          description: Museo o oggetto non trovato
+        '500':
+          description: Errore traduzione
+
+  /musei/{nome_museo}/layout/translate-labels:
+    post:
+      summary: Traduci etichette di stanze e percorsi del layout
+      description: |
+        Genera (o aggiorna) `labelI18n.stanze` e `labelI18n.percorsi` nel layout
+        del museo, con traduzioni automatiche per le lingue supportate.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Etichette tradotte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labelI18n:
+                    type: object
+                    properties:
+                      stanze:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          additionalProperties: { type: string }
+                      percorsi:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          additionalProperties: { type: string }
+        '404':
+          description: Museo non trovato
+        '500':
+          description: Errore traduzione etichette
+
+  /musei/{nome_museo}/stanze/{stanza}/immagini:
+    get:
+      summary: Lista immagini di una stanza
+      description: |
+        Stessa logica di `/musei/.../oggetti/.../immagini` ma applicata alla stanza.
+        Ritorna `preview` come prima e poi i numeri in ordine crescente.
+        I dati binari non sono inclusi.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+        - in: path
+          name: stanza
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista immagini stanza
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stanza: { type: string }
+                  immagini:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImmagineInfo'
+        '404':
+          description: Museo o stanza non trovata
+        '500':
+          description: Errore recupero lista immagini stanza
+
+  /musei/{nome_museo}/stanze/{stanza}/immagini/{tipo}:
+    get:
+      summary: Scarica un'immagine della stanza
+      description: |
+        Restituisce i byte grezzi dell'immagine con il corretto Content-Type.
+        Conversione lazy in webp per gli upload non-webp/non-svg gia esistenti.
+        La risposta include `Cache-Control: public, max-age=31536000, immutable`.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+        - in: path
+          name: stanza
+          required: true
+          schema: { type: string }
+        - in: path
+          name: tipo
+          required: true
+          schema: { type: string }
+          description: "'preview' oppure un numero intero (es. '1', '2')"
+      responses:
+        '200':
+          description: Immagine stanza restituita come stream binario
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Immagine stanza non trovata
+        '500':
+          description: Errore recupero immagine stanza
+
+    post:
+      summary: Carica o sostituisce un'immagine di una stanza
+      description: |
+        Field name del form-data: **immagine**. Dimensione massima 10 MB.
+        Le immagini non-webp/non-svg vengono convertite a webp lato server in fase di upload.
+        Collection MongoDB: `musei.stanze_immagini`. `_id` = `<nome_museo>_<stanza>_<tipo>`.
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+        - in: path
+          name: stanza
+          required: true
+          schema: { type: string }
+        - in: path
+          name: tipo
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [immagine]
+              properties:
+                immagine:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Immagine stanza salvata con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+        '400':
+          description: Nessun file ricevuto, tipo non valido o file non immagine
+        '404':
+          description: Museo o stanza non trovata
+        '500':
+          description: Errore salvataggio immagine stanza
+
+    delete:
+      summary: Elimina un'immagine di una stanza
+      parameters:
+        - in: path
+          name: nome_museo
+          required: true
+          schema: { type: string }
+        - in: path
+          name: stanza
+          required: true
+          schema: { type: string }
+        - in: path
+          name: tipo
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Immagine stanza eliminata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        '404':
+          description: Museo o immagine stanza non trovata
+        '500':
+          description: Errore eliminazione immagine stanza

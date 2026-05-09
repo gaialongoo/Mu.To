@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getStoredNavLang, useNavLang } from "../i18n/NavLangContext";
 import { createModel, type Model, type KaldiRecognizer } from "vosk-browser";
 import QrGate from "./QrGate";
+import MuseumChatPanel from "./MuseumChatPanel";
 import {
   isMobileDevice,
   isObjectUnlocked,
@@ -336,6 +337,24 @@ export default function SvgViewer() {
 
   const [focusedObject, setFocusedObject] = useState<string | null>(null);
   const [qrGate, setQrGate] = useState<{ museo: string; oggetto: string } | null>(null);
+  const [museumChatOpen, setMuseumChatOpen] = useState(false);
+  // Viewport stretto: serve a sollevare il FAB "Chiedi alla guida" sopra
+  // la barra SHOP/WC/OUT (bottom:16 left:16) quando lo spazio orizzontale
+  // non basta. Aggiornato a runtime al resize / cambio orientamento.
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setIsNarrowViewport(window.innerWidth <= MOBILE_BREAKPOINT);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
   // Mobile: default delock (freeExplore=true). Desktop: default lock (freeExplore=false).
   const [freeExplore, setFreeExplore] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -688,6 +707,14 @@ export default function SvgViewer() {
         } else if (isSpecialRouteNode(currentObjectName)) {
           if (!previousObjectName || isSpecialRouteNode(previousObjectName)) return;
           stanzaObj = await fetchObjectRoom(session.museo, previousObjectName);
+        } else if (isSpecialRouteNode(previousObjectName)) {
+          // Primissimo step della visita guidata: il prof ha appena avviato
+          // ma non ha ancora cliccato "tappa successiva". Il gruppo e'
+          // logicamente ancora al nodo speciale (es. IN) e l'SVG mostra
+          // gia' la freccia/path verso il primo oggetto. Manteniamo gli
+          // studenti inquadrati su IN/SHOP/WC, senza teletrasportarli
+          // direttamente nella stanza dell'oggetto target.
+          stanzaObj = String(previousObjectName).toUpperCase();
         } else {
           stanzaObj = await fetchObjectRoom(session.museo, currentObjectName);
         }
@@ -739,6 +766,14 @@ export default function SvgViewer() {
 
   useEffect(() => {
     if (!isGuidedTeacher) return;
+    // Per il docente in visita guidata il tutorial generico del Navigator
+    // non e' utile (e si sovrappone al pannello "Dashboard classe" che si
+    // apre automaticamente con ?dashboard=1). Lo saltiamo subito e lo
+    // marchiamo come visto, cosi' non riappare ai prossimi accessi.
+    if (tutorialOpen) {
+      setTutorialOpen(false);
+      try { localStorage.setItem("mu_nav_tutorial_dismissed", "1"); } catch {}
+    }
     const qs = new URLSearchParams(window.location.search);
     if (qs.get("dashboard") === "1") {
       setTeacherPanelOpen(true);
@@ -746,6 +781,7 @@ export default function SvgViewer() {
       const next = `${window.location.pathname}${qs.toString() ? `?${qs.toString()}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGuidedTeacher]);
 
   /* ---- modalità esplora / lock ---- */
@@ -1152,7 +1188,9 @@ export default function SvgViewer() {
             alignItems: "center",
             justifyContent: "center",
             padding: 16,
-            background: "transparent",
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
           }}
         >
           <div
@@ -1279,7 +1317,7 @@ export default function SvgViewer() {
         </div>
       )}
 
-      {!isGuidedVisit && (
+      {!isGuidedVisit && !tutorialOpen && (
         <button
           onClick={() => setExitConfirmOpen(true)}
           title={t("exitTitle")}
@@ -1309,7 +1347,7 @@ export default function SvgViewer() {
         </button>
       )}
 
-      {isGuidedTeacher && session?.guidedVisitId && (
+      {isGuidedTeacher && session?.guidedVisitId && !tutorialOpen && (
         <button
           onClick={() => setTeacherPanelOpen(true)}
           style={{
@@ -1481,6 +1519,89 @@ export default function SvgViewer() {
         >
           {t("resumePath")}
         </button>
+      )}
+
+      {session && !objectDetailOverlayOpen && !qrGate && !teacherPanelOpen && !tutorialOpen && (
+        isNarrowViewport ? (
+          /* Mobile: FAB rotondo in basso a destra, sopra il pulsante mappa
+             (bottom:16 right:16, w:44). Niente piu' overlap con SHOP/WC/OUT. */
+          <button
+            onClick={() => setMuseumChatOpen(true)}
+            title={t("museumChatFab")}
+            aria-label={t("museumChatFab")}
+            style={{
+              position: "fixed",
+              bottom: 74,
+              right: 16,
+              zIndex: 1001,
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              border: "1px solid rgba(92,191,128,0.45)",
+              background: "rgba(92,191,128,0.22)",
+              color: "var(--green, #5cbf80)",
+              fontSize: 22,
+              lineHeight: "46px",
+              textAlign: "center",
+              cursor: "pointer",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              padding: 0,
+            }}
+          >
+            <span aria-hidden="true">💬</span>
+          </button>
+        ) : (
+          /* Desktop: pillola estesa centro-bassa, sfondo solido verde per
+             garantire leggibilita' anche sopra zone chiare della mappa. */
+          <button
+            onClick={() => setMuseumChatOpen(true)}
+            title={t("museumChatFab")}
+            aria-label={t("museumChatFab")}
+            style={{
+              position: "fixed",
+              bottom: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 1001,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 18px",
+              borderRadius: 999,
+              border: "1px solid rgba(92,191,128,0.85)",
+              background: "var(--green, #5cbf80)",
+              color: "#0d0d0d",
+              fontFamily: "var(--font-head)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              boxShadow:
+                "0 14px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.25)",
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>💬</span>
+            {t("museumChatFab")}
+          </button>
+        )
+      )}
+
+      {museumChatOpen && session && (
+        <MuseumChatPanel
+          museo={session.museo}
+          stanzaCorrente={currentStanzaLabel}
+          oggettoCorrente={focusedObject}
+          tappaCorrente={getCurrentPathEndpointsFromUrl(session).to || (session.percorso?.[0] ?? null)}
+          percorso={
+            Array.isArray(session?.guidedFlowNodes) && session.guidedFlowNodes.length > 0
+              ? session.guidedFlowNodes
+              : (Array.isArray(session?.percorso) ? session.percorso : [])
+          }
+          onClose={() => setMuseumChatOpen(false)}
+        />
       )}
 
       <div

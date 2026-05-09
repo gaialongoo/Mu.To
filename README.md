@@ -33,32 +33,74 @@ Variabili importanti (OpenAPI):
 
 ## Avvio del progetto
 
-Servono **3 terminali** separati.
+A partire dalla versione corrente il **BFF orchestra tutto**: avviando
+`server_bff.js` vengono lanciati come processi figli anche `openAPI_server.js`
+e `svg_server.js`. I log di entrambi i servizi vengono mostrati nello stesso
+terminale con prefisso colorato `[API]` (verde) e `[SVG]` (cyan), e in
+shutdown (CTRL+C) il BFF termina anche i figli in modo pulito.
 
-### Terminale 1 - OpenAPI server
-
-```bash
-cd server/openAPI
-npm install
-node openAPI_server.js
-```
-
-### Terminale 2 - SVG server
+### Avvio unico (consigliato)
 
 ```bash
-cd navigator/map-creator/js_server
-npm install
-node svg_server.js
-```
+# 1) Una volta sola: installa le dipendenze in ognuna delle tre cartelle
+cd server/openAPI && npm install && cd -
+cd navigator/map-creator/js_server && npm install && cd -
+cd navigator/UI/bff && npm install && npm run build
 
-### Terminale 3 - BFF/UI
-
-```bash
+# 2) Da questo momento basta:
 cd navigator/UI/bff
-npm install
-npm run build
 npm start
 ```
+
+### Avvio manuale (debug, opt-out)
+
+Se vuoi avviare OpenAPI o SVG separatamente (es. per fare debug),
+imposta `BFF_SPAWN_INTERNAL=false` nell'`.env`. In quel caso il BFF
+non spawna nulla e si limita a fare proxy verso le porte gia' attive.
+
+```bash
+# in server/openAPI/.env
+BFF_SPAWN_INTERNAL=false
+```
+
+Poi avvii i tre processi nei terminali separati come prima
+(`node openAPI_server.js`, `node svg_server.js`, `npm start`).
+
+### Variabili rilevanti
+
+| Variabile | Default | Descrizione |
+|-----------|---------|-------------|
+| `BFF_SPAWN_INTERNAL` | `true` | Se `false`, il BFF non lancia OpenAPI/SVG. |
+| `BFF_API_BOOTSTRAP` | `disk-override` | Forwardato a OpenAPI come `--bootstrap-mode`. Valori: `disk-override`, `mongo`. |
+| `API_PORT`, `SVG_PORT`, `BFF_PORT` | 3000/3001/8080 | Porte usate dai servizi e dal proxy. |
+| `BFF_FORCE_HTTP` | `false` | Disattiva TLS sul BFF anche se `cert/bff.{crt,key}` sono presenti. |
+
+---
+
+## HTTPS sul BFF (per la fotocamera su iPhone)
+
+iOS Safari rifiuta `getUserMedia` (e quindi lo scanner QR del navigator)
+quando la pagina e' servita in chiaro. Per questo il BFF puo' partire **direttamente in HTTPS**
+usando un certificato self-signed locale.
+
+Un certificato gia' pronto e' in `navigator/UI/bff/cert/bff.crt`
+(la chiave `bff.key` e' ignorata da git). E' generato per:
+
+- `localhost`, `127.0.0.1`
+- l'IP LAN della macchina di sviluppo (es. `192.168.1.144`)
+
+Se vuoi rigenerarlo per un IP diverso (es. perche' lavori su un'altra rete):
+
+```bash
+cd navigator/UI/bff/cert
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1   -keyout bff.key -out bff.crt -days 825 -nodes   -subj "/CN=mu.to-dev"   -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:192.168.1.42"
+```
+
+Poi su iPhone apri `https://192.168.1.42:8080` (o la porta del BFF) e
+accetta l'avviso del certificato self-signed: a quel punto la fotocamera funziona.
+
+Per disattivare temporaneamente HTTPS (es. dietro un reverse proxy che gia' fa TLS),
+imposta `BFF_FORCE_HTTP=true` nell'`.env`.
 
 ---
 
@@ -139,16 +181,141 @@ curl -k -H "X-API-Key: test" https://localhost:3000/musei
 
 ## Endpoint utili
 
+### Musei / oggetti / percorsi
 - `GET /musei` lista musei
 - `GET /musei/:nome_museo` museo completo
 - `POST /musei` crea museo
 - `POST /musei/:nome_museo/oggetti` aggiunge oggetto
-- `POST /musei/:nome_museo/percorsi` crea percorso
-- `GET /musei/:nome_museo/layout` leggi layout
-- `PUT /musei/:nome_museo/layout` aggiorna layout
-- `DELETE /musei/:nome_museo/layout` elimina layout
+- `PUT /musei/:nome_museo/oggetti/:oggetto` aggiorna oggetto
+- `DELETE /musei/:nome_museo/oggetti/:oggetto` cancella oggetto
+- `POST /musei/:nome_museo/oggetti/:oggetto/translate-descriptions` traduce le descrizioni IT in EN/FR
+- `GET /musei/:nome_museo/percorso?oggetti=A,B,C` BFS multi-tappa
+- `GET|POST|DELETE /musei/:nome_museo/percorsi` (+ `/:nome_percorso`) gestione percorsi statici
+- `GET|PUT|DELETE /musei/:nome_museo/layout` layout grafico (rooms + corridoi)
+- `POST /musei/:nome_museo/layout/translate-labels` traduce le etichette stanze/percorsi
+
+### Immagini (oggetti & stanze)
+- `GET|POST|DELETE /musei/:nome_museo/oggetti/:oggetto/immagini[/:tipo]`
+- `GET|POST|DELETE /musei/:nome_museo/stanze/:stanza/immagini[/:tipo]`
+- Le `GET` di immagini sono pubbliche (senza `X-API-Key`) per permettere il caricamento via `<img>`.
+
+### Utenti
+- `POST /users/register|login|logout`
+- `GET /users/me`, `PUT /users/me`, `PATCH /users/me/nav-lang`
+- `GET /users/me/percorsi`, `POST /users/me/percorsi/acquista`
+- `GET /users/me/percorsi/combined?museo=...` percorsi standard + personalizzati visibili
+- `GET /users/me/percorsi/personalizzati[?museo=...]`, `GET|DELETE /users/me/percorsi/personalizzati/:id`
+- `POST /users/me/percorsi/personalizzati/genera` genera un percorso IA per quel museo
+- `GET /users/me/oggetti/richieste`, `POST /users/me/oggetti/acquista-richiesta` (marketplace)
+- `GET /users/me/guided-visits` lista visite create dal professore loggato
+
+### Marketplace (admin)
+- `GET /admin/marketplace/richieste`, `PATCH /admin/marketplace/richieste/:id`
+
+### Chat IA
+- `POST /ai/object-chat` chat sulla scheda di un singolo oggetto
+- `POST /ai/museum-chat` "Chiedi alla guida": domande generiche sul museo, posizione, prossima tappa
+
+### QR oggetti
+- `POST /qr/validate` valida l'hash di un QR per la coppia (museo, oggetto)
+
+### Visite guidate (professore/studenti)
+- `POST /guided-visits`, `PUT /guided-visits/:id`, `DELETE /guided-visits/:id`
+- `GET /guided-visits/:id/public` info pubbliche (per landing studente)
+- `POST /guided-visits/:id/join` ingresso studente (ritorna `participantToken`)
+- `GET /guided-visits/:id/teacher-state` stato per il professore
+- `GET /guided-visits/:id/student-state?participantToken=...` polling lato studente
+- `POST /guided-visits/:id/participants/:participantId/accept`
+- `POST /guided-visits/:id/participants/accept-all`
+- `POST /guided-visits/:id/participants/:participantId/remove`
+- `POST /guided-visits/:id/navigation` (per `stepIndex`)
+- `POST /guided-visits/:id/navigation/by-object` (per `objectName`)
+- `POST /guided-visits/:id/navigation/by-node` (per nodo speciale: `IN/OUT/SHOP/WC` o oggetto)
+- `POST /guided-visits/:id/quiz/start`, `POST /guided-visits/:id/quiz/submit`
+- `GET /guided-visits/:id/results` (voti finali del professore)
 
 Spec completa: `server/openAPI/extra/musei_api.yaml`
+
+---
+
+## Chat IA del navigator
+
+Il navigator espone due chat IA distinte verso lo stesso provider OpenAI-compatibile
+(impostato dall'`.env` del server OpenAPI):
+
+### "Dimmi di piu" — chat sulla scheda oggetto
+Endpoint: `POST /ai/object-chat`. Risponde **solo** sui dati dell'oggetto
+(autore, anno, descrizioni multilivello, immagini disponibili). Le risposte vengono
+adattate al profilo utente (livello + durata + interessi + lingua del navigator).
+
+### "Chiedi alla guida" — chat di museo
+Endpoint: `POST /ai/museum-chat`. Costruisce un contesto con:
+- struttura del museo (stanze, oggetti, label tradotte)
+- posizione corrente dello studente (stanza + oggetto + tappa del percorso + percorso completo)
+- conversazione precedente (`history`)
+
+E' il backend del bottone **"Chiedi alla guida"** del viewer.
+Se il provider IA non e' raggiungibile, le route restituiscono comunque
+una risposta di fallback (`source: "fallback"`).
+
+---
+
+## Visite guidate (professori e studenti)
+
+I professori possono creare visite guidate con **step ordinati** (oggetti reali
+o "step di solo testo" che il viewer mostra come nodi virtuali `__text__N`),
+piu' un **quiz finale** opzionale a risposta multipla.
+
+- Le visite vivono in `users.guided_visits` su MongoDB.
+- Lo studente entra con un link tipo `/navigator/?guidedVisit=<id>` e riceve
+  un `participantToken` (cookie/local storage), poi fa polling su `student-state`.
+- Il professore vede la lista partecipanti, accetta/rifiuta, fa avanzare
+  manualmente la visita (`navigation/*`) e gestisce il quiz.
+- Quando una visita ha gia' ricevuto un `accept` o `accept-all`,
+  diventa **read-only** (`PUT /guided-visits/:id` -> 409).
+- Durante una visita guidata il **QR-gate** del viewer e' disattivato:
+  in classe non e' pratico far inquadrare il QR a tutti gli studenti.
+
+Comodita' per il professore:
+- l'auto-apertura della "Dashboard classe" (URL `?dashboard=1`) chiude
+  e marca come visto il tutorial, per non sovrapporsi.
+- alla partenza della visita, sia teacher che studenti restano fissati
+  sulla stanza speciale `IN` finche' non si avanza al primo oggetto reale.
+
+---
+
+## Marketplace richieste oggetti
+
+Gli utenti standard possono "richiedere" l'aggiunta di un oggetto specifico
+in una stanza esistente, a un prezzo fisso (`MARKETPLACE_OBJECT_FIXED_PRICE`,
+default 25 EUR). Le richieste vivono in `users.marketplace_object_requests`.
+
+- Utente: `POST /users/me/oggetti/acquista-richiesta` -> stato iniziale `pending`.
+- Admin: `GET /admin/marketplace/richieste`, `PATCH /admin/marketplace/richieste/:id`
+  con `status: approved|rejected`. Approvare popola anche i dati lato museo.
+- Le richieste duplicate (stesso museo+oggetto+stanza ancora `pending`/`approved`)
+  vengono deduplicate dal server.
+
+---
+
+## Percorsi personalizzati IA
+
+Un utente loggato puo' chiedere al server di generare un percorso pensato
+per il proprio profilo (interessi + livello + durata + lingua del navigator):
+
+```
+POST /users/me/percorsi/personalizzati/genera
+{ "museo": "Uffizi", "lengthPreset": "medio", "nome": "Visita IA mattina" }
+```
+
+- Il server costruisce due chiamate IA (selezione oggetti + descrizioni multilingua),
+  con fallback locale se il provider non e' disponibile.
+- I percorsi generati restano salvati nel campo `users.percorsiPersonalizzati`
+  fino a max ~20 record per utente (cap automatico).
+- `GET /users/me/percorsi/combined?museo=...` ritorna percorsi standard visibili
+  (gratuiti o gia' acquistati) + percorsi personalizzati di quel museo,
+  con un campo `source` (`standard` | `ai_personalized`).
+- Rate limit per utente: una chiamata di generazione ogni `PERSONAL_ROUTE_AI_RATE_MS`.
 
 ---
 

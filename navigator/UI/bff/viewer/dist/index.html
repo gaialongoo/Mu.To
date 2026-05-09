@@ -1294,7 +1294,7 @@
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
   </style>
-  <script type="module" crossorigin src="/assets/index-CpG5jyRj.js"></script>
+  <script type="module" crossorigin src="/assets/index-BN74vLuA.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-BXcMfQ6S.css">
 </head>
 <body>
@@ -2443,12 +2443,17 @@
           .filter(Boolean),
       };
       setSession(session);
+      // Al primissimo step (routeFromName="IN") teniamo l'inquadratura su IN
+      // invece di teletrasportare il prof nella stanza del primo oggetto:
+      // l'SVG mostra gia' la freccia da IN al primo oggetto.
       let stanzaObj = "IN";
-      try {
-        const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
-        const od = await rr.json().catch(() => ({}));
-        stanzaObj = String(od?.stanza || "IN");
-      } catch {}
+      if (routeFromName !== "IN") {
+        try {
+          const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
+          const od = await rr.json().catch(() => ({}));
+          stanzaObj = String(od?.stanza || "IN");
+        } catch {}
+      }
       const redirectUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(routeFromName)}/${encodeURIComponent(routeToName)}&dashboard=1`;
       window.location.replace(redirectUrl);
       return;
@@ -2658,12 +2663,16 @@
           .filter(Boolean),
       };
       setSession(session);
+      // Stesso ragionamento del flusso "apri direttamente": se siamo al
+      // primo step (routeFromName="IN") manteniamo IN come inquadratura.
       let stanzaObj = "IN";
-      try {
-        const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
-        const od = await rr.json().catch(() => ({}));
-        stanzaObj = String(od?.stanza || "IN");
-      } catch {}
+      if (routeFromName !== "IN") {
+        try {
+          const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
+          const od = await rr.json().catch(() => ({}));
+          stanzaObj = String(od?.stanza || "IN");
+        } catch {}
+      }
       const redirectUrl = `/?stanza=${encodeURIComponent(stanzaObj)}/path/${encodeURIComponent(routeFromName)}/${encodeURIComponent(routeToName)}`;
       if (redirectUrl) window.location.replace(redirectUrl);
     });

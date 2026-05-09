@@ -1317,6 +1317,227 @@ async function askObjectAI({ question, museo, oggetto, userPrefs, immaginiOggett
   }
 }
 
+// ============================================================
+// AI MUSEUM GUIDE (chat generica sul museo)
+// ============================================================
+
+/**
+ * Costruisce un contesto compatto del museo per la chat generica.
+ * Pensato per stare entro pochi KB anche con musei grandi: non includiamo
+ * descrizioni complete degli oggetti, solo dati strutturali (stanza, autore,
+ * corrente, anno, eventuale titolo) + label tradotte delle stanze dal layout.
+ */
+function buildMuseumContextForAI({ museo, layout, navLang }) {
+  const lang = normalizeNavLang(navLang);
+  const labelI18n = (layout && layout.labelI18n && layout.labelI18n.stanze) || {};
+  const rooms = layout && layout.rooms && typeof layout.rooms === "object" ? layout.rooms : {};
+  const grid = layout && layout.grid && typeof layout.grid === "object" ? layout.grid : {};
+  const stanzeKeys = new Set([...Object.keys(rooms), ...Object.keys(grid)]);
+
+  const stanze = Array.from(stanzeKeys).map((key) => {
+    const room = rooms[key] || {};
+    const cell = grid[key] || {};
+    const tipo = String(room.tipo || cell.tipo || "normale").trim().toLowerCase() || "normale";
+    const tradotte = labelI18n[key] && typeof labelI18n[key] === "object" ? labelI18n[key] : null;
+    const label = tradotte && tradotte[lang] ? String(tradotte[lang]).trim() : key;
+    const out = { id: key, label, tipo };
+    if (typeof room.x === "number" && typeof room.y === "number") {
+      out.posizione = { x: room.x, y: room.y, w: room.w || 0, h: room.h || 0 };
+    }
+    if (typeof cell.row === "number" && typeof cell.col === "number") {
+      out.griglia = { row: cell.row, col: cell.col };
+    }
+    return out;
+  });
+
+  const oggettiList = Array.from(museo?.oggetti instanceof Map ? museo.oggetti.values() : []);
+  const oggetti = oggettiList
+    .map((o) => {
+      const objectType = String(o?.objectType || "").trim().toLowerCase() || "normal";
+      // Gli item solo testo non sono "opere navigabili": teniamo solo titolo.
+      if (objectType === "text") {
+        return {
+          nome: String(o?.nome || "").trim(),
+          stanza: String(o?.stanza || "").trim(),
+          objectType,
+          textTitle: String(o?.textTitle || "").trim(),
+        };
+      }
+      return {
+        nome: String(o?.nome || "").trim(),
+        stanza: String(o?.stanza || "").trim(),
+        objectType,
+        autore: String(o?.autore || "").trim() || undefined,
+        anno: String(o?.anno || "").trim() || undefined,
+        correnteArtistica: String(o?.correnteArtistica || "").trim() || undefined,
+        connessi: Array.isArray(o?.connessi) ? o.connessi.filter(Boolean).slice(0, 6) : [],
+      };
+    })
+    .filter((o) => o.nome);
+
+  const stanzeConOggetti = {};
+  for (const o of oggetti) {
+    if (!o.stanza) continue;
+    if (!stanzeConOggetti[o.stanza]) stanzeConOggetti[o.stanza] = [];
+    stanzeConOggetti[o.stanza].push(o.nome);
+  }
+
+  return {
+    museo: {
+      nome: String(museo?.nome || "").trim(),
+      citta: String(museo?.citta || "").trim(),
+    },
+    stanze,
+    oggetti,
+    stanzeConOggetti,
+  };
+}
+
+/**
+ * Chat generica "Chiedi alla guida": risponde sia su singoli oggetti che
+ * su come muoversi nel museo (es. "dov'e' il bagno?", "cosa vedo in questa
+ * stanza?", "qual e' il prossimo oggetto del mio percorso?"). La risposta
+ * resta corta (2-4 frasi) per essere comoda da leggere/ascoltare in mappa.
+ */
+async function askMuseumGuideAI({
+  question,
+  museoCtx,
+  positionCtx,
+  history,
+  navLang,
+}) {
+  const cleanQuestion = String(question || "").trim();
+  if (!cleanQuestion) throw new Error("Domanda vuota");
+
+  const lang = normalizeNavLang(navLang);
+
+  if (!aiUpstreamReady()) {
+    // Fallback super semplice: prova a indovinare se chiede una stanza nota.
+    const lc = cleanQuestion.toLowerCase();
+    if (museoCtx?.stanze?.length) {
+      const hit = museoCtx.stanze.find((s) =>
+        lc.includes(String(s.label || "").toLowerCase()) ||
+        lc.includes(String(s.id || "").toLowerCase())
+      );
+      if (hit) {
+        return lang === "it"
+          ? `La sala "${hit.label}" si trova nella mappa: usa il percorso o tocca la sala per andarci.`
+          : lang === "fr"
+            ? `La salle "${hit.label}" se trouve sur la carte : utilisez le parcours ou touchez la salle.`
+            : `Room "${hit.label}" is on the map: use the path or tap the room to get there.`;
+      }
+    }
+    return lang === "it"
+      ? "La guida AI non è raggiungibile in questo momento. Prova più tardi."
+      : lang === "fr"
+        ? "Le guide IA n'est pas joignable pour l'instant. Réessayez plus tard."
+        : "The AI guide is not reachable right now. Please try again later.";
+  }
+
+  const authHeader = resolveAiAuthHeader();
+
+  const linguaRisposta =
+    lang === "it"
+      ? [
+          "Rispondi in italiano, in tono di guida museale gentile e concreta.",
+          "Sii breve: 2-4 frasi al massimo, niente elenchi puntati lunghi.",
+        ]
+      : lang === "en"
+        ? [
+            "IMPORTANT: the JSON CONTESTO_DATI below uses Italian source labels.",
+            "Answer entirely in English, friendly museum-guide tone.",
+            "Be brief: 2-4 sentences max, no long bullet lists.",
+            "Translate room labels and object names if natural; keep proper names recognizable.",
+          ]
+        : [
+            "IMPORTANT : le JSON CONTESTO_DATI ci-dessous est en italien.",
+            "Répondez entièrement en français, ton de guide de musée bienveillant.",
+            "Soyez bref : 2-4 phrases maximum, pas de longues listes à puces.",
+            "Traduisez les noms de salles si c'est naturel, gardez les noms propres reconnaissables.",
+          ];
+
+  const istruzione = [
+    "ISTRUZIONE ASSOLUTA — sei la guida del museo. Rispondi alle domande del visitatore",
+    "usando ESCLUSIVAMENTE i dati del CONTESTO_DATI (mappa del museo, stanze, oggetti)",
+    "e la POSIZIONE_VISITATORE. Non inventare opere, autori o stanze che non sono nel JSON.",
+    "Domande possibili: descrizione di un oggetto/stanza, indicazioni di percorso (es. «come arrivo al bagno?», «dov'è lo shop?»), prossima tappa del percorso, suggerimenti.",
+    "Se la domanda è di navigazione: usa la posizione attuale e il tipo delle stanze (ingresso/normale/uscita/wc/shop) per dare un'indicazione semplice (es. «in fondo a destra», «torna indietro alla sala A e poi a sinistra»).",
+    "Se non hai dati sufficienti, dillo in una frase invece di inventare.",
+    ...linguaRisposta,
+  ].join(" ");
+
+  const systemPrompt = istruzione;
+
+  const trimmedHistory = Array.isArray(history)
+    ? history
+        .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.text === "string")
+        .slice(-6)
+    : [];
+
+  const contestoDati = {
+    museo: museoCtx?.museo || { nome: "", citta: "" },
+    stanze: museoCtx?.stanze || [],
+    stanzeConOggetti: museoCtx?.stanzeConOggetti || {},
+    oggetti: museoCtx?.oggetti || [],
+    posizioneVisitatore: positionCtx || {},
+  };
+
+  const userContent = [
+    "DOMANDA DEL VISITATORE:",
+    cleanQuestion,
+    "",
+    "POSIZIONE_VISITATORE (JSON):",
+    JSON.stringify(positionCtx || {}),
+    "",
+    "CONTESTO_DATI (JSON):",
+    JSON.stringify(contestoDati),
+  ].join("\n");
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+  ];
+  for (const m of trimmedHistory) {
+    messages.push({ role: m.role, content: String(m.text || "").slice(0, 2000) });
+  }
+  messages.push({ role: "user", content: userContent });
+
+  const payload = {
+    model: AI_MODEL,
+    temperature: 0.4,
+    max_tokens: 380,
+    messages,
+  };
+
+  const headers = { "Content-Type": "application/json" };
+  if (authHeader) headers.Authorization = authHeader;
+
+  try {
+    const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`AI upstream error (${response.status}): ${errText || "unknown"}`);
+    }
+    const data = await response.json();
+    const answer = String(extractChatCompletionText(data) || "").trim();
+    if (!answer) throw new Error("Risposta AI vuota");
+    return answer;
+  } catch (err) {
+    if (AI_STRICT) throw err;
+    const msg = err instanceof Error ? err.message : "unknown";
+    return (
+      (lang === "it"
+        ? "Non riesco a rispondere adesso. "
+        : lang === "fr"
+          ? "Je ne peux pas répondre maintenant. "
+          : "I can't answer right now. ") + `(Nota tecnica: ${msg})`
+    );
+  }
+}
+
 async function withUsersDb(run) {
   const client = new MongoClient(MONGO_URI);
   try {
@@ -2458,6 +2679,91 @@ async function startServer(cliOptions) {
       // In dev: restituiamo anche dettagli per capire subito se è 401/429/quota/timeout.
       res.status(502).json({
         error: "errore chat IA oggetto",
+        detail: msg,
+      });
+    }
+  });
+
+  // ==========================================================
+  // ROUTE — MUSEUM GUIDE CHAT (Chiedi alla guida)
+  // ==========================================================
+  app.post("/ai/museum-chat", async (req, res) => {
+    try {
+      const nomeMuseo = String(req.body?.museo || "").trim();
+      const question = String(req.body?.question || "").trim();
+      if (!nomeMuseo || !question) {
+        return res.status(400).json({ error: "museo e question sono obbligatori" });
+      }
+
+      const museo = sistema.get_museo(nomeMuseo);
+      if (!museo) return res.status(404).json({ error: "Museo non trovato" });
+
+      const session = await getSessionUser(req);
+      const navLang = normalizeNavLang(
+        session?.user?.navLang ?? req.body?.navLang ?? req.body?.nav_lang
+      );
+
+      // Layout dal Mongo (rooms + grid + label tradotte) — best effort.
+      let layout = null;
+      const client = new MongoClient(MONGO_URI);
+      try {
+        await client.connect();
+        layout = await client
+          .db(DB_NAME)
+          .collection(LAYOUT_COLLECTION)
+          .findOne({ _id: nomeMuseo });
+      } catch (e) {
+        console.warn("museum-chat: layout non disponibile:", e?.message || e);
+      } finally {
+        try { await client.close(); } catch {}
+      }
+
+      const museoCtx = buildMuseumContextForAI({ museo, layout, navLang });
+
+      // Contesto posizione: stanza corrente + oggetto corrente (se passato)
+      // + percorso (sequenza ordinata di tappe).
+      const stanzaCorrente = String(req.body?.stanzaCorrente || "").trim() || null;
+      const oggettoCorrente = String(req.body?.oggettoCorrente || "").trim() || null;
+      const percorso = Array.isArray(req.body?.percorso)
+        ? req.body.percorso.map((s) => String(s || "").trim()).filter(Boolean)
+        : [];
+      const tappaCorrente = String(req.body?.tappaCorrente || "").trim() || null;
+      const prossimaTappa = (() => {
+        if (!percorso.length) return null;
+        const ref = oggettoCorrente || tappaCorrente;
+        if (!ref) return percorso[0];
+        const idx = percorso.indexOf(ref);
+        if (idx >= 0 && idx + 1 < percorso.length) return percorso[idx + 1];
+        return null;
+      })();
+
+      const positionCtx = {
+        stanzaCorrente,
+        oggettoCorrente,
+        tappaCorrente,
+        percorso,
+        prossimaTappa,
+      };
+
+      const history = Array.isArray(req.body?.history) ? req.body.history : [];
+
+      const aiAnswer = await askMuseumGuideAI({
+        question,
+        museoCtx,
+        positionCtx,
+        history,
+        navLang,
+      });
+
+      res.json({
+        answer: aiAnswer,
+        source: aiUpstreamReady() ? AI_PROVIDER : "fallback",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err || "unknown");
+      console.error("Errore museum chat AI:", msg);
+      res.status(502).json({
+        error: "errore chat IA museo",
         detail: msg,
       });
     }
