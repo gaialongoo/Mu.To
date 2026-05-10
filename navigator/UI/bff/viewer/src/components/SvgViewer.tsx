@@ -655,8 +655,14 @@ export default function SvgViewer() {
   useEffect(() => {
     const sync = () => {
       const url = new URL(window.location.href);
-      const obj = url.searchParams.get("oggetto");
-      setFocusedObject(obj ? decodeURIComponent(obj) : null);
+      const raw = url.searchParams.get("oggetto");
+      let decoded = raw ? decodeURIComponent(raw.trim()) : null;
+      if (decoded && isSpecialRouteNode(decoded)) {
+        url.searchParams.delete("oggetto");
+        window.history.replaceState({}, "", url.toString());
+        decoded = null;
+      }
+      setFocusedObject(decoded);
     };
     sync();
     window.addEventListener("popstate", sync);
@@ -1174,6 +1180,10 @@ export default function SvgViewer() {
     >
       {tutorialOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mu-tutorial-heading"
+          aria-label={t("ariaTutorialDialog")}
           onClick={() => {
             try {
               if (tutorialDontShow) localStorage.setItem("mu_nav_tutorial_dismissed", "1");
@@ -1212,7 +1222,7 @@ export default function SvgViewer() {
                 <div style={{ fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.22em", color: "var(--green)", textTransform: "uppercase" }}>
                   Tutorial
                 </div>
-                <div style={{ fontFamily: "var(--font-head)", fontSize: 16, letterSpacing: "0.08em", marginTop: 6 }}>
+                <div id="mu-tutorial-heading" style={{ fontFamily: "var(--font-head)", fontSize: 16, letterSpacing: "0.08em", marginTop: 6 }}>
                   Come usare il Navigator
                 </div>
               </div>
@@ -1240,7 +1250,7 @@ export default function SvgViewer() {
                   lineHeight: 1,
                   boxShadow: "0 8px 24px rgba(224, 65, 56, 0.35), 0 0 0 1px rgba(255,255,255,0.04) inset",
                 }}
-                aria-label="Chiudi tutorial"
+                aria-label={t("tutorialCloseAria")}
               >
                 ✕
               </button>
@@ -1319,8 +1329,10 @@ export default function SvgViewer() {
 
       {!isGuidedVisit && !tutorialOpen && (
         <button
+          type="button"
           onClick={() => setExitConfirmOpen(true)}
           title={t("exitTitle")}
+          aria-label={t("exitTitle")}
           style={{
             position: "fixed",
             top: 16,
@@ -1349,7 +1361,9 @@ export default function SvgViewer() {
 
       {isGuidedTeacher && session?.guidedVisitId && !tutorialOpen && (
         <button
+          type="button"
           onClick={() => setTeacherPanelOpen(true)}
+          aria-label={t("dashboardClass")}
           style={{
             position: "fixed",
             top: 16,
@@ -1373,6 +1387,7 @@ export default function SvgViewer() {
       )}
 
       <button
+        type="button"
         onClick={() => {
           if (normalize(currentStanzaLabel ?? "") === "home") return;
           setFreeExplore(prev => !prev);
@@ -1384,6 +1399,14 @@ export default function SvgViewer() {
               ? t("lockView")
               : t("freeExplore")
         }
+        aria-label={
+          normalize(currentStanzaLabel ?? "") === "home"
+            ? t("zoomDisabledHome")
+            : freeExplore
+              ? t("lockView")
+              : t("freeExplore")
+        }
+        aria-pressed={freeExplore}
         style={{
           position: "fixed",
           bottom: 16,
@@ -1446,6 +1469,8 @@ export default function SvgViewer() {
 
       {!isGuidedVisit && (
         <div
+          role="group"
+          aria-label={t("ariaQuickRooms")}
           style={{
             position: "fixed",
             left: 16,
@@ -1470,9 +1495,11 @@ export default function SvgViewer() {
             const enabled = availableQuickRooms[item.key as keyof typeof availableQuickRooms];
             return (
               <button
+                type="button"
                 key={item.key}
                 onClick={() => enabled && !isGuidedStudent && handleQuickRoomNavigate(item.label)}
                 disabled={!enabled || isGuidedStudent}
+                aria-label={item.label === "SHOP" ? t("shop") : item.label === "WC" ? t("wc") : t("out")}
                 style={{
                   border: `1px solid ${enabled ? "rgba(92,191,128,0.35)" : "var(--border)"}`,
                   background: enabled ? "var(--green-dim)" : "rgba(255,255,255,0.03)",
@@ -1497,7 +1524,9 @@ export default function SvgViewer() {
       )}
       {canResumePath && !isGuidedStudent && (
         <button
+          type="button"
           onClick={handleResumePath}
+          aria-label={t("resumePath")}
           style={{
             position: "fixed",
             left: 16,
@@ -1526,6 +1555,7 @@ export default function SvgViewer() {
           /* Mobile: FAB rotondo in basso a destra, sopra il pulsante mappa
              (bottom:16 right:16, w:44). Niente piu' overlap con SHOP/WC/OUT. */
           <button
+            type="button"
             onClick={() => setMuseumChatOpen(true)}
             title={t("museumChatFab")}
             aria-label={t("museumChatFab")}
@@ -1556,6 +1586,7 @@ export default function SvgViewer() {
           /* Desktop: pillola estesa centro-bassa, sfondo solido verde per
              garantire leggibilita' anche sopra zone chiare della mappa. */
           <button
+            type="button"
             onClick={() => setMuseumChatOpen(true)}
             title={t("museumChatFab")}
             aria-label={t("museumChatFab")}
@@ -1606,6 +1637,8 @@ export default function SvgViewer() {
 
       <div
         id="svg-host"
+        role="region"
+        aria-label={t("ariaSvgMap")}
         style={{
           width: "100%",
           flex: 1,
@@ -1622,6 +1655,10 @@ export default function SvgViewer() {
 
       {roomConfirm && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mu-room-confirm-title"
+          aria-label={t("ariaRoomChangeDialog")}
           onClick={() => setRoomConfirm(null)}
           style={{
             position: "fixed",
@@ -1650,11 +1687,12 @@ export default function SvgViewer() {
             <p style={{ margin: "0 0 6px", fontSize: 11, letterSpacing: "0.04em", color: "var(--text-dim)" }}>
               {t("roomConfirmIntro")}
             </p>
-            <h3 style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.1em" }}>
+            <h3 id="mu-room-confirm-title" style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.1em" }}>
               {roomConfirm}
             </h3>
             <div style={{ display: "flex", gap: 10 }}>
               <button
+                type="button"
                 onClick={() => handleRoomConfirm(roomConfirm)}
                 style={{
                   flex: 1,
@@ -1673,6 +1711,7 @@ export default function SvgViewer() {
                 {t("roomGo")}
               </button>
               <button
+                type="button"
                 onClick={() => setRoomConfirm(null)}
                 style={{
                   flex: 1,
@@ -1697,6 +1736,10 @@ export default function SvgViewer() {
 
       {exitConfirmOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mu-exit-confirm-heading"
+          aria-label={t("ariaLeaveConfirm")}
           onClick={() => setExitConfirmOpen(false)}
           style={{
             position: "fixed",
@@ -1731,11 +1774,12 @@ export default function SvgViewer() {
             <p style={{ margin: "0 0 8px", fontSize: 11, letterSpacing: "0.04em", color: "var(--text-dim)" }}>
               {t("exitConfirmTitle")}
             </p>
-            <h3 style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>
+            <h3 id="mu-exit-confirm-heading" style={{ margin: "0 0 20px", fontFamily: "var(--font-head)", fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>
               {t("exitConfirmBody")}
             </h3>
             <div style={{ display: "flex", gap: 10 }}>
               <button
+                type="button"
                 onClick={handleExitConfirm}
                 style={{
                   flex: 1,
@@ -1754,6 +1798,7 @@ export default function SvgViewer() {
                 {t("exitYes")}
               </button>
               <button
+                type="button"
                 onClick={() => setExitConfirmOpen(false)}
                 style={{
                   flex: 1,
@@ -1778,6 +1823,10 @@ export default function SvgViewer() {
 
       {teacherPanelOpen && isGuidedTeacher && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mu-teacher-dashboard-title"
+          aria-label={t("ariaTeacherClassDialog")}
           onClick={() => setTeacherPanelOpen(false)}
           style={{
             position: "fixed",
@@ -1805,21 +1854,21 @@ export default function SvgViewer() {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.08em" }}>{t("teacherDashboardTitle")}</h3>
-              <button onClick={() => setTeacherPanelOpen(false)} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", width: 28, height: 28, borderRadius: "50%", fontSize: 16, cursor: "pointer" }}>✕</button>
+              <h3 id="mu-teacher-dashboard-title" style={{ margin: 0, fontFamily: "var(--font-head)", fontWeight: 500, letterSpacing: "0.08em" }}>{t("teacherDashboardTitle")}</h3>
+              <button type="button" onClick={() => setTeacherPanelOpen(false)} aria-label={t("dashboardCloseAria")} style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", width: 28, height: 28, borderRadius: "50%", fontSize: 16, cursor: "pointer" }}>✕</button>
             </div>
             <p style={{ marginTop: 0, color: "var(--text-dim)", marginBottom: 12, fontSize: 12, letterSpacing: "0.03em" }}>
               {teacherVisitState?.nome || "Visita"} - {teacherVisitState?.museo || ""}
             </p>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-              <button onClick={() => teacherAcceptAll().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid rgba(255,255,255,0.12)", background: "#181818", color: "var(--text)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              <button type="button" onClick={() => teacherAcceptAll().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid rgba(255,255,255,0.12)", background: "#181818", color: "var(--text)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {t("teacherAcceptAll")}
               </button>
-              <button onClick={() => teacherStartQuiz().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--green)", background: "var(--green)", color: "#0d0d0d", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              <button type="button" onClick={() => teacherStartQuiz().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--green)", background: "var(--green)", color: "#0d0d0d", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {t("teacherStartQuiz")}
               </button>
-              <button onClick={() => setTeacherShowResults((v) => !v)} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              <button type="button" onClick={() => setTeacherShowResults((v) => !v)} aria-expanded={teacherShowResults} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", color: "var(--text-dim)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {teacherShowResults ? t("teacherHideResults") : t("teacherShowResults")}
               </button>
             </div>
@@ -1834,8 +1883,8 @@ export default function SvgViewer() {
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{p.displayName}</span>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => teacherAccept(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(92,191,128,0.35)", background: "var(--green-dim)", color: "var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherAccept")}</button>
-                          <button onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherReject")}</button>
+                          <button type="button" onClick={() => teacherAccept(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(92,191,128,0.35)", background: "var(--green-dim)", color: "var(--green)", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherAccept")}</button>
+                          <button type="button" onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherReject")}</button>
                         </div>
                       </div>
                     ))}
@@ -1849,7 +1898,7 @@ export default function SvgViewer() {
                     .map((p: any, idx: number) => (
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span>{idx + 1}. {p.displayName}</span>
-                        <button onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherRemove")}</button>
+                        <button type="button" onClick={() => teacherRemove(p.id).catch((e) => showToast(e.message, "error"))} style={{ border: "1px solid rgba(224,90,74,0.35)", background: "rgba(224,90,74,0.14)", color: "#e05a4a", borderRadius: "var(--radius)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 10px" }}>{t("teacherRemove")}</button>
                       </div>
                     ))}
                 </div>
@@ -1881,6 +1930,10 @@ export default function SvgViewer() {
 
       {guidedQuizState?.quiz && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mu-guided-quiz-title"
+          aria-label={t("ariaQuizDialog")}
           style={{
             position: "fixed",
             inset: 0,
@@ -1893,7 +1946,7 @@ export default function SvgViewer() {
           }}
         >
           <div style={{ width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: "#fff", borderRadius: 14, padding: "18px 20px" }}>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>{guidedQuizState.quiz.title || t("quizFinalTitle")}</h3>
+            <h3 id="mu-guided-quiz-title" style={{ marginTop: 0, marginBottom: 8 }}>{guidedQuizState.quiz.title || t("quizFinalTitle")}</h3>
             <p style={{ marginTop: 0, color: "#666", fontSize: 13 }}>
               {t("quizMaxTime")} {guidedQuizState.quizState?.timeLimitSec || guidedQuizState.quiz?.timeLimitSec || 120} {t("quizSeconds")}
             </p>
@@ -1930,7 +1983,7 @@ export default function SvgViewer() {
         </div>
       )}
 
-      {focusedObject && (
+      {focusedObject && !isSpecialRouteNode(focusedObject) && (
         <ObjectOverlay
           nome={focusedObject}
           session={session}
@@ -2749,6 +2802,13 @@ async function fetchObjectRoom(museo: string, oggettoNome: string): Promise<stri
   const cached = objectRoomCache.get(key);
   if (cached) return cached;
 
+  if (isSpecialRouteNode(oggettoNome)) {
+    const slug = normalize(oggettoNome);
+    const synthetic = slug === "in" ? "IN" : String(oggettoNome || "").trim().toUpperCase();
+    objectRoomCache.set(key, synthetic);
+    return synthetic;
+  }
+
   const inFlight = objectRoomRequestCache.get(key);
   if (inFlight) return inFlight;
 
@@ -2895,6 +2955,7 @@ function replaceCircleWithImage(
 
   const isVirtualTextNode = String(nome || "").startsWith("__text__");
   const isTextObject = String(objectType || "").toLowerCase() === "text";
+  if (isSpecialRouteNode(nome)) return;
   const PREVIEW_SCALE = (isVirtualTextNode || isTextObject) ? 1.6 : 2.5;
   const displayR = r * PREVIEW_SCALE;
   const size = displayR * 2;
@@ -3167,8 +3228,10 @@ function goToRoom(label: string) {
 }
 
 function openObjectFocus(nome: string) {
+  const safe = String(nome || "").trim();
+  if (!safe || isSpecialRouteNode(safe)) return;
   const url = new URL(window.location.href);
-  url.searchParams.set("oggetto", nome);
+  url.searchParams.set("oggetto", safe);
   window.history.pushState({}, "", url);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
@@ -3419,6 +3482,14 @@ function ObjectOverlay({
     setSlideIdx(0);
     setFetchedObjectType(null);
     const guidedText = readImmediateGuidedText();
+    if (isSpecialRouteNode(nome)) {
+      setAutore("");
+      setCorrenteArtistica("");
+      setAnno("");
+      setDescrizione(null);
+      setImmagini([]);
+      return;
+    }
     if (virtualObject) {
       setAutore("");
       setCorrenteArtistica("");
@@ -4331,11 +4402,10 @@ function ObjectOverlay({
     }
     const percorso = session.percorso;
     const index = percorso.indexOf(nome);
-    if (index <= 1) return;
+    // index 0 = IN: niente precedente; index 1 = primo oggetto → "Precedente" mostra ancora IN→oggetto
+    if (index < 1) return;
     const prevNode = percorso[index - 1];
     await syncTeacherNavigationByObject(prevNode);
-    // Manteniamo la coppia locale precedente->corrente (es: mummia->collana)
-    // per evitare salti al segmento precedente (es: IN->mummia).
     updateURL(prevNode, percorso[index]);
   };
 
@@ -5016,7 +5086,7 @@ function ObjectOverlay({
                 cursor: "pointer",
               }}
             >
-              ← {t("prev")}
+              {t("prev")}
             </button>
             <button
               onClick={handleNext}
@@ -5034,7 +5104,7 @@ function ObjectOverlay({
                 cursor: "pointer",
               }}
             >
-              {t("next")} →
+              {t("next")}
             </button>
           </div>
         )}

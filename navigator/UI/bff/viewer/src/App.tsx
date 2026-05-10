@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import "./styles/svg.css";
 import SvgViewer from "./components/SvgViewer";
 import RouteStartBriefing from "./components/RouteStartBriefing";
-import { NavLangProvider } from "./i18n/NavLangContext";
+import { NavLangProvider, useNavLang } from "./i18n/NavLangContext";
 
 const COOKIE_NAME = "museo_session";
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
@@ -41,6 +41,7 @@ function briefingToken(s: BriefSession) {
 }
 
 function AppContent() {
+  const { t } = useNavLang();
   const session = useMemo(() => readSessionCookie(), []);
   const [showBriefing, setShowBriefing] = useState(() => {
     if (!session) return false;
@@ -63,7 +64,7 @@ function AppContent() {
   };
 
   return (
-    <div className="app-root">
+    <main id="navigator-main" className="app-root" aria-label={t("ariaMainNavigator")}>
       <div className="viewer-shell">
         {showBriefing && session ? (
           <RouteStartBriefing session={session} onContinue={finishBriefing} />
@@ -71,7 +72,7 @@ function AppContent() {
           <SvgViewer />
         )}
       </div>
-    </div>
+    </main>
   );
 }
 

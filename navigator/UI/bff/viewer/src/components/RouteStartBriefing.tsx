@@ -80,10 +80,10 @@ export default function RouteStartBriefing({
     data != null ? [data.nome, data.citta].filter(Boolean).join(" · ") : null;
 
   return (
-    <div className="route-briefing">
+    <div className="route-briefing" role="region" aria-labelledby="route-briefing-heading">
       <div className="route-briefing__scroll">
         <p className="route-briefing__kicker">{t("visitBriefingTitle")}</p>
-        <h1 className="route-briefing__head">{t("visitBriefingSubtitle")}</h1>
+        <h1 id="route-briefing-heading" className="route-briefing__head">{t("visitBriefingSubtitle")}</h1>
 
         {data == null ? (
           <p className="route-briefing__loading">{t("visitBriefingLoading")}</p>

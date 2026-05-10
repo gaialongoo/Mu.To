@@ -35,6 +35,7 @@ export default function MuseumChatPanel({
 
   const quickQuestions = useMemo(
     () => [
+      t("museumQuickAccess"),
       t("museumQuickWc"),
       t("museumQuickShop"),
       t("museumQuickRoom"),
@@ -183,6 +184,7 @@ export default function MuseumChatPanel({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label={t("museumChatClose")}
             title={t("museumChatClose")}
@@ -286,6 +288,7 @@ export default function MuseumChatPanel({
           >
             {quickQuestions.map((q) => (
               <button
+                type="button"
                 key={q}
                 onClick={() => send(q)}
                 disabled={loading}

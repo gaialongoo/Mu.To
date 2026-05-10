@@ -453,6 +453,12 @@
       opacity: 0;
       animation: fadeUpCenter .8s 1.3s var(--ease) forwards;
       cursor: pointer;
+      font: inherit;
+      color: inherit;
+      border: none;
+      background: none;
+      padding: 0;
+      text-align: center;
     }
     .scroll-hint span {
       font-size: .65rem;
@@ -574,6 +580,7 @@
       gap: .5rem;
     }
     .select-label {
+      display: block;
       font-size: .7rem;
       letter-spacing: .2em;
       text-transform: uppercase;
@@ -1293,26 +1300,71 @@
     .reveal-delay-1 { transition-delay: .1s; }
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .35s; }
+
+    /* Accessibilità: salto contenuto */
+    .skip-link {
+      position: absolute;
+      left: -999px;
+      top: 12px;
+      z-index: 10000;
+      padding: .65rem 1.1rem;
+      background: var(--green);
+      color: var(--bg);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: .9rem;
+      text-decoration: none;
+      border-radius: var(--radius);
+      outline: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .skip-link:focus {
+      left: 12px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    .scroll-hint:focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: 6px;
+    }
+    :focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: 3px;
+    }
+    button:focus:not(:focus-visible),
+    a:focus:not(:focus-visible) {
+      outline: none;
+    }
   </style>
 </head>
 <body>
 
+  <a href="#main-content" class="skip-link" id="skipToMain" data-i18n="skipToMain">Salta al contenuto</a>
+
   <div id="home">
     <!-- ── NAVBAR ──────────────────────────────── -->
-  <nav class="navbar" id="navbar">
+  <nav class="navbar" id="navbar" aria-label="Navigazione principale">
     <a href="#" class="nav-logo">Art<em>Around</em></a>
     <ul class="nav-links">
       <li><a href="#about" data-i18n="navExplore">Esplora</a></li>
       <li><a href="#project" data-i18n="navInfo">Info</a></li>
       <li><button class="auth-btn" id="navAuthBtn" type="button">Login</button></li>
     </ul>
-    <button class="hamburger" id="hamburger" aria-label="Menu">
+    <button class="hamburger" id="hamburger" type="button" aria-label="Menu" aria-controls="mobileMenu" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
   </nav>
 
   <!-- Mobile menu -->
-  <div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu" id="mobileMenu" role="navigation" aria-label="Menu mobile" aria-hidden="true">
     <button class="mobile-menu-close" onclick="closeMobile()" aria-label="Chiudi menu">
       <span></span>
       <span></span>
@@ -1322,6 +1374,7 @@
     <button class="auth-btn" id="mobileAuthBtn" type="button">Login</button>
   </div>
 
+  <main id="main-content" tabindex="-1">
   <!-- ── HERO ────────────────────────────────── -->
   <section class="hero" id="hero">
     <div class="hero-bg"></div>
@@ -1337,13 +1390,13 @@
       <div class="hero-divider"><div class="hero-divider-diamond"></div></div>
     </div>
 
-    <div class="scroll-hint" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
+    <button type="button" class="scroll-hint" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})" data-i18n-aria-label="scrollToAboutAria">
       <span data-i18n="scrollHint">Scorri</span>
       <div class="scroll-arrow">
         <i></i><i></i>
         <div class="chevron-down"></div>
       </div>
-    </div>
+    </button>
   </section>
 
   <!-- ── ABOUT / CTA ──────────────────────────── -->
@@ -1364,7 +1417,7 @@
       <p class="cta-desc" data-i18n="ctaDesc">Seleziona un museo per accedere ai percorsi di navigazione guidata o al marketplace delle opere.</p>
 
       <div class="museum-select-wrapper">
-        <p class="select-label" data-i18n="museumLabel">Museo</p>
+        <label class="select-label" for="museo" data-i18n="museumLabel">Museo</label>
         <div class="select-group">
           <select class="museum-select" id="museo" disabled>
             <option value="" id="museoPlaceholderOpt">— Caricamento… —</option>
@@ -1409,6 +1462,7 @@
       </div>
     </div>
   </section>
+  </main>
 
   <!-- ── FOOTER ──────────────────────────────── -->
   <footer>
@@ -1420,7 +1474,7 @@
   <!-- ── OVERLAY ─────────────────────────────── -->
   <div class="overlay" id="overlay">
     <div class="overlay-panel">
-      <button class="overlay-close" onclick="closeOverlay()">✕</button>
+      <button type="button" class="overlay-close" onclick="closeOverlay()" data-i18n-aria-label="overlayCloseAria">✕</button>
       <p class="overlay-museum-name" id="overlayMuseumName">Museo selezionato</p>
       <h3 class="overlay-title" data-i18n="overlayHowExplore">Come vuoi esplorare?</h3>
 
@@ -1464,7 +1518,7 @@
 
   <div class="overlay" id="authOverlay">
     <div class="overlay-panel">
-      <button class="overlay-close" onclick="closeAuthOverlay()">✕</button>
+      <button type="button" class="overlay-close" onclick="closeAuthOverlay()" data-i18n-aria-label="overlayCloseAria">✕</button>
       <p class="overlay-museum-name" data-i18n="authAccount">Account</p>
       <h3 class="overlay-title" id="authOverlayTitle">Login</h3>
 
@@ -1554,7 +1608,7 @@
 
   <div class="overlay" id="profileOverlay">
     <div class="overlay-panel">
-      <button class="overlay-close" onclick="closeProfileOverlay()">✕</button>
+      <button type="button" class="overlay-close" onclick="closeProfileOverlay()" data-i18n-aria-label="overlayCloseAria">✕</button>
       <p class="overlay-museum-name" data-i18n="authAccount">Account</p>
       <h3 class="overlay-title" data-i18n="profileTitle">Profilo</h3>
       <form class="auth-form" id="profileStandaloneForm">
@@ -1632,6 +1686,9 @@
   const HOME_I18N = {
     it: {
       langLabel: "Lingua",
+      skipToMain: "Salta al contenuto principale",
+      scrollToAboutAria: "Scorri alla sezione sul progetto",
+      overlayCloseAria: "Chiudi finestra",
       navExplore: "Esplora", navInfo: "Info", navLogin: "Login", navProfile: "Profilo",
       heroEyebrow: "Esplora l'arte attorno a te", heroSub: "Percorsi personalizzati · Marketplace", scrollHint: "Scorri",
       aboutLabel: "Il progetto",
@@ -1667,6 +1724,9 @@
     },
     en: {
       langLabel: "Language",
+      skipToMain: "Skip to main content",
+      scrollToAboutAria: "Scroll to the About section",
+      overlayCloseAria: "Close dialog",
       navExplore: "Explore", navInfo: "About", navLogin: "Login", navProfile: "Profile",
       heroEyebrow: "Explore art around you", heroSub: "Personal routes · Marketplace", scrollHint: "Scroll",
       aboutLabel: "The project",
@@ -1702,6 +1762,9 @@
     },
     fr: {
       langLabel: "Langue",
+      skipToMain: "Aller au contenu principal",
+      scrollToAboutAria: "Aller à la rubrique sur le projet",
+      overlayCloseAria: "Fermer la fenêtre",
       navExplore: "Explorer", navInfo: "Infos", navLogin: "Connexion", navProfile: "Profil",
       heroEyebrow: "Explorez l'art autour de vous", heroSub: "Parcours personnalisés · Marketplace", scrollHint: "Défiler",
       aboutLabel: "Le projet",
@@ -1752,6 +1815,11 @@
       if (L[k] == null) return;
       if (el.getAttribute("data-i18n-html") === "1") el.innerHTML = L[k];
       else el.textContent = L[k];
+    });
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+      const k = el.getAttribute("data-i18n-aria-label");
+      if (L[k] == null) return;
+      el.setAttribute("aria-label", L[k]);
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const k = el.getAttribute("data-i18n-placeholder");
@@ -2230,6 +2298,12 @@
       Date.now() - s.createdAt <= MAX_AGE;
   }
 
+  /** Nodi tecnici sulla mappa (IN/OUT/SHOP/WC): non sono opere registrate come /api/.../oggetti/:nome */
+  function isNavigatorWaypoint(name) {
+    const k = String(name || '').trim().toLowerCase();
+    return k === 'in' || k === 'out' || k === 'shop' || k === 'wc';
+  }
+
   function startReact() {
     if (home && root) {
       home.classList.add("hidden");
@@ -2445,7 +2519,7 @@
       // invece di teletrasportare il prof nella stanza del primo oggetto:
       // l'SVG mostra gia' la freccia da IN al primo oggetto.
       let stanzaObj = "IN";
-      if (routeFromName !== "IN") {
+      if (routeFromName !== "IN" && !isNavigatorWaypoint(currentObjectName)) {
         try {
           const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
           const od = await rr.json().catch(() => ({}));
@@ -2664,7 +2738,7 @@
       // Stesso ragionamento del flusso "apri direttamente": se siamo al
       // primo step (routeFromName="IN") manteniamo IN come inquadratura.
       let stanzaObj = "IN";
-      if (routeFromName !== "IN") {
+      if (routeFromName !== "IN" && !isNavigatorWaypoint(currentObjectName)) {
         try {
           const rr = await fetch(`${API}/musei/${encodeURIComponent(visit.museo)}/oggetti/${encodeURIComponent(currentObjectName)}`);
           const od = await rr.json().catch(() => ({}));
@@ -2698,13 +2772,19 @@
       const open = hamburger.classList.toggle('open');
       mobileMenu.classList.toggle('open', open);
       document.body.style.overflow = open ? 'hidden' : '';
+      hamburger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      mobileMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
     });
+    hamburger.setAttribute('aria-expanded', 'false');
+    mobileMenu.setAttribute('aria-hidden', 'true');
   }
   function closeMobile() {
     if (!hamburger || !mobileMenu) return;
     hamburger.classList.remove('open');
     mobileMenu.classList.remove('open');
     document.body.style.overflow = '';
+    hamburger.setAttribute('aria-expanded', 'false');
+    mobileMenu.setAttribute('aria-hidden', 'true');
   }
 
   /* ── MUSEUM SELECT — GET /api/musei ────────── */

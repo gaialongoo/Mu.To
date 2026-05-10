@@ -1890,7 +1890,7 @@ export default function MuseoEditor() {
   // ─── RENDER: WELCOME / NUOVO ──────────────────────────────────────────
   if (screen === "welcome" || screen === "nuovo") {
     return (
-      <div style={{display:"flex",height:"100vh",background:THEME.bg,alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",padding:isMobile?12:20}}>
+      <main id="editor-main" tabIndex={-1} aria-label="ArtAround editor museo" style={{display:"flex",height:"100vh",background:THEME.bg,alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",padding:isMobile?12:20,outline:"none"}}>
         <div style={{width:isMobile?"100%":520,maxWidth:520,background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px #00000066"}}>
           <div style={{padding:isMobile?"20px 16px 16px":"32px 40px 24px",borderBottom:`1px solid ${THEME.border}`}}>
             <div style={{fontSize:11,letterSpacing:3,color:THEME.accent,marginBottom:8}}>MUSEO EDITOR</div>
@@ -1935,13 +1935,13 @@ export default function MuseoEditor() {
             </>}
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // ─── RENDER: EDITOR ───────────────────────────────────────────────────
   return (
-    <div style={{display:"flex",flexDirection:isMobile?"column":"row",height:"100vh",fontFamily:"Arial,sans-serif",overflow:"hidden",position:"relative",background:THEME.bg,color:THEME.text}}>
+    <main id="editor-main" tabIndex={-1} aria-label="ArtAround editor mappa museo" style={{display:"flex",flexDirection:isMobile?"column":"row",height:"100vh",fontFamily:"Arial,sans-serif",overflow:"hidden",position:"relative",background:THEME.bg,color:THEME.text,outline:"none"}}>
 
       {modal && <ModalPrompt modal={modal} setModal={setModal} />}
       {confirmModal && <ModalConfirm modal={confirmModal} setModal={setConfirmModal} />}
@@ -2948,7 +2948,7 @@ export default function MuseoEditor() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

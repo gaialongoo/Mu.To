@@ -1326,6 +1326,8 @@ async function askObjectAI({ question, museo, oggetto, userPrefs, immaginiOggett
  * Pensato per stare entro pochi KB anche con musei grandi: non includiamo
  * descrizioni complete degli oggetti, solo dati strutturali (stanza, autore,
  * corrente, anno, eventuale titolo) + label tradotte delle stanze dal layout.
+ * Gli item objectType \"text\" (schede solo testo sulla mappa) sono esclusi dalla lista:
+ * nella chat museo si ignorano per orientamento/descrizione come opere esposte.
  */
 function buildMuseumContextForAI({ museo, layout, navLang }) {
   const lang = normalizeNavLang(navLang);
@@ -1352,17 +1354,12 @@ function buildMuseumContextForAI({ museo, layout, navLang }) {
 
   const oggettiList = Array.from(museo?.oggetti instanceof Map ? museo.oggetti.values() : []);
   const oggetti = oggettiList
+    .filter((raw) => {
+      const ot = String(raw?.objectType || "").trim().toLowerCase() || "normal";
+      return ot !== "text";
+    })
     .map((o) => {
       const objectType = String(o?.objectType || "").trim().toLowerCase() || "normal";
-      // Gli item solo testo non sono "opere navigabili": teniamo solo titolo.
-      if (objectType === "text") {
-        return {
-          nome: String(o?.nome || "").trim(),
-          stanza: String(o?.stanza || "").trim(),
-          objectType,
-          textTitle: String(o?.textTitle || "").trim(),
-        };
-      }
       return {
         nome: String(o?.nome || "").trim(),
         stanza: String(o?.stanza || "").trim(),
@@ -1382,12 +1379,44 @@ function buildMuseumContextForAI({ museo, layout, navLang }) {
     stanzeConOggetti[o.stanza].push(o.nome);
   }
 
+  const percorsiRaw = Array.isArray(museo?.percorsi) ? museo.percorsi : [];
+  const percorsiCatalogo = percorsiRaw
+    .slice(0, 16)
+    .map((p) => {
+      const tappe = Array.isArray(p?.oggetti)
+        ? p.oggetti.map((x) => String(x || "").trim()).filter(Boolean).slice(0, 36)
+        : [];
+      const nomePercorso = String(p?.nome || "").trim();
+      if (!nomePercorso && tappe.length < 1) return null;
+      return { nome: nomePercorso || "Senza nome", tappe };
+    })
+    .filter(Boolean);
+
+  const stanzeRiassuntoTipo = stanze.reduce(
+    (acc, s) => {
+      const t = String(s.tipo || "normale").toLowerCase();
+      if (!acc[t]) acc[t] = [];
+      acc[t].push(s.label || s.id);
+      return acc;
+    },
+    /** @type {Record<string, string[]>} */ ({})
+  );
+
+  const indirizzo = String(museo?.indirizzo ?? "").trim();
+  const palazzo = String(museo?.palazzo ?? "").trim();
+  const istruzioniAccesso = String(museo?.istruzioniAccesso ?? "").trim();
+
   return {
     museo: {
       nome: String(museo?.nome || "").trim(),
       citta: String(museo?.citta || "").trim(),
+      ...(indirizzo ? { indirizzo } : {}),
+      ...(palazzo ? { palazzo } : {}),
+      ...(istruzioniAccesso ? { istruzioniAccesso } : {}),
     },
     stanze,
+    stanzeRiassuntoTipo,
+    percorsiCatalogo,
     oggetti,
     stanzeConOggetti,
   };
@@ -1414,6 +1443,37 @@ async function askMuseumGuideAI({
   if (!aiUpstreamReady()) {
     // Fallback super semplice: prova a indovinare se chiede una stanza nota.
     const lc = cleanQuestion.toLowerCase();
+    const museoBlk = museoCtx?.museo || {};
+    const accessSnippet = [museoBlk.indirizzo, museoBlk.palazzo, museoBlk.istruzioniAccesso].filter(Boolean).join(" · ");
+    if (
+      accessSnippet &&
+      /\b(indirizzo|ubicazione|dove\s+(è|si\s+trova|si\s+trova\s+il)|come\s+(arrivo|arrivare|si\s+arriva)|ingresso|accesso)|\b(address|location|how\s+to\s+(get|reach)|where\s+(is|to\s+find))|\b(adresse|accès|comment\s+(venir|arriver))\b/i.test(
+        lc
+      )
+    ) {
+      return lang === "it"
+        ? `Info dal profilo museo: ${accessSnippet}`
+        : lang === "fr"
+          ? `Infos du profil du musée : ${accessSnippet}`
+          : `From the museum profile: ${accessSnippet}`;
+    }
+    const srTipo = museoCtx?.stanzeRiassuntoTipo || {};
+    if (/\b(wc|toilettes?|bagno\b|servizi\s+igienic)/i.test(lc) && srTipo.wc && srTipo.wc.length) {
+      const labels = srTipo.wc.slice(0, 3).join(", ");
+      return lang === "it"
+        ? `Secondo la mappa, servizi correlati alla tipo «wc»: ${labels}. Apri la mappa e cerca queste sale oppure usa i collegamenti rapidi se disponibili.`
+        : lang === "fr"
+          ? `D'après le plan (type WC) : ${labels}. Ouvrez la carte ou les raccourcis si disponibles.`
+          : `From the floor plan (WC-type rooms): ${labels}. Use the map or quick links if shown.`;
+    }
+    if (/\b(shop|bookshop|museum\s+shop|negozio|boutique\s+mus)/i.test(lc) && srTipo.shop && srTipo.shop.length) {
+      const labels = srTipo.shop.slice(0, 3).join(", ");
+      return lang === "it"
+        ? `Punti di tipo shop sulla mappa: ${labels}.`
+        : lang === "fr"
+          ? `Points type boutique sur le plan : ${labels}.`
+          : `Shop-type areas on the map: ${labels}.`;
+    }
     if (museoCtx?.stanze?.length) {
       const hit = museoCtx.stanze.find((s) =>
         lc.includes(String(s.label || "").toLowerCase()) ||
@@ -1458,10 +1518,15 @@ async function askMuseumGuideAI({
 
   const istruzione = [
     "ISTRUZIONE ASSOLUTA — sei la guida del museo. Rispondi alle domande del visitatore",
-    "usando ESCLUSIVAMENTE i dati del CONTESTO_DATI (mappa del museo, stanze, oggetti)",
+    "usando ESCLUSIVAMENTE i dati del CONTESTO_DATI (mappa del museo, stanze, oggetti, percorsi, accesso al luogo)",
     "e la POSIZIONE_VISITATORE. Non inventare opere, autori o stanze che non sono nel JSON.",
-    "Domande possibili: descrizione di un oggetto/stanza, indicazioni di percorso (es. «come arrivo al bagno?», «dov'è lo shop?»), prossima tappa del percorso, suggerimenti.",
-    "Se la domanda è di navigazione: usa la posizione attuale e il tipo delle stanze (ingresso/normale/uscita/wc/shop) per dare un'indicazione semplice (es. «in fondo a destra», «torna indietro alla sala A e poi a sinistra»).",
+    "Per «come arrivo al museo», indirizzo, ingressi, ingresso disabili o note pratiche: usa solo museo.indirizzo, museo.palazzo, museo.istruzioniAccesso se presenti; se mancano, dichiaralo senza inventare.",
+    "Percorso attivo nell'app: in POSIZIONE_VISITATORE usa l'array «percorsoAttivoNelNavigator» (stabilità: è la lista inviata dal client / navigator che descrive la visita CORRENTE: percorso acquistato, visita IA o visita guidata). percorsiCatalogo in CONTESTO_DATI elenca altri percorsi in catalogo: non sostituiscono questa sequenza.",
+    "Ignora per descrizione come «opera esposta» gli oggetti con objectType \"text\": non sono nel JSON oggetti. Se in percorso compaiono id tipo __text__… (solo visite guidate), sono contenuti solo testuali in stanza — non cercarli nell'elenco opere né come dipinti/statue.",
+    "Usa stanzeRiassuntoTipo per collegare i servizi alle etichette delle sale (ingresso, uscita, wc, shop, corridoio, normale…).",
+    "Usa percorsiCatalogo solo per confrontare o menzionare alternative; la sequenza autoritativa dell'utente è «percorsoAttivoNelNavigator» in POSIZIONE_VISITATORE. La mappa usa nodi tecnici IN/OUT/SHOP/WC (vedi notaPercorso).",
+    "Domande possibili: descrizione di un oggetto/stanza, indicazioni di spostamento in museo (bagno, shop, sala), ordine delle tappe, prossimo passo suggerito.",
+    "Navigazione in museo: combina tipo stanza, posizione (stanza/oggetto correnti) e eventualmente la sequenza nel percorso (tappa prima/dopo/indice); resta sintetico e orientativo come su una mappa SVG.",
     "Se non hai dati sufficienti, dillo in una frase invece di inventare.",
     ...linguaRisposta,
   ].join(" ");
@@ -1477,7 +1542,9 @@ async function askMuseumGuideAI({
   const contestoDati = {
     museo: museoCtx?.museo || { nome: "", citta: "" },
     stanze: museoCtx?.stanze || [],
+    stanzeRiassuntoTipo: museoCtx?.stanzeRiassuntoTipo || {},
     stanzeConOggetti: museoCtx?.stanzeConOggetti || {},
+    percorsiCatalogo: museoCtx?.percorsiCatalogo || [],
     oggetti: museoCtx?.oggetti || [],
     posizioneVisitatore: positionCtx || {},
   };
@@ -1503,8 +1570,8 @@ async function askMuseumGuideAI({
 
   const payload = {
     model: AI_MODEL,
-    temperature: 0.4,
-    max_tokens: 380,
+    temperature: 0.35,
+    max_tokens: 480,
     messages,
   };
 
@@ -2732,21 +2799,34 @@ async function startServer(cliOptions) {
         ? req.body.percorso.map((s) => String(s || "").trim()).filter(Boolean)
         : [];
       const tappaCorrente = String(req.body?.tappaCorrente || "").trim() || null;
-      const prossimaTappa = (() => {
-        if (!percorso.length) return null;
-        const ref = oggettoCorrente || tappaCorrente;
-        if (!ref) return percorso[0];
-        const idx = percorso.indexOf(ref);
-        if (idx >= 0 && idx + 1 < percorso.length) return percorso[idx + 1];
-        return null;
-      })();
+      const refPercorso = oggettoCorrente || tappaCorrente;
+      let indiceTappaCorrente = null;
+      let tappaPrecedente = null;
+      let prossimaTappa = null;
+      if (percorso.length > 0) {
+        const idx =
+          refPercorso !== null && refPercorso !== undefined && refPercorso !== ""
+            ? percorso.indexOf(refPercorso)
+            : -1;
+        indiceTappaCorrente = idx >= 0 ? idx : null;
+        if (idx > 0) tappaPrecedente = percorso[idx - 1];
+        if (idx >= 0 && idx + 1 < percorso.length) prossimaTappa = percorso[idx + 1];
+        else if (idx < 0 && !refPercorso) prossimaTappa = percorso[0];
+      }
 
       const positionCtx = {
         stanzaCorrente,
         oggettoCorrente,
         tappaCorrente,
-        percorso,
+        percorsoAttivoNelNavigator: percorso,
+        tappaPrecedente,
         prossimaTappa,
+        indiceTappaCorrente,
+        totaleTappePercorso: percorso.length,
+        notaPercorso:
+          "Sulla mappa la visita usa nodi tecnici IN, OUT, SHOP, WC tra le tappe: servono all'orientamento, non sono opere sul catalogo.",
+        notaSequenza:
+          "\"percorsoAttivoNelNavigator\" è la sequenza ordinata attualmente attiva nell'app (identica al campo «percorso» nella richiesta HTTP dal navigator). Possono comparire __text__… nelle visite guidate (solo messaggio in sala, non catalogo opere).",
       };
 
       const history = Array.isArray(req.body?.history) ? req.body.history : [];

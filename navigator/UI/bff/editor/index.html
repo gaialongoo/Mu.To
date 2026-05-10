@@ -8,8 +8,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+    <style>
+      .skip-to-main {
+        position: absolute;
+        left: -9999px;
+        z-index: 100000;
+        padding: 10px 16px;
+        background: #5cbf80;
+        color: #0d0d0d;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        border-radius: 6px;
+      }
+      .skip-to-main:focus {
+        left: 12px;
+        top: 12px;
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+    </style>
   </head>
   <body>
+    <a class="skip-to-main" href="#editor-main">Salta al contenuto principale</a>
     <div id="root"></div>
     <script type="module" src="./src/main.jsx"></script>
   </body>

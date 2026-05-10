@@ -63,13 +63,13 @@ function Skeleton() {
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
-function Pagination({ total, current, onChange }) {
+function Pagination({ total, current, onChange, ariaLabel }) {
   const pages = Math.ceil(total / PAGE_SIZE);
   if (pages <= 1) return null;
   return (
-    <div style={{ display: "flex", justifyContent: "center", gap: 6, margin: "36px 0 16px" }}>
+    <nav aria-label={ariaLabel} style={{ display: "flex", justifyContent: "center", gap: 6, margin: "36px 0 16px" }}>
       {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-        <button key={p} onClick={() => onChange(p)} style={{
+        <button type="button" key={p} onClick={() => onChange(p)} style={{
           padding: "8px 13px",
           border: `1px solid ${p === current ? "var(--green)" : "var(--border)"}`,
           background: p === current ? "var(--green)" : "var(--bg-card)",
@@ -81,7 +81,7 @@ function Pagination({ total, current, onChange }) {
           color: p === current ? "#0d0d0d" : "var(--text-dim)",
         }}>{p}</button>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -1311,24 +1311,25 @@ export default function App() {
   // ── No museo ───────────────────────────────────────────────────────────────
   if (!authChecked) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>
+      <main id="marketplace-main" tabIndex={-1} aria-label={mp("ariaMainMarketplace")} style={{ outline: "none", minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontFamily: "var(--font-head)", letterSpacing: "0.08em" }}>
         {mp("authChecking")}
-      </div>
+      </main>
     );
   }
 
   if (!MUSEO) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
+      <main id="marketplace-main" tabIndex={-1} aria-label={mp("ariaMainMarketplace")} style={{ outline: "none", minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
         <p style={{ fontFamily: "var(--font-head)", fontSize: 14, letterSpacing: "0.1em", color: "var(--text-dim)" }}>{mp("noMuseo")}</p>
         <a href="/" style={{ padding: "10px 22px", background: "transparent", color: "var(--green)", border: "1px solid var(--green)", borderRadius: "var(--radius)", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.13em", textDecoration: "none" }}>{mp("backHome")}</a>
-      </div>
+      </main>
     );
   }
 
   return (
     <>
       <ArcDeco />
+      <main id="marketplace-main" tabIndex={-1} aria-label={mp("ariaMainMarketplace")} style={{ outline: "none" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1440, margin: "0 auto", padding: isMobile ? "0 12px 56px" : isTablet ? "0 22px 70px" : "0 40px 80px" }}>
 
         {/* ── Header ── */}
@@ -1367,7 +1368,7 @@ export default function App() {
         </header>
 
         {/* ── Navigation ── */}
-        <nav style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12, marginBottom: isMobile ? 22 : 32 }}>
+        <nav aria-label={mp("ariaMarketplaceNav")} style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12, marginBottom: isMobile ? 22 : 32 }}>
           <div style={{ display: "flex", gap: 2, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 4, width: isMobile ? "100%" : "auto" }}>
             {[
               { id: "items", labelKey: "tabItems" },
@@ -1538,7 +1539,7 @@ export default function App() {
                   ))
               }
             </div>
-            <Pagination total={filtered.length} current={itemPage} onChange={setItemPage} />
+            <Pagination total={filtered.length} current={itemPage} onChange={setItemPage} ariaLabel={mp("ariaPagination")} />
           </>
         )}
 
@@ -1640,7 +1641,7 @@ export default function App() {
                   ))
               }
             </div>
-            <Pagination total={allVisitRoutes.length} current={visitPage} onChange={setVisitPage} />
+            <Pagination total={allVisitRoutes.length} current={visitPage} onChange={setVisitPage} ariaLabel={mp("ariaPagination")} />
           </>
         )}
 
@@ -2216,6 +2217,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      </main>
 
       <ApiKeyModal open={modalOpen} onClose={() => setModalOpen(false)} onConfirm={handleApiKey} />
       <Toast ref={toastRef} />
