@@ -23,42 +23,28 @@ def svg_header(title, w, h):
       .stanza.bagno {{ fill:#aed6f1; stroke:#3498db; }}
       .stanza.servizio {{ fill:#fad7a0; stroke:#f39c12; }}
 
-      .stanza-label {{ font:bold 14px Arial; fill:#2c3e50; }}
+      .stanza-label {{ font:bold 14px Arial; fill:#5cbf80; pointer-events:none; }}
 
       .corridoio {{ fill:#ecf0f1; stroke:#95a5a6; stroke-width:2; }}
 
-      .oggetto {{ fill:#3498db; stroke:#2980b9; stroke-width:2; }}
-      .oggetto-label {{ font:10px Arial; fill:black; text-anchor:middle; pointer-events:none; }}
+      .oggetto {{ fill:rgba(92,191,128,.28); stroke:#5cbf80; stroke-width:2; cursor:pointer; }}
+      .oggetto-label {{ font:700 10px Arial; fill:#3d8f5a; text-anchor:middle; pointer-events:none; }}
 
-      /* ===== PERCORSI ANIMATI ===== */
+      /* ===== PERCORSI ANIMATI (stesso verde ovunque) ===== */
 
-      .conn-obj {{
-        stroke:#e74c3c;
+      .conn-percorso, .conn-obj, .conn-obj-debug {{
+        stroke:#5cbf80;
         stroke-width:4;
         fill:none;
         stroke-linecap:round;
         stroke-dasharray:12 10;
-        animation: flow-red 1.2s linear infinite;
+        animation: flow-dash 1.1s linear infinite;
+        opacity:1;
       }}
 
-      .conn-obj-debug {{
-        stroke:black;
-        stroke-width:3;
-        fill:none;
-        stroke-linecap:round;
-        stroke-dasharray:6 6;
-        animation: flow-black 0.9s linear infinite;
-        opacity:0.85;
-      }}
-
-      @keyframes flow-red {{
+      @keyframes flow-dash {{
         from {{ stroke-dashoffset: 0; }}
         to   {{ stroke-dashoffset: -22; }}
-      }}
-
-      @keyframes flow-black {{
-        from {{ stroke-dashoffset: 0; }}
-        to   {{ stroke-dashoffset: -12; }}
       }}
     </style>
   </defs>
@@ -194,8 +180,7 @@ def draw(svg, stanze, corridoi, oggetti, edge_mode="all", edge_focus=None):
             b = find_object(oggetti, edge_focus[1])
             if a and b:
                 d = rounded_path(route_between(a, b, stanze, corridoi))
-                cls = "conn-obj-debug" if is_special(a) or is_special(b) else "conn-obj"
-                svg += f'\n<path d="{d}" class="{cls}"/>'
+                svg += f'\n<path d="{d}" class="conn-percorso"/>'
 
     elif edge_mode != "none":
         specials = [o for o in oggetti if is_special(o)]
@@ -212,7 +197,7 @@ def draw(svg, stanze, corridoi, oggetti, edge_mode="all", edge_focus=None):
                     if key in drawn:
                         continue
                     drawn.add(key)
-                    edges.append((o, t, "conn-obj"))
+                    edges.append((o, t, "conn-percorso"))
 
             for s in specials:
                 if s is o:
@@ -221,7 +206,7 @@ def draw(svg, stanze, corridoi, oggetti, edge_mode="all", edge_focus=None):
                 if key in drawn:
                     continue
                 drawn.add(key)
-                edges.append((o, s, "conn-obj-debug"))
+                edges.append((o, s, "conn-percorso"))
 
         for o, t, cls in edges:
             if edge_mode == "services" and not (is_special(o) or is_special(t)):

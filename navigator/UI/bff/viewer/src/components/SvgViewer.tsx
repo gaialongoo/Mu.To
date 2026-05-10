@@ -2450,8 +2450,8 @@ function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
   exitText.setAttribute("text-anchor", "middle");
   exitText.setAttribute("dominant-baseline", "middle");
   exitText.setAttribute("class", "exit-room-label");
-  exitText.setAttribute("fill", "#ff2b2b");
-  exitText.setAttribute("stroke", "#630000");
+  exitText.setAttribute("fill", "#7fe8a8");
+  exitText.setAttribute("stroke", "#1f5c38");
   exitText.setAttribute("stroke-width", "1.1");
   exitText.textContent = "EXIT";
 
@@ -2727,7 +2727,9 @@ function drawArrowText(layer: SVGGElement, link: Link) {
   }
 
   const g = document.createElementNS(ns, "g");
+  g.setAttribute("class", "nav-arrow-group");
   const img = document.createElementNS(ns, "image");
+  img.setAttribute("class", "nav-arrow-img");
   img.setAttribute("href", "./icons/arrow-right.png");
   img.setAttribute("width", `${SIZE}`);
   img.setAttribute("height", `${SIZE}`);

@@ -128,6 +128,48 @@ rect.corridoio {
   stroke-width: 2;
 }
 
+/* Titoli stanze: neri, maiuscolo solo visivo (textContent originale per i18n/url) */
+#svg-host svg text.stanza-label {
+  fill: #000000 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#svg-host svg circle.oggetto {
+  fill: rgba(92, 191, 128, 0.32) !important;
+  stroke: #5cbf80 !important;
+}
+
+#svg-host svg text.oggetto-label {
+  fill: #3d8f5a !important;
+  font-weight: 700;
+}
+
+#svg-host svg circle.oggetto-ripple {
+  stroke: #5cbf80 !important;
+}
+
+#svg-host svg path.conn-percorso,
+#svg-host svg path.conn-obj,
+#svg-host svg path.conn-obj-debug {
+  stroke: #5cbf80 !important;
+  stroke-width: 4px;
+  fill: none !important;
+  stroke-linecap: round;
+  stroke-dasharray: 12 10;
+  animation: navigator-flow-dash 1.1s linear infinite;
+  opacity: 1 !important;
+}
+
+@keyframes navigator-flow-dash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+
 /* =========================
    FRECCE (UNICODE)
    ========================= */
@@ -149,12 +191,12 @@ rect.corridoio {
 }
 
 .nav-arrow-group:hover .nav-arrow-img {
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+  filter: drop-shadow(0 0 6px rgba(92, 191, 128, 0.55));
 }
 
 /* Se vuoi feedback al click senza muovere/ruotare */
 .nav-arrow-group:active .nav-arrow-img {
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.45));
+  filter: drop-shadow(0 0 10px rgba(127, 232, 168, 0.65));
 }
 
 
@@ -179,10 +221,10 @@ rect.corridoio {
 }
 
 .exit-room-label {
-  fill: #ff2b2b;
+  fill: #7fe8a8;
   font-size: 30px;
   font-weight: 900;
-  stroke: #630000;
+  stroke: #1f5c38;
   stroke-width: 1.1px;
   paint-order: stroke fill;
   letter-spacing: 0.12em;
@@ -191,9 +233,9 @@ rect.corridoio {
   cursor: pointer;
   user-select: none;
   text-shadow:
-    0 0 4px rgba(255, 180, 180, 0.95),
-    0 0 10px rgba(255, 90, 90, 0.9),
-    0 0 18px rgba(255, 58, 58, 0.72);
+    0 0 4px rgba(92, 191, 128, 0.95),
+    0 0 10px rgba(92, 191, 128, 0.75),
+    0 0 18px rgba(127, 232, 168, 0.55);
 }
 
 /* =========================

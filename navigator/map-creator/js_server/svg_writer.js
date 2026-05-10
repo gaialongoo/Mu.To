@@ -30,36 +30,51 @@ function svgHeader(title, w, h) {
     viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
   <defs>
     <style>
-      /* ===== STANZE ===== */
+      /* Stanze: bordi come in origine (IN verde, OUT rosso, WC/servizi a colori, sale grigio scuro) */
       .stanza {
         stroke: #2c3e50;
         stroke-width: 3;
       }
 
-      .stanza.ingresso  { stroke: #2ecc71; }
-      .stanza.uscita    { stroke: #e74c3c; }
-      .stanza.bagno     { stroke: #3498db; }
-      .stanza.servizio  { stroke: #f39c12; }
+      .stanza.ingresso {
+        stroke: #2ecc71;
+      }
+      .stanza.uscita {
+        stroke: #e74c3c;
+      }
+      .stanza.bagno {
+        stroke: #3498db;
+      }
+      .stanza.servizio {
+        stroke: #f39c12;
+      }
 
       .stanza-label {
         font: bold 14px Arial;
-        fill: #2c3e50;
+        fill: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         pointer-events: none;
       }
 
       /* ===== CORRIDOI ===== */
-      .corridoio { fill: #ecf0f1; stroke: #95a5a6; stroke-width: 2; }
+      .corridoio {
+        fill: #ecf0f1;
+        stroke: #95a5a6;
+        stroke-width: 2;
+      }
 
       /* ===== OGGETTI ===== */
       .oggetto {
-        fill: #3498db;
-        stroke: #2980b9;
+        fill: rgba(92, 191, 128, 0.28);
+        stroke: #5cbf80;
         stroke-width: 2;
         cursor: pointer;
       }
       .oggetto-label {
         font: 10px Arial;
-        fill: black;
+        fill: #3d8f5a;
+        font-weight: 700;
         text-anchor: middle;
         pointer-events: none;
       }
@@ -67,7 +82,7 @@ function svgHeader(title, w, h) {
       /* Anello ripple che pulsa attorno all'oggetto */
       .oggetto-ripple {
         fill: none;
-        stroke: #3498db;
+        stroke: #5cbf80;
         stroke-width: 2.5;
         opacity: 0;
         animation: ripple-out 1.8s ease-out infinite;
@@ -80,34 +95,22 @@ function svgHeader(title, w, h) {
         100% { r: 26px; opacity: 0;    stroke-width: 0.5; }
       }
 
-      /* ===== PERCORSI ANIMATI ===== */
-      .conn-obj {
-        stroke: #e74c3c;
+      /* ===== PERCORSI ANIMATI (stesso verde per tutti i segmenti) ===== */
+      .conn-percorso,
+      .conn-obj,
+      .conn-obj-debug {
+        stroke: #5cbf80;
         stroke-width: 4;
         fill: none;
         stroke-linecap: round;
         stroke-dasharray: 12 10;
-        animation: flow-red 1.2s linear infinite;
+        animation: flow-dash 1.1s linear infinite;
+        opacity: 1;
       }
 
-      .conn-obj-debug {
-        stroke: #27ae60;
-        stroke-width: 3;
-        fill: none;
-        stroke-linecap: round;
-        stroke-dasharray: 6 6;
-        animation: flow-green 0.9s linear infinite;
-        opacity: 0.85;
-      }
-
-      @keyframes flow-red {
+      @keyframes flow-dash {
         from { stroke-dashoffset: 0; }
         to   { stroke-dashoffset: -22; }
-      }
-
-      @keyframes flow-green {
-        from { stroke-dashoffset: 0; }
-        to   { stroke-dashoffset: -12; }
       }
     </style>
   </defs>
@@ -301,8 +304,7 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
       const b = findObject(oggetti, edgeFocus[1]);
       if (a && b) {
         const d = roundedPath(routeBetween(a, b, stanze, corridoi));
-        const cls = isSpecial(a) || isSpecial(b) ? "conn-obj-debug" : "conn-obj";
-        svg += `\n<path d="${d}" class="${cls}"/>`;
+        svg += `\n<path d="${d}" class="conn-percorso"/>`;
       }
     }
   } else if (edgeMode !== "none") {
@@ -318,7 +320,7 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
           const key = [o.nome, t.nome].sort().join("|");
           if (drawn.has(key)) continue;
           drawn.add(key);
-          edges.push([o, t, "conn-obj"]);
+          edges.push([o, t, "conn-percorso"]);
         }
       }
 
@@ -327,7 +329,7 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
         const key = [o.nome, s.nome].sort().join("|");
         if (drawn.has(key)) continue;
         drawn.add(key);
-        edges.push([o, s, "conn-obj-debug"]);
+        edges.push([o, s, "conn-percorso"]);
       }
     }
 
