@@ -12,6 +12,10 @@ class SistemaMusei {
   // ✅ FIX: carica i percorsi dal JSON
   museo.percorsi = museoData.percorsi || [];
 
+  museo.indirizzo = String(museoData.indirizzo ?? "").trim();
+  museo.palazzo = String(museoData.palazzo ?? "").trim();
+  museo.istruzioniAccesso = String(museoData.istruzioniAccesso ?? "").trim();
+
   for (const oggetto of museoData.oggetti || []) {
     museo.aggiungi_oggetto(oggetto);
   }
@@ -37,6 +41,9 @@ class SistemaMusei {
       const museoJson = {
         nome: museo.nome,
         citta: museo.citta,
+        indirizzo: museo.indirizzo || "",
+        palazzo: museo.palazzo || "",
+        istruzioniAccesso: museo.istruzioniAccesso || "",
         oggetti: Array.from(museo.oggetti.values()).map(ogg => ({
           nome: ogg.nome,
           stanza: ogg.stanza,

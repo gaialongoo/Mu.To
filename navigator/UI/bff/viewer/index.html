@@ -2888,7 +2888,7 @@
           combinedRouteIndex.set(routeId, p);
           const o = document.createElement('option');
           o.value = routeId;
-          o.textContent = p.source === "ai_personalized" ? `${p.nome} (IA)` : p.nome;
+          o.textContent = p.nome;
           percorso.appendChild(o);
         });
         percorso.disabled = false;

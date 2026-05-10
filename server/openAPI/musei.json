@@ -3,6 +3,9 @@
     {
       "nome": "Uffizi",
       "citta": "Firenze",
+      "indirizzo": "Piazzale degli Uffizi 6, 50122 Firenze",
+      "palazzo": "Palazzo degli Uffizi",
+      "istruzioniAccesso": "Ingresso dai Portici degli Uffizi: segui le indicazioni per i biglietti prenotati.",
       "oggetti": [
         {
           "nome": "statua",
@@ -283,6 +286,9 @@
     {
       "nome": "Museo di Torino",
       "citta": "Torino",
+      "indirizzo": "Piazza dei Musei 1, 10124 Torino",
+      "palazzo": "Palazzo dei Musei (esempio)",
+      "istruzioniAccesso": "Ingresso dal portico principale: ritira l’audioguida in biglietteria se inclusa. Guardaroba al piano terra a sinistra; il percorso consigliato segue le frecce verdi sul pavimento.",
       "oggetti": [
         {
           "nome": "collana",

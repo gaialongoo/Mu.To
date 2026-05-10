@@ -1646,6 +1646,9 @@ async function loadSistemaFromMongo() {
         citta: d.citta,
         oggetti: d.oggetti || [],
         percorsi: d.percorsi || [],
+        indirizzo: d.indirizzo,
+        palazzo: d.palazzo,
+        istruzioniAccesso: d.istruzioniAccesso,
       });
     }
     return sistema;
@@ -2207,7 +2210,8 @@ async function startServer(cliOptions) {
 
       const now = new Date();
       const customRouteName = String(req.body?.nome || "").trim();
-      const routeName = customRouteName || `Visita IA ${lengthPreset} ${now.toLocaleDateString("it-IT")}`;
+      const routeName =
+        customRouteName || `Visita personalizzata ${lengthPreset} ${now.toLocaleDateString("it-IT")}`;
       const routeDoc = normalizePersonalRouteStorage({
         id: new ObjectId().toString(),
         museo: museoNome,
@@ -3457,6 +3461,9 @@ async function startServer(cliOptions) {
     res.json({
       nome: museo.nome,
       citta: museo.citta,
+      indirizzo: museo.indirizzo || "",
+      palazzo: museo.palazzo || "",
+      istruzioniAccesso: museo.istruzioniAccesso || "",
       oggetti: Array.from(museo.oggetti.values()),
       percorsi: museo.percorsi || [],
       labelI18n,
@@ -3645,7 +3652,10 @@ async function startServer(cliOptions) {
     if (!nome || !citta) return res.status(400).json({ error: "Nome e città obbligatori" });
     if (sistema.get_museo(nome)) return res.status(400).json({ error: "Museo già esistente" });
 
-    const museo = { nome, citta, oggetti: oggetti || [], percorsi: [] };
+    const indirizzo = String(req.body?.indirizzo ?? "").trim();
+    const palazzo = String(req.body?.palazzo ?? "").trim();
+    const istruzioniAccesso = String(req.body?.istruzioniAccesso ?? "").trim();
+    const museo = { nome, citta, oggetti: oggetti || [], percorsi: [], indirizzo, palazzo, istruzioniAccesso };
     sistema.aggiungi_museo(museo);
     sistema.salvaSuFile(FILE_JSON);
 
@@ -3734,11 +3744,28 @@ async function startServer(cliOptions) {
       sistema.musei.set(nome, museo);
     }
     if (citta) museo.citta = citta;
+    if (Object.prototype.hasOwnProperty.call(req.body, "indirizzo")) {
+      museo.indirizzo = String(req.body.indirizzo ?? "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "palazzo")) {
+      museo.palazzo = String(req.body.palazzo ?? "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "istruzioniAccesso")) {
+      museo.istruzioniAccesso = String(req.body.istruzioniAccesso ?? "").trim();
+    }
 
     sistema.salvaSuFile(FILE_JSON);
 
     try {
-      await upsertMuseo({ nome: museo.nome, citta: museo.citta, oggetti: Array.from(museo.oggetti.values()), percorsi: museo.percorsi || [] });
+      await upsertMuseo({
+        nome: museo.nome,
+        citta: museo.citta,
+        indirizzo: museo.indirizzo || "",
+        palazzo: museo.palazzo || "",
+        istruzioniAccesso: museo.istruzioniAccesso || "",
+        oggetti: Array.from(museo.oggetti.values()),
+        percorsi: museo.percorsi || [],
+      });
       console.log(`Museo '${museo.nome}' aggiornato`);
     } catch (err) {
       console.error("Errore MongoDB:", err.message);

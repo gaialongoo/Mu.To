@@ -1357,7 +1357,7 @@ export default function SvgViewer() {
             zIndex: 1001,
             border: "none",
             borderRadius: 10,
-            background: "rgba(24,95,165,0.92)",
+            background: "#185fa5",
             color: "#fff",
             fontSize: 12,
             fontWeight: 700,
@@ -1783,7 +1783,7 @@ export default function SvgViewer() {
             position: "fixed",
             inset: 0,
             zIndex: 9400,
-            background: "rgba(0,0,0,0.65)",
+            background: "var(--bg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1796,9 +1796,9 @@ export default function SvgViewer() {
               width: "min(920px, 96vw)",
               maxHeight: "92vh",
               overflowY: "auto",
-              background: "var(--bg-card)",
+              background: "#141414",
               color: "var(--text)",
-              border: "1px solid var(--border)",
+              border: "1px solid rgba(255,255,255,0.14)",
               borderRadius: "var(--radius-lg)",
               padding: "16px 18px",
               boxShadow: "0 40px 100px rgba(0,0,0,0.7)",
@@ -1813,7 +1813,7 @@ export default function SvgViewer() {
             </p>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-              <button onClick={() => teacherAcceptAll().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              <button onClick={() => teacherAcceptAll().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid rgba(255,255,255,0.12)", background: "#181818", color: "var(--text)", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {t("teacherAcceptAll")}
               </button>
               <button onClick={() => teacherStartQuiz().catch((e) => showToast(e.message, "error"))} style={{ padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--green)", background: "var(--green)", color: "#0d0d0d", cursor: "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
@@ -1825,7 +1825,7 @@ export default function SvgViewer() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
+              <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: "var(--radius-lg)", padding: 10, background: "#181818" }}>
                 <strong>{t("teacherWaiting")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
@@ -1841,7 +1841,7 @@ export default function SvgViewer() {
                     ))}
                 </div>
               </div>
-              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
+              <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: "var(--radius-lg)", padding: 10, background: "#181818" }}>
                 <strong>{t("teacherInside")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {(Array.isArray(teacherVisitState?.participants) ? teacherVisitState.participants : [])
@@ -1857,7 +1857,7 @@ export default function SvgViewer() {
             </div>
 
             {teacherShowResults && (
-              <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10, background: "var(--bg-panel)" }}>
+              <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.1)", borderRadius: "var(--radius-lg)", padding: 10, background: "#181818" }}>
                 <strong>{t("teacherQuizResults")}</strong>
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {teacherQuizResults.length < 1
@@ -3517,19 +3517,7 @@ function ObjectOverlay({
       window.clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    try {
-      window.speechSynthesis?.cancel?.();
-    } catch {}
-    try {
-      if (ttsAudioRef.current) {
-        ttsAudioRef.current.pause();
-        ttsAudioRef.current.src = "";
-      }
-    } catch {}
-    setTtsBusyKey(null);
-    setTtsPaused(false);
-    setTtsRange(null);
-    utteranceRef.current = null;
+    stopTts();
   }, [nome]);
 
   const waitForVoices = async () => {
@@ -3557,6 +3545,14 @@ function ObjectOverlay({
   };
 
   const stopTts = () => {
+    if (ttsLiveRestartTimerRef.current) {
+      try {
+        window.clearTimeout(ttsLiveRestartTimerRef.current);
+      } catch {
+        /* ignore */
+      }
+      ttsLiveRestartTimerRef.current = null;
+    }
     try { window.speechSynthesis?.cancel?.(); } catch {}
     try {
       if (ttsAudioRef.current) {
@@ -3582,6 +3578,11 @@ function ObjectOverlay({
     ttsCharIndexRef.current = 0;
   };
 
+  const requestCloseOverlay = () => {
+    stopTts();
+    onClose();
+  };
+
   const pauseTts = () => {
     try {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -3596,8 +3597,13 @@ function ObjectOverlay({
             Math.max(ttsCharIndexRef.current || 0, Number.isFinite(idxFromRange) ? idxFromRange : 0)
           )
         );
-        const remaining = String(ttsFullTextRef.current || "").slice(idx).trimStart();
-        if (remaining) ttsManualRemainingRef.current = remaining;
+        const rawAfter = String(ttsFullTextRef.current || "").slice(idx);
+        const leadSkip = rawAfter.length - rawAfter.trimStart().length;
+        const remaining = rawAfter.trimStart();
+        if (remaining) {
+          ttsManualRemainingRef.current = remaining;
+          ttsCharIndexRef.current = Math.min(ttsFullTextRef.current.length, idx + leadSkip);
+        }
         // Segna che la cancel è una "pausa", non uno stop definitivo
         ttsPausingRef.current = true;
         synth.cancel();
@@ -3667,30 +3673,67 @@ function ObjectOverlay({
     return ranges;
   };
 
-  const startTtsHighlightFallback = (fullText: string) => {
-    if (ttsFallbackStartedRef.current) return;
+  /** Stima millisecondi per allineare il fallback “a parole” dopo una posizione nel testo. */
+  const approxElapsedMsForChar = (
+    fullText: string,
+    charIdx: number,
+    rate: number
+  ) => {
     const ranges = buildWordRanges(fullText);
-    if (ranges.length < 2) return;
-    ttsWordRangesRef.current = ranges;
-    ttsFallbackStartedRef.current = true;
-    ttsFallbackElapsedBeforePauseRef.current = 0;
-    ttsFallbackStartTsRef.current = Date.now();
+    if (!ranges.length) return 0;
+    const cx = Math.max(0, Math.floor(charIdx));
+    let wi = ranges.findIndex((r) => r.end > cx);
+    if (wi < 0) wi = Math.max(0, ranges.length - 1);
+    const wps = 2.5 * Math.max(0.6, Math.min(1.6, Number(rate) || 1));
+    return (wi / Math.max(wps, 1e-6)) * 1000;
+  };
+
+  const startTtsHighlightFallback = (fullText: string, opts?: { resume?: boolean }) => {
+    const resume = !!opts?.resume;
     if (ttsFallbackTimerRef.current) {
-      window.clearInterval(ttsFallbackTimerRef.current);
+      try {
+        window.clearInterval(ttsFallbackTimerRef.current);
+      } catch {
+        /* ignore */
+      }
       ttsFallbackTimerRef.current = null;
     }
-    ttsFallbackTimerRef.current = window.setInterval(() => {
+
+    const ranges = buildWordRanges(fullText);
+    if (ranges.length < 2) return;
+
+    if (!resume) {
+      ttsFallbackElapsedBeforePauseRef.current = 0;
+    } else {
+      const rateSeed = Math.max(0.6, Math.min(1.6, Number(ttsRateRef.current) || 1));
+      const acc = Number(ttsFallbackElapsedBeforePauseRef.current) || 0;
+      const chNow = Number(ttsCharIndexRef.current) || 0;
+      if (acc < 200 && fullText.trim().length > 0 && chNow > 0) {
+        ttsFallbackElapsedBeforePauseRef.current = Math.max(
+          acc,
+          approxElapsedMsForChar(fullText, chNow, rateSeed)
+        );
+      }
+    }
+
+    ttsWordRangesRef.current = ranges;
+    ttsFallbackStartedRef.current = true;
+    ttsFallbackStartTsRef.current = Date.now();
+
+    const tick = () => {
       const rate = Math.max(0.6, Math.min(1.6, Number(ttsRateRef.current) || 1));
       const wps = 2.5 * rate;
-      const elapsedMs = ttsFallbackElapsedBeforePauseRef.current + Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
+      const elapsedMs =
+        ttsFallbackElapsedBeforePauseRef.current +
+        Math.max(0, Date.now() - ttsFallbackStartTsRef.current);
       const wordIdx = Math.floor((elapsedMs / 1000) * wps);
       const r = ranges[Math.max(0, Math.min(ranges.length - 1, wordIdx))];
       if (r) {
         setTtsRange(r);
-        // Aggiorna anche l'indice corrente così Pausa/Riprendi riparte dal punto giusto
         ttsCharIndexRef.current = r.end;
       }
-    }, 120);
+    };
+    ttsFallbackTimerRef.current = window.setInterval(tick, 120);
   };
 
   const startUtterance = async (text: string, key: string, { isResume }: { isResume: boolean }) => {
@@ -3719,8 +3762,11 @@ function ObjectOverlay({
     } catch {}
 
     let gotBoundary = false;
-    // base nel testo completo (serve per resume e per non "sommarlo" male)
-    const base = Math.max(0, Math.min(ttsFullTextRef.current.length, ttsCharIndexRef.current || 0));
+    // base nel testo completo: in resume coincide con l'inizio del segmento parlato dopo trim live-restart
+    const base =
+      isResume
+        ? Math.max(0, Math.min(ttsFullTextRef.current.length, ttsCharIndexRef.current || 0))
+        : 0;
     ttsUtteranceBaseRef.current = base;
     u.onboundary = (ev: any) => {
       gotBoundary = true;
@@ -3741,7 +3787,9 @@ function ObjectOverlay({
       ttsPausingRef.current = false;
       // Fallback highlight: se non arrivano boundary dopo un attimo, evidenziamo “a tempo”.
       setTimeout(() => {
-        if (!gotBoundary && ttsKeyRef.current === key) startTtsHighlightFallback(ttsFullTextRef.current);
+        if (!gotBoundary && ttsKeyRef.current === key) {
+          startTtsHighlightFallback(ttsFullTextRef.current, { resume: isResume });
+        }
       }, 250);
     };
     u.onend = () => {
@@ -3892,8 +3940,11 @@ function ObjectOverlay({
         Math.max(ttsCharIndexRef.current || 0, Number.isFinite(idxFromRange) ? idxFromRange : 0)
       )
     );
-    const remaining = fullText.slice(charIdx).trimStart();
+    const rawTail = fullText.slice(charIdx);
+    const leadingSkip = rawTail.length - rawTail.trimStart().length;
+    const remaining = rawTail.trimStart();
     if (!remaining) return;
+    ttsCharIndexRef.current = Math.min(fullText.length, charIdx + leadingSkip);
 
     // Dedup: se c'e' gia' un restart pendente (drag rapido dello slider), annulla
     // quello vecchio. Poi marca il flag perche' onerror/onend ignorino la cancel.
@@ -4340,7 +4391,7 @@ function ObjectOverlay({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestCloseOverlay}
       style={{
         position: "fixed", inset: 0,
         background: "transparent",
@@ -4389,7 +4440,7 @@ function ObjectOverlay({
           aria-label={t("closeSheet")}
           onClick={(e) => {
             e.stopPropagation();
-            onClose();
+            requestCloseOverlay();
           }}
           style={{
             position: "absolute",

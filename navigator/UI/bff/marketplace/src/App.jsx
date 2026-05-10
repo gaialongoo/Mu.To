@@ -559,9 +559,9 @@ export default function App() {
       setPersonalRoutes(Array.isArray(data.percorsiPersonalizzati) ? data.percorsiPersonalizzati : []);
     } catch (e) {
       setPersonalRoutes([]);
-      showToast("Errore caricamento visite IA: " + e.message, "error");
+      showToast(`${mp("errLoadPersonalRoutes")} ${e.message}`, "error");
     }
-  }, [MUSEO]);
+  }, [MUSEO, mp]);
 
   const loadPurchasedPaths = useCallback(async () => {
     if (!MUSEO) return;
@@ -1093,7 +1093,7 @@ export default function App() {
 
   const openPathDetails = (percorso) => {
     if (generatingAiRoute) {
-      showToast("Attendi la fine della generazione IA prima di aprire il percorso", "error");
+      showToast(mp("waitPersonalRouteGenerating"), "error");
       return;
     }
     if (!canAccessPath(percorso)) {
@@ -1118,7 +1118,7 @@ export default function App() {
   const startNavigatorForRoute = (percorso) => {
     if (!MUSEO) return;
     if (generatingAiRoute) {
-      showToast("Attendi la fine della generazione IA prima di avviare il navigator", "error");
+      showToast(mp("waitPersonalRouteGeneratingNav"), "error");
       return;
     }
     if (!canAccessPath(percorso)) {
@@ -1135,12 +1135,12 @@ export default function App() {
           : (Array.isArray(percorso?.oggetti) ? percorso.oggetti : []));
       const firstNode = objectNodes[0];
       if (!firstNode) {
-        showToast("Percorso IA vuoto", "error");
+        showToast(mp("personalRouteEmpty"), "error");
         return;
       }
       const personalizedRouteId = String(percorso?.id || "").trim();
       if (!personalizedRouteId) {
-        showToast("ID percorso IA mancante", "error");
+        showToast(mp("personalRouteIdMissing"), "error");
         return;
       }
       setMuseoSessionCookie({
@@ -1230,14 +1230,14 @@ export default function App() {
       setShowAiGenerateModal(false);
       setAiRouteNameDraft("");
     } catch (e) {
-      showToast("Errore generazione visita IA: " + e.message, "error");
+      showToast(`${mp("personalRouteGenFail")} ${e.message}`, "error");
     } finally {
       setGeneratingAiRoute(false);
     }
   };
 
   const deleteAiRoute = async (routeId) => {
-    const ok = window.confirm("Eliminare questa visita IA?");
+    const ok = window.confirm(mp("personalRouteDeleteConfirm"));
     if (!ok) return;
     try {
       await api(`/users/me/percorsi/personalizzati/${enc(routeId)}`, {
@@ -1245,9 +1245,9 @@ export default function App() {
         credentials: "include",
       });
       loadPersonalRoutes();
-      showToast("Visita IA eliminata");
+      showToast(mp("personalRouteDeleted"));
     } catch (e) {
-      showToast("Errore eliminazione visita IA: " + e.message, "error");
+      showToast(`${mp("personalRouteDeleteFail")} ${e.message}`, "error");
     }
   };
 
@@ -2193,7 +2193,7 @@ export default function App() {
             <input
               value={aiRouteNameDraft}
               onChange={(e) => setAiRouteNameDraft(e.target.value)}
-              placeholder="Nome percorso IA (opzionale)"
+              placeholder={mp("aiRouteNamePh")}
               style={{ width: "100%", padding: "10px 12px", marginBottom: 10, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
             />
             <label style={{ display: "block", margin: "2px 0 6px", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-dim)" }}>

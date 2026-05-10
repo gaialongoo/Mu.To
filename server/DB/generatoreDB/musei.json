@@ -46,6 +46,9 @@
 {
   "nome": "Museo di Torino",
   "citta": "Torino",
+  "indirizzo": "Piazza dei Musei 1, 10124 Torino",
+  "palazzo": "Palazzo dei Musei (esempio)",
+  "istruzioniAccesso": "Ingresso dal portico principale: ritira l'audioguida in biglietteria se inclusa. Guardaroba al piano terra a sinistra; il percorso consigliato segue le frecce verdi sul pavimento.",
   "oggetti": [
     {
       "indice": 0,
