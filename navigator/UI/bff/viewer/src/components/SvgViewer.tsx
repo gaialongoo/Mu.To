@@ -2450,8 +2450,8 @@ function mountExitInOutRoom(svg: SVGSVGElement, onExitRequested: () => void) {
   exitText.setAttribute("text-anchor", "middle");
   exitText.setAttribute("dominant-baseline", "middle");
   exitText.setAttribute("class", "exit-room-label");
-  exitText.setAttribute("fill", "#7fe8a8");
-  exitText.setAttribute("stroke", "#1f5c38");
+  exitText.setAttribute("fill", "#ff2b2b");
+  exitText.setAttribute("stroke", "#630000");
   exitText.setAttribute("stroke-width", "1.1");
   exitText.textContent = "EXIT";
 

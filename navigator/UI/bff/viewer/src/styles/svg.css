@@ -221,10 +221,10 @@ rect.corridoio {
 }
 
 .exit-room-label {
-  fill: #7fe8a8;
+  fill: #ff2b2b;
   font-size: 30px;
   font-weight: 900;
-  stroke: #1f5c38;
+  stroke: #630000;
   stroke-width: 1.1px;
   paint-order: stroke fill;
   letter-spacing: 0.12em;
@@ -233,9 +233,9 @@ rect.corridoio {
   cursor: pointer;
   user-select: none;
   text-shadow:
-    0 0 4px rgba(92, 191, 128, 0.95),
-    0 0 10px rgba(92, 191, 128, 0.75),
-    0 0 18px rgba(127, 232, 168, 0.55);
+    0 0 4px rgba(255, 180, 180, 0.95),
+    0 0 10px rgba(255, 90, 90, 0.9),
+    0 0 18px rgba(255, 58, 58, 0.72);
 }
 
 /* =========================
