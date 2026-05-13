@@ -2,7 +2,14 @@ import React, { useState } from "react";
 
 export default function ApiKeyModal({ open, onClose, onConfirm }) {
   const [key, setKey] = useState("");
-  const isMobile = window.innerWidth <= 768;
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const handleConfirm = () => {
     if (!key.trim()) return;

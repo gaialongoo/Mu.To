@@ -20,15 +20,15 @@ function displayI18nMapLookup(map, key, navLang) {
 function ArcDeco() {
   return (
     <>
-      <div style={{ position: "fixed", top: -180, right: -180, width: 520, height: 520, pointerEvents: "none", zIndex: 0 }}>
-        <svg viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
+      <div style={{ position: "fixed", top: -180, right: -180, width: "min(520px, 60vw)", height: "min(520px, 60vw)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+        <svg viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
           <circle cx="520" cy="0" r="160" fill="none" stroke="#5cbf80" strokeOpacity="0.045" strokeWidth="1.5"/>
           <circle cx="520" cy="0" r="230" fill="none" stroke="#5cbf80" strokeOpacity="0.03"  strokeWidth="1"/>
           <circle cx="520" cy="0" r="300" fill="none" stroke="#5cbf80" strokeOpacity="0.02"  strokeWidth="0.75"/>
         </svg>
       </div>
-      <div style={{ position: "fixed", bottom: -200, left: -200, width: 480, height: 480, pointerEvents: "none", zIndex: 0 }}>
-        <svg viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
+      <div style={{ position: "fixed", bottom: -200, left: -200, width: "min(480px, 55vw)", height: "min(480px, 55vw)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+        <svg viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
           <circle cx="0" cy="480" r="150" fill="none" stroke="#5cbf80" strokeOpacity="0.04"  strokeWidth="1.5"/>
           <circle cx="0" cy="480" r="220" fill="none" stroke="#5cbf80" strokeOpacity="0.028" strokeWidth="1"/>
           <circle cx="0" cy="480" r="290" fill="none" stroke="#5cbf80" strokeOpacity="0.018" strokeWidth="0.75"/>
@@ -1823,8 +1823,8 @@ export default function App() {
                       </button>
 
                       {showAllDescriptions && (
-                        <div style={{ marginTop: 12 }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                        <div style={{ marginTop: 12, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                          <table style={{ width: "100%", minWidth: isMobile ? 520 : undefined, borderCollapse: "collapse", tableLayout: "fixed" }}>
                             <thead>
                               <tr>
                                 <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--green)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{mp("tableLevelLength")}</th>

@@ -14,8 +14,9 @@ const Toast = forwardRef(function Toast(_, ref) {
     <div
       style={{
         position: "fixed",
-        bottom: 32,
-        right: 32,
+        bottom: 16,
+        right: 16,
+        left: typeof window !== "undefined" && window.innerWidth <= 768 ? 16 : "auto",
         padding: "14px 22px",
         background: "var(--bg-card)",
         border: `1px solid ${state.type === "error" ? "rgba(200,70,60,0.4)" : "var(--border)"}`,

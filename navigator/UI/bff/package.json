@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "postinstall":       "npm install --prefix viewer && npm install --prefix editor",
     "dev:viewer":        "cd viewer && vite",
     "dev:editor":        "cd editor && vite",
     "dev:marketplace":   "cd marketplace && vite",

@@ -4733,6 +4733,7 @@ function ObjectOverlay({
                     </button>
                   )}
                 </div>
+                {ttsBusyKey && (
                 <div
                   style={{
                     display: "grid",
@@ -4762,6 +4763,7 @@ function ObjectOverlay({
                     aria-label={t("ttsRate")}
                   />
                 </div>
+                )}
               </div>
             )
             : <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>{t("loadingDesc")}</p>
@@ -4951,9 +4953,9 @@ function ObjectOverlay({
                 disabled={chatLoading || sttLoadingModel || sttStarting}
                 aria-label="Microfono"
                 style={{
-                  border: "1px solid rgba(92,191,128,0.35)",
+                  border: sttRecording ? "1px solid rgba(224,90,74,0.55)" : "1px solid rgba(92,191,128,0.35)",
                   borderRadius: 999,
-                  padding: "0 12px",
+                  padding: 0,
                   background: sttRecording ? "rgba(224,90,74,0.14)" : "var(--green-dim)",
                   color: sttRecording ? "#e05a4a" : "var(--green)",
                   cursor: chatLoading || sttLoadingModel || sttStarting ? "not-allowed" : "pointer",
@@ -4961,19 +4963,20 @@ function ObjectOverlay({
                   alignItems: "center",
                   justifyContent: "center",
                   width: 42,
-                  height: 36,
-                  fontSize: 0,
-                  fontWeight: 700,
+                  minWidth: 42,
+                  height: 38,
+                  flexShrink: 0,
+                  lineHeight: 1,
                 }}
               >
                 {sttStarting || sttLoadingModel ? (
-                  <span style={{ fontSize: 14, lineHeight: 1, color: "currentColor" }}>…</span>
+                  <span style={{ fontSize: 16, lineHeight: 1, color: "currentColor" }}>…</span>
                 ) : sttRecording ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false" style={{ display: "block" }}>
                     <rect x="4" y="4" width="8" height="8" rx="2" fill="currentColor" />
                   </svg>
                 ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" style={{ display: "block" }}>
                     <path
                       fill="currentColor"
                       d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.08A7 7 0 0 0 19 11Z"
