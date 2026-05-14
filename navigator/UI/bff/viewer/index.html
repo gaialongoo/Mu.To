@@ -1621,9 +1621,6 @@
           <input id="profileStandaloneEta" type="number" min="1" max="120" data-i18n-placeholder="phAgeShort" placeholder="Eta" />
         </div>
         <div class="auth-grid">
-          <input id="profileStandaloneRuolo" type="text" data-i18n-placeholder="phRole" placeholder="Ruolo" disabled />
-        </div>
-        <div class="auth-grid">
           <select id="profileStandaloneLivello">
             <option value="" data-i18n="lvlPlaceholder">Livello</option>
             <option value="bambino" data-i18n="lvlChild">Bambino</option>
@@ -1638,9 +1635,9 @@
             <option value="lungo" data-i18n="durLong">Lungo</option>
           </select>
         </div>
-        <div class="auth-grid">
-          <label for="profileStandaloneNavLang" class="auth-interest-title" style="margin:0;text-align:left;" data-i18n="langLabel">Lingua navigazione</label>
-          <select id="profileStandaloneNavLang">
+        <div>
+          <p class="auth-interest-title" style="margin:0 0 8px;text-align:left;" data-i18n="langLabel">Lingua navigazione</p>
+          <select id="profileStandaloneNavLang" style="width:100%;max-width:calc(50% - .375rem);">
             <option value="it">Italiano</option>
             <option value="en">English</option>
             <option value="fr">Français</option>
@@ -1977,7 +1974,6 @@
     document.getElementById("profileStandaloneCognome").value = user?.cognome || "";
     document.getElementById("profileStandaloneEmail").value = user?.email || "";
     document.getElementById("profileStandaloneEta").value = user?.eta ?? "";
-    document.getElementById("profileStandaloneRuolo").value = user?.ruolo || "";
     document.getElementById("profileStandaloneLivello").value = user?.livello || "";
     document.getElementById("profileStandaloneDurata").value = user?.durata || "";
     document.getElementById("profileStandaloneNavLang").value = normalizeNavLang(user?.navLang);

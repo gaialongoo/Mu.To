@@ -1,117 +1,4 @@
 {
-  "Uffizi": {
-    "grid": {
-      "IN": {
-        "row": 0,
-        "col": 0,
-        "tipo": "ingresso"
-      },
-      "sala A": {
-        "row": 1,
-        "col": 0
-      },
-      "sala B": {
-        "row": 1,
-        "col": 1
-      },
-      "sala C": {
-        "row": 2,
-        "col": 0
-      },
-      "OUT": {
-        "row": 2,
-        "col": 1,
-        "tipo": "uscita"
-      }
-    },
-    "rooms": {
-      "IN": {
-        "x": 100,
-        "y": 120,
-        "w": 220,
-        "h": 180,
-        "tipo": "ingresso"
-      },
-      "sala A": {
-        "x": 100,
-        "y": 440,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale"
-      },
-      "sala B": {
-        "x": 440,
-        "y": 440,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale"
-      },
-      "sala C": {
-        "x": 100,
-        "y": 760,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale"
-      },
-      "OUT": {
-        "x": 440,
-        "y": 760,
-        "w": 220,
-        "h": 180,
-        "tipo": "uscita"
-      },
-      "Stanza 6": {
-        "x": 353,
-        "y": 155,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale"
-      }
-    },
-    "corridoi": [],
-    "labelI18n": {
-      "stanze": {
-        "IN": {
-          "en": "Entrance",
-          "fr": "Entrée"
-        },
-        "sala A": {
-          "en": "Room A",
-          "fr": "Salle A"
-        },
-        "sala B": {
-          "en": "Room B",
-          "fr": "Salle B"
-        },
-        "sala C": {
-          "en": "Room C",
-          "fr": "Salle C"
-        },
-        "OUT": {
-          "en": "Exit",
-          "fr": "Sortie"
-        },
-        "Stanza 6": {
-          "en": "Room 6",
-          "fr": "Salle 6"
-        }
-      },
-      "percorsi": {
-        "Percorso rapido": {
-          "en": "Quick tour",
-          "fr": "Parcours rapide"
-        },
-        "Percorso completo": {
-          "en": "Full tour",
-          "fr": "Parcours complet"
-        },
-        "Percorso archeologico": {
-          "en": "Archaeological tour",
-          "fr": "Parcours archéologique"
-        }
-      }
-    }
-  },
   "Museo di Torino": {
     "grid": {
       "IN": {
@@ -382,79 +269,334 @@
       }
     }
   },
-  "Museo Demo QA": {
+  "Moco museum": {
     "grid": {
       "IN": {
         "row": 0,
-        "col": 0,
+        "col": 1,
         "tipo": "ingresso"
       },
-      "sala 1": {
+      "stanza 1": {
         "row": 1,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 2": {
+        "row": 2,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 3": {
+        "row": 3,
         "col": 0,
         "tipo": "normale"
       },
-      "sala 3": {
-        "row": 2,
-        "col": 0,
+      "WC": {
+        "row": 3,
+        "col": 2,
+        "tipo": "bagno"
+      },
+      "stanza 4": {
+        "row": 4,
+        "col": 1,
         "tipo": "normale"
+      },
+      "stanza 5": {
+        "row": 5,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "SHOP": {
+        "row": 6,
+        "col": 0,
+        "tipo": "servizio"
       },
       "OUT": {
-        "row": 2,
+        "row": 6,
         "col": 1,
         "tipo": "uscita"
-      },
-      "Stanza 5": {
-        "row": 1,
-        "col": 1,
-        "tipo": "normale"
       }
     },
     "corridoi": [
       {
         "a": "IN",
-        "b": "sala 1"
+        "b": "stanza 1",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
       },
       {
-        "a": "sala 3",
-        "b": "OUT"
+        "a": "stanza 1",
+        "b": "stanza 2",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
       },
       {
-        "a": "sala 1",
-        "b": "sala 3"
+        "a": "stanza 2",
+        "b": "WC",
+        "x": 670,
+        "y": 710,
+        "w": 124,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
       },
       {
-        "a": "OUT",
-        "b": "Stanza 5"
+        "a": "stanza 2",
+        "b": "stanza 4",
+        "x": 530,
+        "y": 830,
+        "w": 40,
+        "h": 75.4833984375,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 4",
+        "b": "stanza 5",
+        "x": 534.5833129882812,
+        "y": 1155.4833984375,
+        "w": 40,
+        "h": 72.2666015625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 5",
+        "b": "SHOP",
+        "x": 402.0999755859375,
+        "y": 1387.75,
+        "w": 40,
+        "h": 201.7833251953125,
+        "aDoor": {
+          "side": "W",
+          "offset": 0.8
+        },
+        "bDoor": {
+          "side": "E",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 5",
+        "b": "OUT",
+        "x": 532.0999755859375,
+        "y": 1427.75,
+        "w": 40,
+        "h": 98.7833251953125,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "SHOP",
+        "b": "OUT",
+        "x": 326.1000061035156,
+        "y": 1569.5333251953125,
+        "w": 118.99996948242188,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 3",
+        "b": "stanza 2",
+        "x": 318.20001220703125,
+        "y": 708.2500610351562,
+        "w": 111.79998779296875,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
       }
     ],
+    "rooms": {
+      "IN": {
+        "x": 450,
+        "y": 100,
+        "w": 200,
+        "h": 150,
+        "tipo": "ingresso",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 1": {
+        "x": 430,
+        "y": 340,
+        "w": 240,
+        "h": 200,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 2": {
+        "x": 430,
+        "y": 630,
+        "w": 240,
+        "h": 200,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 3": {
+        "x": 38.20001220703125,
+        "y": 618.2500610351562,
+        "w": 280,
+        "h": 220,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "WC": {
+        "x": 794,
+        "y": 655.1500244140625,
+        "w": 180,
+        "h": 160,
+        "tipo": "bagno",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 4": {
+        "x": 399.58331298828125,
+        "y": 905.4833984375,
+        "w": 310,
+        "h": 250,
+        "tipo": "normale",
+        "bgImage": "/api/musei/Moco%20museum/stanze/stanza%204/immagini/preview?v=1778749943826",
+        "bgTipo": "preview"
+      },
+      "stanza 5": {
+        "x": 422.0999755859375,
+        "y": 1227.75,
+        "w": 260,
+        "h": 200,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "SHOP": {
+        "x": 126.10000610351562,
+        "y": 1509.5333251953125,
+        "w": 200,
+        "h": 160,
+        "tipo": "servizio",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "OUT": {
+        "x": 445.0999755859375,
+        "y": 1526.5333251953125,
+        "w": 200,
+        "h": 160,
+        "tipo": "uscita",
+        "bgImage": null,
+        "bgTipo": "preview"
+      }
+    },
     "labelI18n": {
       "stanze": {
         "IN": {
           "en": "Entrance",
           "fr": "Entrée"
         },
-        "sala 1": {
-          "en": "Room 1",
-          "fr": "Salle 1"
+        "stanza 1": {
+          "en": "Street Art & Urban Protest",
+          "fr": "Street Art & Protestation Urbaine"
         },
-        "sala 3": {
-          "en": "Room 3",
-          "fr": "Salle 3"
+        "stanza 2": {
+          "en": "Pop Culture & Consumerism",
+          "fr": "Culture Pop & Consumérisme"
+        },
+        "stanza 3": {
+          "en": "Identity, Anxiety & Mind",
+          "fr": "Identité, Anxiété & Esprit"
+        },
+        "stanza 4": {
+          "en": "Pattern, Obsession & Perception",
+          "fr": "Motif, Obsession & Perception"
+        },
+        "stanza 5": {
+          "en": "Control & System",
+          "fr": "Contrôle & Système"
+        },
+        "WC": {
+          "en": "Restrooms",
+          "fr": "Toilettes"
+        },
+        "SHOP": {
+          "en": "Shop",
+          "fr": "Boutique"
         },
         "OUT": {
           "en": "Exit",
           "fr": "Sortie"
-        },
-        "Stanza 5": {
-          "en": "Room 5",
-          "fr": "Salle 5"
         }
       },
       "percorsi": {
-        "Percorso Base": {
-          "en": "Basic tour",
-          "fr": "Parcours de base"
+        "Highlights Moco": {
+          "en": "Moco Highlights",
+          "fr": "Incontournables Moco"
+        },
+        "Banksy Tour": {
+          "en": "Banksy Tour",
+          "fr": "Parcours Banksy"
+        },
+        "Pop & Street Art": {
+          "en": "Pop & Street Art",
+          "fr": "Pop & Street Art"
+        },
+        "Emozioni e Percezione": {
+          "en": "Emotions & Perception",
+          "fr": "Émotions & Perception"
+        },
+        "Percorso Completo": {
+          "en": "Complete Tour",
+          "fr": "Parcours Complet"
         }
       }
     }

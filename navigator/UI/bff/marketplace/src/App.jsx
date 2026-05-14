@@ -1665,8 +1665,7 @@ export default function App() {
                 <input value={profileForm.email} disabled placeholder={mp("phEmail")} style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
                 <input value={profileForm.eta} onChange={(e) => setProfileForm((p) => ({ ...p, eta: e.target.value }))} type="number" min="1" max="120" placeholder={mp("phAge")} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12 }}>
-                <input value={profileForm.ruolo} disabled placeholder={mp("phRole")} style={{ padding: "12px 14px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 <select value={profileForm.livello} onChange={(e) => setProfileForm((p) => ({ ...p, livello: e.target.value }))} style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}>
                   <option value="">{mp("levelPlaceholder")}</option>
                   <option value="bambino">{mp("lvlChild")}</option>
@@ -1682,8 +1681,8 @@ export default function App() {
                   <option value="esteso">{mp("durOptExt")}</option>
                 </select>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "160px 1fr", gap: 12, alignItems: "center" }}>
-                <label htmlFor="profile-nav-lang" style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", fontFamily: "var(--font-head)" }}>{mp("langLabel")}</label>
+              <div>
+                <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 10, fontFamily: "var(--font-head)" }}>{mp("langLabel")}</p>
                 <select
                   id="profile-nav-lang"
                   value={normalizeNavLang(profileForm.navLang)}
@@ -1692,7 +1691,7 @@ export default function App() {
                     setProfileForm((p) => ({ ...p, navLang: v }));
                     setNavLang(v);
                   }}
-                  style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+                  style={{ padding: "12px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", width: isMobile ? "100%" : "calc(50% - 6px)" }}
                 >
                   {MP_LANG_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>

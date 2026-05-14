@@ -1,289 +1,6 @@
 {
   "musei": [
     {
-      "nome": "Uffizi",
-      "citta": "Firenze",
-      "indirizzo": "Piazzale degli Uffizi 6, 50122 Firenze",
-      "palazzo": "Palazzo degli Uffizi",
-      "istruzioniAccesso": "Ingresso dai Portici degli Uffizi: segui le indicazioni per i biglietti prenotati.",
-      "oggetti": [
-        {
-          "nome": "statua",
-          "stanza": "sala A",
-          "connessi": [
-            "dipinto"
-          ],
-          "descrizioni": [
-            [
-              "Statua in marmo bianco raffigurante una figura umana",
-              "Questa statua rappresenta una figura elegante scolpita nel marmo",
-              "Osservando la statua si notano proporzioni armoniche e dettagli curati"
-            ],
-            [
-              "Statua classica di epoca rinascimentale",
-              "La statua è riconducibile allo stile rinascimentale fiorentino",
-              "Le forme equilibrate richiamano i canoni artistici del Rinascimento"
-            ],
-            [
-              "Scultura rinascimentale in marmo",
-              "Questa scultura mostra l’influenza dell’arte classica antica",
-              "La lavorazione del marmo evidenzia grande abilità tecnica"
-            ],
-            [
-              "Capolavoro scultoreo del Rinascimento italiano",
-              "La statua è un esempio significativo dell’arte rinascimentale",
-              "L’opera testimonia la ricerca di perfezione formale e anatomica"
-            ]
-          ],
-          "descrizioniI18n": {
-            "en": [
-              [
-                "White marble statue depicting a human figure",
-                "This statue shows an elegant figure carved in marble",
-                "The statue displays harmonious proportions and careful details"
-              ],
-              [
-                "Classical statue from the Renaissance",
-                "The statue reflects the Florentine Renaissance style",
-                "The balanced forms echo the artistic ideals of the Renaissance"
-              ],
-              [
-                "Renaissance marble sculpture",
-                "This sculpture shows the influence of classical antiquity",
-                "The marble carving demonstrates great technical skill"
-              ],
-              [
-                "Masterpiece of Italian Renaissance sculpture",
-                "The statue is a significant example of Renaissance art",
-                "The work reflects a quest for formal and anatomical perfection"
-              ]
-            ],
-            "fr": [
-              [
-                "Statue en marbre blanc représentant une figure humaine",
-                "Cette statue figure une silhouette élégante sculptée dans le marbre",
-                "On y observe des proportions harmonieuses et des détails soignés"
-              ],
-              [
-                "Statue classique de la Renaissance",
-                "La statue relève du style florentin de la Renaissance",
-                "Les formes équilibrées reprennent les canons artistiques de la Renaissance"
-              ],
-              [
-                "Sculpture en marbre de la Renaissance",
-                "Cette sculpture montre l’influence de l’art classique antique",
-                "Le travail du marbre révèle une grande maîtrise technique"
-              ],
-              [
-                "Chef-d’œuvre sculptural de la Renaissance italienne",
-                "La statue est un exemple marquant de l’art de la Renaissance",
-                "L’œuvre témoigne de la recherche de perfection formelle et anatomique"
-              ]
-            ]
-          },
-          "objectType": "normal",
-          "textTitle": "",
-          "textBody": "",
-          "autore": "",
-          "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
-        },
-        {
-          "nome": "dipinto",
-          "stanza": "sala B",
-          "connessi": [
-            "statua",
-            "anfora"
-          ],
-          "descrizioni": [
-            [
-              "Dipinto dai colori vivaci raffigurante una scena storica",
-              "Il dipinto utilizza colori accesi e una composizione equilibrata",
-              "La scena rappresentata racconta un episodio significativo"
-            ],
-            [
-              "Dipinto rinascimentale su tavola",
-              "L’opera pittorica mostra l’uso della prospettiva",
-              "I personaggi sono disposti secondo uno schema armonico"
-            ],
-            [
-              "Opera pittorica del Rinascimento italiano",
-              "Questo dipinto evidenzia la padronanza della luce e delle ombre",
-              "La resa dei volti suggerisce un forte realismo"
-            ],
-            [
-              "Dipinto rinascimentale di grande valore artistico",
-              "L’opera rappresenta una sintesi di tecnica e narrazione",
-              "Il dipinto è considerato un esempio fondamentale della pittura rinascimentale"
-            ]
-          ],
-          "descrizioniI18n": {
-            "en": [
-              [
-                "Painting in vivid colours depicting a historical scene",
-                "The painting uses bright colours and a balanced composition",
-                "The scene tells a meaningful episode"
-              ],
-              [
-                "Renaissance panel painting",
-                "The work shows the use of perspective",
-                "The figures are arranged in a harmonious scheme"
-              ],
-              [
-                "Italian Renaissance painting",
-                "This painting shows mastery of light and shadow",
-                "The faces suggest strong realism"
-              ],
-              [
-                "Highly important Renaissance painting",
-                "The work combines technique and narrative",
-                "It is considered a landmark of Renaissance painting"
-              ]
-            ],
-            "fr": [
-              [
-                "Tableau aux couleurs vives représentant une scène historique",
-                "Le tableau utilise des couleurs vives et une composition équilibrée",
-                "La scène raconte un épisode significatif"
-              ],
-              [
-                "Tableau de la Renaissance sur panneau",
-                "L’œuvre montre l’usage de la perspective",
-                "Les personnages sont disposés selon un schéma harmonieux"
-              ],
-              [
-                "Peinture italienne de la Renaissance",
-                "Ce tableau illustre la maîtrise de la lumière et des ombres",
-                "Le rendu des visages suggère un fort réalisme"
-              ],
-              [
-                "Tableau de la Renaissance d’une grande valeur artistique",
-                "L’œuvre unit technique et récit",
-                "Il est considéré comme un exemple fondamental de la peinture de la Renaissance"
-              ]
-            ]
-          },
-          "objectType": "normal",
-          "textTitle": "",
-          "textBody": "",
-          "autore": "",
-          "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
-        },
-        {
-          "nome": "anfora",
-          "stanza": "sala C",
-          "connessi": [
-            "dipinto"
-          ],
-          "descrizioni": [
-            [
-              "Anfora in ceramica con decorazioni geometriche",
-              "Questa anfora presenta motivi semplici ma eleganti",
-              "L’oggetto era probabilmente utilizzato per contenere liquidi"
-            ],
-            [
-              "Anfora decorata di epoca antica",
-              "Le decorazioni suggeriscono un’origine mediterranea",
-              "La forma è tipica delle anfore utilizzate nell’antichità"
-            ],
-            [
-              "Anfora antica con motivi ornamentali",
-              "L’anfora mostra segni di lavorazione artigianale",
-              "Le decorazioni raccontano scene simboliche"
-            ],
-            [
-              "Anfora storica di rilevanza archeologica",
-              "Questo reperto fornisce informazioni sugli usi quotidiani antichi",
-              "L’anfora rappresenta un importante esempio di ceramica storica"
-            ]
-          ],
-          "descrizioniI18n": {
-            "en": [
-              [
-                "Ceramic amphora with geometric decoration",
-                "This amphora has simple yet elegant motifs",
-                "It was probably used to hold liquids"
-              ],
-              [
-                "Decorated amphora from antiquity",
-                "The decoration suggests a Mediterranean origin",
-                "The shape is typical of amphorae used in the ancient world"
-              ],
-              [
-                "Ancient amphora with ornamental motifs",
-                "The amphora shows skilled craftsmanship",
-                "The decoration suggests symbolic scenes"
-              ],
-              [
-                "Historically significant amphora",
-                "This find sheds light on everyday life in antiquity",
-                "The amphora is an important example of historical ceramics"
-              ]
-            ],
-            "fr": [
-              [
-                "Amphore en céramique à décor géométrique",
-                "Cette amphore présente des motifs simples mais élégants",
-                "L’objet servait probablement à contenir des liquides"
-              ],
-              [
-                "Amphore décorée de l’Antiquité",
-                "Le décor suggère une origine méditerranéenne",
-                "La forme est typique des amphores utilisées dans l’Antiquité"
-              ],
-              [
-                "Amphore ancienne à motifs ornementaux",
-                "L’amphore montre un travail artisanal soigné",
-                "Les décorations évoquent des scènes symboliques"
-              ],
-              [
-                "Amphore historique d’intérêt archéologique",
-                "Cette pièce informe sur les usages quotidiens antiques",
-                "L’amphore est un exemple important de céramique historique"
-              ]
-            ]
-          },
-          "objectType": "normal",
-          "textTitle": "",
-          "textBody": "",
-          "autore": "",
-          "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
-        }
-      ],
-      "percorsi": [
-        {
-          "nome": "Percorso rapido",
-          "prezzo": 0,
-          "oggetti": [
-            "statua",
-            "dipinto"
-          ]
-        },
-        {
-          "nome": "Percorso completo",
-          "prezzo": 9.99,
-          "oggetti": [
-            "statua",
-            "dipinto",
-            "anfora"
-          ]
-        },
-        {
-          "nome": "Percorso archeologico",
-          "prezzo": 4.5,
-          "oggetti": [
-            "dipinto",
-            "anfora"
-          ]
-        }
-      ]
-    },
-    {
       "nome": "Museo di Torino",
       "citta": "Torino",
       "indirizzo": "Piazza dei Musei 1, 10124 Torino",
@@ -759,164 +476,1022 @@
       ]
     },
     {
-      "nome": "Museo Demo QA",
-      "citta": "Firenze",
+      "nome": "Moco museum",
+      "citta": "Amsterdam",
+      "indirizzo": "Honthorststraat 20, 1071 DE Amsterdam",
+      "palazzo": "Villa Alsberg",
+      "istruzioniAccesso": "Ingresso principale su Honthorststraat, accanto a Museumplein. Ritira il biglietto alla reception e segui il percorso indicato dalle frecce. Non è consentito toccare le opere; fotografie senza flash sono ammesse.",
       "oggetti": [
         {
-          "nome": "Vaso Antico",
-          "stanza": "sala 1",
+          "nome": "Girl with Balloon",
+          "stanza": "stanza 1",
+          "pos": {
+            "x": 0.25,
+            "y": 0.35
+          },
           "connessi": [
-            "Quadro Astratto"
+            "Love Is in the Air",
+            "Laugh Now"
           ],
           "descrizioni": [
             [
-              "Vaso etrusco decorato a figure nere."
+              "Una bambina allunga la mano verso un palloncino rosso a forma di cuore.",
+              "Una bambina cerca di afferrare un palloncino rosso a cuore che vola via. Sembra triste perché lo sta perdendo.",
+              "L'opera mostra una piccola bambina in bianco e nero che allunga la mano verso un palloncino rosso a cuore portato via dal vento. Il palloncino è l'unica cosa colorata e rappresenta qualcosa di prezioso che rischiamo di perdere, come un sogno o l'affetto di qualcuno."
+            ],
+            [
+              "Stencil iconico di Banksy sulla perdita dell'innocenza, con una bambina e un palloncino a cuore.",
+              "Girl with Balloon è una delle opere più riconoscibili di Banksy: una ragazzina tende la mano verso un palloncino rosso a cuore che le sfugge, evocando speranza e perdita con un linguaggio essenziale.",
+              "Realizzata nel 2002 come stencil sui muri di Londra, Girl with Balloon mostra una bambina che perde un palloncino rosso a cuore. L'opera è diventata un simbolo globale di speranza e innocenza perduta. Il contrasto tra il bianco e nero della figura e il rosso acceso del palloncino invita a riflettere sulla fragilità delle cose più preziose."
+            ],
+            [
+              "Stencil del 2002, icona della street art contemporanea e della critica sociale di Banksy.",
+              "Girl with Balloon, apparsa nel 2002 a Waterloo Bridge, è l'opera più celebre di Banksy. Lo stencil monocromo con il palloncino rosso sintetizza perdita, speranza e vulnerabilità in un linguaggio visivo universale.",
+              "Originariamente realizzata sul South Bank di Londra nel 2002, Girl with Balloon è l'immagine più iconica di Banksy. Il contrasto tra la monocromia della figura e il rosso del palloncino evoca fragilità dell'innocenza e desiderio. Nel 2018 una versione si autodistrusse durante un'asta da Sotheby's, diventando Love Is in the Bin e alimentando il dibattito su arte, mercato e provocazione."
+            ],
+            [
+              "Capolavoro di Banksy che indaga il rapporto tra arte urbana, valore di mercato e simbolismo pop.",
+              "Girl with Balloon trascende la street art per diventare fenomeno culturale. Lo stencil condensa una potente narrazione su perdita e speranza; la sua autodistruzione da Sotheby's nel 2018 ha ridefinito i confini tra performance e mercificazione artistica.",
+              "Girl with Balloon è il punto di convergenza tra arte urbana, cultura pop e critica istituzionale. Banksy utilizza lo stencil — tecnica rapida, riproducibile, democratica — per un'immagine che nella sua apparente semplicità tocca corde universali: perdita dell'innocenza, fragilità della speranza, desiderio inappagato. L'autodistruzione da Sotheby's nel 2018 ha aggiunto un livello meta-artistico, trasformando l'opera in riflessione su creazione, distruzione e mercificazione nell'arte contemporanea."
             ]
           ],
           "descrizioniI18n": {
             "en": [
               [
-                "Etruscan black-figure vase."
+                "A little girl reaches for a red heart-shaped balloon floating away.",
+                "A little girl tries to catch a red heart balloon drifting away. She looks sad because she is losing it.",
+                "The artwork shows a small girl in black and white stretching her hand towards a red heart-shaped balloon blown away by the wind. The balloon is the only coloured element, representing something precious we risk losing, like a dream or someone's love."
+              ],
+              [
+                "Iconic Banksy stencil about the loss of innocence, featuring a girl and a heart balloon.",
+                "Girl with Balloon is one of Banksy's most recognisable works: a girl reaching for a red heart balloon that slips away, evoking hope and loss through minimal visual language.",
+                "Created in 2002 as a stencil on London walls, Girl with Balloon shows a child losing a red heart balloon. It has become a global symbol of hope and lost innocence. The contrast between the black-and-white figure and the bright red balloon invites reflection on the fragility of what we treasure most."
+              ],
+              [
+                "2002 stencil, icon of contemporary street art and Banksy's social critique.",
+                "Girl with Balloon first appeared at Waterloo Bridge in 2002 and is Banksy's most celebrated work. The monochrome stencil with its red balloon distils loss, hope and vulnerability into a universal visual language.",
+                "Originally sprayed on London's South Bank in 2002, Girl with Balloon is Banksy's most iconic image. The contrast between the monochrome figure and the red balloon evokes the fragility of innocence and desire. In 2018 a version self-shredded at Sotheby's, becoming Love Is in the Bin and fuelling debate on art, the market and provocation."
+              ],
+              [
+                "Banksy masterpiece exploring the nexus of street art, market value and pop symbolism.",
+                "Girl with Balloon transcends street art to become a cultural phenomenon. The stencil condenses a powerful narrative of loss and hope; its self-destruction at Sotheby's in 2018 redefined the boundary between performance and commodification.",
+                "Girl with Balloon sits at the intersection of urban art, pop culture and institutional critique. Banksy employs stencil — fast, reproducible, democratic — to craft an image of deceptive simplicity touching universal chords: loss of innocence, fragile hope, unfulfilled longing. The 2018 Sotheby's shredding added a meta-artistic layer, turning the work into a meditation on creation, destruction and commodification in contemporary art."
               ]
             ],
             "fr": [
               [
-                "Vase étrusque à figures noires."
+                "Une petite fille tend la main vers un ballon rouge en forme de cœur qui s'envole.",
+                "Une petite fille essaie d'attraper un ballon rouge en cœur qui lui échappe. Elle semble triste car elle est en train de le perdre.",
+                "L'œuvre montre une petite fille en noir et blanc tendant la main vers un ballon rouge en forme de cœur emporté par le vent. Le ballon est le seul élément en couleur et représente quelque chose de précieux que l'on risque de perdre, comme un rêve ou l'affection d'un être cher."
+              ],
+              [
+                "Pochoir emblématique de Banksy sur la perte de l'innocence, avec une fillette et un ballon-cœur.",
+                "Girl with Balloon est l'une des œuvres les plus reconnaissables de Banksy : une fillette tend la main vers un ballon rouge en cœur qui lui échappe, évoquant espoir et perte dans un langage visuel épuré.",
+                "Réalisée en 2002 au pochoir sur les murs de Londres, Girl with Balloon montre une enfant perdant un ballon rouge en cœur. L'œuvre est devenue un symbole mondial d'espoir et d'innocence perdue. Le contraste entre le noir et blanc de la figure et le rouge vif du ballon invite à réfléchir sur la fragilité de ce qui nous est le plus cher."
+              ],
+              [
+                "Pochoir de 2002, icône de l'art urbain contemporain et de la critique sociale de Banksy.",
+                "Girl with Balloon, apparue en 2002 à Waterloo Bridge, est l'œuvre la plus célèbre de Banksy. Le pochoir monochrome au ballon rouge condense perte, espoir et vulnérabilité en un langage visuel universel.",
+                "Initialement réalisée sur le South Bank de Londres en 2002, Girl with Balloon est l'image la plus emblématique de Banksy. Le contraste entre la figure monochrome et le rouge du ballon évoque la fragilité de l'innocence. En 2018 une version s'est autodétruite chez Sotheby's, devenant Love Is in the Bin et nourrissant le débat sur art, marché et provocation."
+              ],
+              [
+                "Chef-d'œuvre de Banksy explorant le lien entre art urbain, valeur marchande et symbolisme pop.",
+                "Girl with Balloon dépasse l'art urbain pour devenir phénomène culturel. Le pochoir condense un récit puissant de perte et d'espoir ; son autodestruction chez Sotheby's en 2018 a redéfini les limites entre performance et marchandisation de l'art.",
+                "Girl with Balloon se situe au croisement de l'art urbain, de la culture pop et de la critique institutionnelle. Banksy utilise le pochoir — rapide, reproductible, démocratique — pour une image d'une simplicité trompeuse touchant des cordes universelles : perte de l'innocence, espoir fragile, désir inassouvi. Le broyage chez Sotheby's en 2018 a ajouté une couche méta-artistique, transformant l'œuvre en méditation sur création, destruction et marchandisation dans l'art contemporain."
               ]
             ]
           },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
-          "autore": "",
+          "autore": "Banksy",
           "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
+          "correnteArtistica": "Street Art",
+          "anno": "2002"
         },
         {
-          "nome": "Quadro Astratto",
-          "stanza": "sala 3",
+          "nome": "Love Is in the Air",
+          "stanza": "stanza 1",
+          "pos": {
+            "x": 0.55,
+            "y": 0.3
+          },
           "connessi": [
-            "Statua in Bronzo",
-            "Vaso Antico",
-            "Oggetto 3"
+            "Girl with Balloon",
+            "Beanfield"
           ],
           "descrizioni": [
             [
-              "Composizione astratta su tela."
+              "Un ragazzo mascherato lancia un mazzo di fiori invece di una bomba.",
+              "Un giovane con il volto coperto sta per lanciare qualcosa, ma non è una pietra: è un mazzo di fiori colorati! È come dire che l'amore è più forte della rabbia.",
+              "L'opera mostra un ragazzo vestito di scuro con il viso coperto, nella posizione di chi sta per lanciare qualcosa. Ma al posto di una bomba o una pietra tiene in mano un bellissimo mazzo di fiori. Banksy vuole dirci che anche nei momenti di rabbia possiamo scegliere la gentilezza e la pace."
+            ],
+            [
+              "Opera di Banksy che contrappone violenza e pace: un manifestante lancia fiori anziché pietre.",
+              "Love Is in the Air mostra un manifestante mascherato nell'atto di lanciare un mazzo di fiori. L'immagine rovescia il gesto violento della protesta, trasformandolo in un atto di pace e resistenza nonviolenta.",
+              "Conosciuta anche come Flower Thrower, quest'opera di Banksy raffigura un manifestante con il volto coperto che scaglia un bouquet di fiori al posto di una molotov. Apparsa originariamente su un muro a Betlemme vicino alla barriera di separazione israeliana, l'opera trasforma un gesto di violenza in simbolo universale di pace, contestando la guerra attraverso la bellezza."
+            ],
+            [
+              "Stencil di Banksy del 2003, manifesto visivo della resistenza nonviolenta nel contesto del conflitto israelo-palestinese.",
+              "Love Is in the Air, nota come Flower Thrower, è apparsa nel 2003 su un muro di Betlemme. Il manifestante mascherato che scaglia fiori anziché pietre sintetizza la filosofia di Banksy: sovvertire il linguaggio della violenza con quello della bellezza.",
+              "Realizzata nel 2003 nei pressi del muro di separazione a Betlemme, Love Is in the Air è una delle opere più politicamente cariche di Banksy. Lo stencil rovescia l'iconografia della protesta sostituendo l'arma con un bouquet, creando un corto circuito visivo tra violenza e tenerezza. L'opera ha acquisito risonanza globale come emblema della resistenza pacifica e del potere simbolico dell'arte in contesti di conflitto."
+            ],
+            [
+              "Opera cardine di Banksy che decostruisce l'iconografia della rivolta attraverso la sostituzione simbolica.",
+              "Love Is in the Air opera una sovversione semiotica: il gesto del lanciatore di pietre, codificato nei media come violenza, viene risignificato dal bouquet. L'opera interroga la costruzione visiva del conflitto e il ruolo dell'immagine nella propaganda politica.",
+              "Love Is in the Air rappresenta uno dei vertici della pratica di Banksy: la decostruzione dell'iconografia mediatica attraverso la sostituzione simbolica. Il manifestante palestinese, figura cristallizzata nei reportage come agente di violenza, viene riconsegnato alla sua umanità dal gesto floreale. L'opera problematizza la rappresentazione del conflitto, il ruolo dell'immagine nella costruzione del nemico e la possibilità dell'arte di proporre narrazioni alternative in contesti di oppressione strutturale."
             ]
           ],
           "descrizioniI18n": {
             "en": [
               [
-                "Abstract composition on canvas."
+                "A masked young man throws a bouquet of flowers instead of a bomb.",
+                "A young man with a covered face is about to throw something — but it is not a stone, it is a colourful bunch of flowers! It is like saying love is stronger than anger.",
+                "The artwork shows a young man dressed in dark clothes with his face covered, posed as if throwing something. But instead of a bomb or a stone he holds a beautiful bouquet. Banksy tells us that even in moments of rage we can choose kindness and peace."
+              ],
+              [
+                "Banksy work contrasting violence and peace: a protester hurls flowers instead of stones.",
+                "Love Is in the Air shows a masked protester throwing a bouquet of flowers. The image overturns the violent gesture of protest, turning it into an act of peace and nonviolent resistance.",
+                "Also known as Flower Thrower, this Banksy piece depicts a masked protester hurling a bouquet instead of a Molotov cocktail. First appearing on a wall in Bethlehem near the Israeli separation barrier, it transforms a violent gesture into a universal symbol of peace, challenging war through beauty."
+              ],
+              [
+                "2003 Banksy stencil, visual manifesto of nonviolent resistance in the Israeli-Palestinian conflict.",
+                "Love Is in the Air, known as Flower Thrower, appeared in 2003 on a Bethlehem wall. The masked protester throwing flowers instead of stones encapsulates Banksy's philosophy: subverting the language of violence with that of beauty.",
+                "Created in 2003 near the separation wall in Bethlehem, Love Is in the Air is one of Banksy's most politically charged works. The stencil inverts protest iconography by replacing the weapon with a bouquet, creating a visual short-circuit between violence and tenderness. It has gained global resonance as an emblem of peaceful resistance and the symbolic power of art in conflict zones."
+              ],
+              [
+                "Pivotal Banksy work deconstructing the iconography of revolt through symbolic substitution.",
+                "Love Is in the Air performs a semiotic subversion: the stone-thrower's gesture, coded by media as violence, is re-signified by the bouquet. The work questions the visual construction of conflict and the role of images in political propaganda.",
+                "Love Is in the Air marks a high point in Banksy's practice: deconstructing media iconography through symbolic substitution. The Palestinian protester, a figure crystallised in news coverage as an agent of violence, is restored to his humanity by the floral gesture. The work problematises conflict representation, the role of images in constructing the enemy, and art's capacity to propose alternative narratives under structural oppression."
               ]
             ],
             "fr": [
               [
-                "Composition abstraite sur toile."
+                "Un jeune homme masqué lance un bouquet de fleurs au lieu d'une bombe.",
+                "Un jeune homme au visage couvert s'apprête à lancer quelque chose, mais ce n'est pas une pierre : c'est un bouquet de fleurs colorées ! C'est comme dire que l'amour est plus fort que la colère.",
+                "L'œuvre montre un jeune homme vêtu de sombre, le visage couvert, dans la posture de quelqu'un qui va lancer quelque chose. Mais au lieu d'une bombe il tient un magnifique bouquet. Banksy nous dit que même dans les moments de colère, on peut choisir la gentillesse et la paix."
+              ],
+              [
+                "Œuvre de Banksy opposant violence et paix : un manifestant lance des fleurs au lieu de pierres.",
+                "Love Is in the Air montre un manifestant masqué lançant un bouquet de fleurs. L'image renverse le geste violent de la révolte pour le transformer en acte de paix et de résistance non-violente.",
+                "Aussi connue sous le nom de Flower Thrower, cette œuvre de Banksy représente un manifestant masqué lançant un bouquet au lieu d'un cocktail Molotov. Apparue à Bethléem près du mur de séparation israélien, elle transforme un geste de violence en symbole universel de paix, contestant la guerre par la beauté."
+              ],
+              [
+                "Pochoir de 2003, manifeste visuel de la résistance non-violente dans le conflit israélo-palestinien.",
+                "Love Is in the Air, dite Flower Thrower, est apparue en 2003 sur un mur de Bethléem. Le manifestant masqué lançant des fleurs plutôt que des pierres résume la philosophie de Banksy : subvertir le langage de la violence par celui de la beauté.",
+                "Réalisée en 2003 près du mur de séparation à Bethléem, Love Is in the Air est l'une des œuvres les plus engagées de Banksy. Le pochoir inverse l'iconographie de la révolte en remplaçant l'arme par un bouquet, créant un court-circuit visuel entre violence et tendresse. L'œuvre a acquis un rayonnement mondial comme emblème de la résistance pacifique et du pouvoir symbolique de l'art en zone de conflit."
+              ],
+              [
+                "Œuvre charnière de Banksy déconstruisant l'iconographie de la révolte par la substitution symbolique.",
+                "Love Is in the Air opère une subversion sémiotique : le geste du lanceur de pierres, codé par les médias comme violence, est re-signifié par le bouquet. L'œuvre interroge la construction visuelle du conflit et le rôle de l'image dans la propagande politique.",
+                "Love Is in the Air marque un sommet dans la pratique de Banksy : la déconstruction de l'iconographie médiatique par la substitution symbolique. Le manifestant palestinien, figure cristallisée dans les reportages comme agent de violence, retrouve son humanité par le geste floral. L'œuvre problématise la représentation du conflit, le rôle de l'image dans la construction de l'ennemi et la capacité de l'art à proposer des récits alternatifs sous l'oppression structurelle."
               ]
             ]
           },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
-          "autore": "",
+          "autore": "Banksy",
           "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
+          "correnteArtistica": "Street Art",
+          "anno": "2003"
         },
         {
-          "nome": "Oggetto 3",
-          "stanza": "Stanza 5",
+          "nome": "Laugh Now",
+          "stanza": "stanza 1",
+          "pos": {
+            "x": 0.8,
+            "y": 0.55
+          },
           "connessi": [
-            "Quadro Astratto"
+            "Girl with Balloon",
+            "Love Is in the Air"
           ],
           "descrizioni": [
             [
-              "",
-              "",
-              ""
+              "Una scimmia con un cartello appeso al collo ci guarda con aria triste.",
+              "Una scimmia indossa un cartello che dice di ridere adesso, perché un giorno sarà lei a comandare. Sembra seria e un po' arrabbiata.",
+              "L'opera mostra una scimmia che porta un cartello con la scritta 'Laugh now, but one day we'll be in charge'. La scimmia ci guarda dritto negli occhi con espressione seria. Banksy usa la scimmia per farci pensare a come trattiamo chi è diverso da noi e a come un giorno le cose potrebbero cambiare."
             ],
             [
-              "",
-              "",
-              ""
+              "Scimmia di Banksy con un cartello sovversivo: un invito a riflettere su potere e sottomissione.",
+              "Laugh Now raffigura una scimmia che indossa un cartello con la scritta 'Laugh now, but one day we'll be in charge'. L'opera usa l'immagine della scimmia da circo per commentare l'obbedienza cieca e la sottomissione alla società.",
+              "Realizzata nel 2002, Laugh Now mostra una fila di scimmie con cartelli al collo. Il messaggio 'Laugh now, but one day we'll be in charge' trasforma l'animale addomesticato in simbolo di rivolta silenziosa. Banksy denuncia il conformismo e la gerarchia sociale, suggerendo che chi oggi è sottomesso potrebbe un giorno ribaltare l'ordine costituito."
             ],
             [
-              "",
-              "",
-              ""
+              "Stencil del 2002 che usa la figura della scimmia per una critica al conformismo e alle strutture di potere.",
+              "Laugh Now è una delle prime opere di grande formato di Banksy. Le scimmie con i cartelli al collo rappresentano l'umanità asservita al consumismo e alle istituzioni, in una metafora visiva che richiama la tradizione satirica della caricatura politica.",
+              "Commissionata nel 2002 per un locale di Brighton, Laugh Now è un'opera fondamentale nella produzione di Banksy. La scimmia antropomorfa con il cartello sovversivo opera su più livelli: critica il conformismo sociale, la docilità dell'individuo di fronte all'autorità e la riduzione dell'essere umano a intrattenitore del sistema capitalistico. Il formato seriale anticipa il linguaggio della produzione di massa che Banksy continuerà a esplorare."
             ],
             [
-              "",
-              "",
-              ""
+              "Opera seminale di Banksy sulla dialettica servo-padrone e sulla potenzialità rivoluzionaria del soggetto oppresso.",
+              "Laugh Now articola una critica strutturale al rapporto di dominio attraverso la metafora della scimmia ammaestrata. Il cartello sovversivo introduce un elemento performativo che destabilizza il rapporto spettatore-opera e interroga la complicità dello sguardo.",
+              "Laugh Now rappresenta una riflessione sulla dialettica servo-padrone declinata nella società dello spettacolo. La scimmia, figura liminale tra natura e cultura, incarna il soggetto alienato dal capitalismo: obbediente, esibito, apparentemente pacificato. Il cartello sovversivo reintroduce l'agency dell'oppresso, trasformando l'intrattenimento in minaccia latente. L'opera anticipa temi centrali nella pratica di Banksy: serialità, appropriazione del linguaggio pubblicitario e sovversione dello spazio espositivo come gesto politico."
             ]
           ],
           "descrizioniI18n": {
             "en": [
               [
-                "",
-                "",
-                ""
+                "A monkey wearing a sign around its neck stares at us with a sad face.",
+                "A monkey wears a sign saying to laugh now, because one day it will be in charge. It looks serious and a little angry.",
+                "The artwork shows a monkey wearing a sign reading 'Laugh now, but one day we'll be in charge'. The monkey looks us straight in the eye with a serious expression. Banksy uses the monkey to make us think about how we treat those who are different and how things might change one day."
               ],
               [
-                "",
-                "",
-                ""
+                "Banksy monkey with a subversive sign: an invitation to reflect on power and submission.",
+                "Laugh Now depicts a monkey wearing a sign reading 'Laugh now, but one day we'll be in charge'. The work uses the circus monkey to comment on blind obedience and submission to society.",
+                "Created in 2002, Laugh Now shows a row of monkeys wearing signs around their necks. The message 'Laugh now, but one day we'll be in charge' turns the tamed animal into a symbol of silent revolt. Banksy denounces conformity and social hierarchy, suggesting that the oppressed may one day overturn the established order."
               ],
               [
-                "",
-                "",
-                ""
+                "2002 stencil using the monkey figure to critique conformity and power structures.",
+                "Laugh Now is one of Banksy's first large-format works. The monkeys with signs around their necks represent humanity enslaved by consumerism and institutions, in a visual metaphor recalling the satirical tradition of political caricature.",
+                "Commissioned in 2002 for a Brighton venue, Laugh Now is a landmark in Banksy's output. The anthropomorphic monkey with its subversive sign operates on multiple levels: it critiques social conformity, individual docility before authority and the reduction of human beings to entertainers for the capitalist system. The serial format anticipates the mass-production language Banksy would continue to explore."
               ],
               [
-                "",
-                "",
-                ""
+                "Seminal Banksy work on the master-servant dialectic and the revolutionary potential of the oppressed subject.",
+                "Laugh Now articulates a structural critique of domination through the trained-monkey metaphor. The subversive sign introduces a performative element destabilising the viewer-work relationship and questioning the complicity of the gaze.",
+                "Laugh Now reflects on the master-servant dialectic within the society of the spectacle. The monkey, a liminal figure between nature and culture, embodies the subject alienated by capitalism: obedient, exhibited, seemingly pacified. The subversive sign reintroduces the agency of the oppressed, turning entertainment into latent threat. The work anticipates key themes in Banksy's practice: seriality, appropriation of advertising language and subversion of exhibition space as political gesture."
               ]
             ],
             "fr": [
               [
-                "",
-                "",
-                ""
+                "Un singe portant une pancarte autour du cou nous regarde d'un air triste.",
+                "Un singe porte une pancarte disant de rire maintenant, car un jour c'est lui qui commandera. Il a l'air sérieux et un peu en colère.",
+                "L'œuvre montre un singe portant une pancarte où l'on peut lire 'Laugh now, but one day we'll be in charge'. Le singe nous regarde droit dans les yeux avec une expression sérieuse. Banksy utilise le singe pour nous faire réfléchir à la façon dont nous traitons ceux qui sont différents et à la possibilité que les choses changent un jour."
               ],
               [
-                "",
-                "",
-                ""
+                "Singe de Banksy avec une pancarte subversive : une invitation à réfléchir sur le pouvoir et la soumission.",
+                "Laugh Now représente un singe portant une pancarte 'Laugh now, but one day we'll be in charge'. L'œuvre utilise l'image du singe de cirque pour commenter l'obéissance aveugle et la soumission à la société.",
+                "Réalisée en 2002, Laugh Now montre une rangée de singes portant des pancartes au cou. Le message 'Laugh now, but one day we'll be in charge' transforme l'animal domestiqué en symbole de révolte silencieuse. Banksy dénonce le conformisme et la hiérarchie sociale, suggérant que les opprimés pourraient un jour renverser l'ordre établi."
               ],
               [
-                "",
-                "",
-                ""
+                "Pochoir de 2002 utilisant la figure du singe pour critiquer le conformisme et les structures de pouvoir.",
+                "Laugh Now est l'une des premières œuvres grand format de Banksy. Les singes avec leurs pancartes représentent l'humanité asservie au consumérisme et aux institutions, dans une métaphore visuelle rappelant la tradition satirique de la caricature politique.",
+                "Commandée en 2002 pour un établissement de Brighton, Laugh Now est une œuvre fondamentale dans la production de Banksy. Le singe anthropomorphe à la pancarte subversive opère à plusieurs niveaux : critique du conformisme social, de la docilité individuelle face à l'autorité et de la réduction de l'être humain en amuseur du système capitaliste. Le format sériel anticipe le langage de la production de masse que Banksy continuera d'explorer."
               ],
               [
-                "",
-                "",
-                ""
+                "Œuvre séminale de Banksy sur la dialectique maître-serviteur et le potentiel révolutionnaire du sujet opprimé.",
+                "Laugh Now articule une critique structurelle du rapport de domination à travers la métaphore du singe dressé. La pancarte subversive introduit un élément performatif déstabilisant le rapport spectateur-œuvre et interrogeant la complicité du regard.",
+                "Laugh Now propose une réflexion sur la dialectique maître-serviteur au sein de la société du spectacle. Le singe, figure liminale entre nature et culture, incarne le sujet aliéné par le capitalisme : obéissant, exhibé, apparemment pacifié. La pancarte subversive réintroduit l'agency de l'opprimé, transformant le divertissement en menace latente. L'œuvre anticipe des thèmes centraux chez Banksy : sérialité, appropriation du langage publicitaire et subversion de l'espace d'exposition comme geste politique."
               ]
             ]
           },
           "objectType": "normal",
           "textTitle": "",
           "textBody": "",
-          "autore": "",
+          "autore": "Banksy",
           "licenza": "",
-          "correnteArtistica": "",
-          "anno": ""
+          "correnteArtistica": "Street Art",
+          "anno": "2002"
+        },
+        {
+          "nome": "Campbell's Soup Cans",
+          "stanza": "stanza 2",
+          "pos": {
+            "x": 0.2,
+            "y": 0.4
+          },
+          "connessi": [
+            "Radiant Baby",
+            "Companion"
+          ],
+          "descrizioni": [
+            [
+              "Tante lattine di zuppa colorate, tutte uguali ma con etichette diverse.",
+              "Questa opera mostra tante lattine di zuppa Campbell's, una accanto all'altra. Sono quelle che si trovano al supermercato! L'artista Andy Warhol le ha dipinte per mostrare che anche le cose di tutti i giorni possono diventare arte.",
+              "Andy Warhol ha dipinto 32 lattine di zuppa Campbell's, una per ogni gusto disponibile. Le lattine sono tutte quasi uguali, cambiano solo le scritte. Warhol voleva farci pensare a come compriamo sempre le stesse cose e a come la pubblicità ci circonda ovunque. Ha trasformato un oggetto banale del supermercato in un'opera d'arte famosa in tutto il mondo."
+            ],
+            [
+              "Serie iconica di Warhol che eleva un prodotto commerciale a soggetto artistico, fondando la Pop Art.",
+              "Campbell's Soup Cans è l'opera che ha reso celebre Andy Warhol. Presentata nel 1962, la serie di 32 tele riproduce le lattine di zuppa Campbell's, eliminando il confine tra arte e prodotto di consumo e inaugurando la stagione della Pop Art americana.",
+              "Esposta per la prima volta nel 1962 alla Ferus Gallery di Los Angeles, Campbell's Soup Cans comprende 32 tele, una per ogni varietà di zuppa. Warhol adotta la ripetizione seriale e il linguaggio pubblicitario per mettere in discussione le gerarchie tra arte alta e cultura commerciale. L'opera segna la nascita della Pop Art come movimento e inaugura la riflessione di Warhol sul rapporto tra consumo, identità e produzione artistica."
+            ],
+            [
+              "Opera fondativa della Pop Art, 1962: Warhol azzera la distinzione tra oggetto commerciale e opera d'arte.",
+              "Campbell's Soup Cans rappresenta il gesto inaugurale della Pop Art americana. Warhol applica la logica della produzione industriale all'arte, utilizzando la ripetizione seriale per svuotare il soggetto di aura e ridefinire il rapporto tra originalità e riproducibilità.",
+              "Con Campbell's Soup Cans Warhol compie un gesto radicale: importa nell'arte il linguaggio della merce, abolendo la distinzione tra prodotto commerciale e oggetto estetico. Le 32 tele adottano la serialità industriale come principio compositivo, anticipando le riflessioni sulla riproducibilità tecnica e sull'esaurimento dell'aura artistica. L'opera dialoga con la tradizione del readymade duchampiano, ma ne sposta il fulcro dalla provocazione concettuale all'analisi della società dei consumi come sistema semiotico."
+            ],
+            [
+              "Gesto fondativo della Pop Art che ridefinisce il rapporto tra merce, aura e produzione artistica nel capitalismo avanzato.",
+              "Campbell's Soup Cans opera lo svuotamento dell'aura benjaminiana attraverso la serialità industriale. Warhol trasforma la superficie del prodotto commerciale in superficie pittorica, ponendo l'equivalenza tra consumo e contemplazione estetica al centro della riflessione sull'arte nel tardo capitalismo.",
+              "Campbell's Soup Cans è il manifesto di una nuova ontologia dell'opera d'arte. Warhol dissolve la distinzione tra originale e copia adottando la serialità come principio generativo, non più come riproduzione degradata. Il soggetto — la lattina — funziona come significante vuoto che assorbe e restituisce i codici della società dei consumi. L'opera anticipa la svolta postmoderna nell'estetica: l'arte non rappresenta più il reale ma ne replica i meccanismi produttivi, ponendosi come simulacro nel senso baudrillardiano. Il gesto di Warhol rimane seminale per ogni riflessione contemporanea su merce, immagine e valore."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "Lots of colourful soup cans, all alike but with different labels.",
+                "This artwork shows many Campbell's soup cans side by side — the kind you find at the supermarket! Artist Andy Warhol painted them to show that everyday things can become art.",
+                "Andy Warhol painted 32 Campbell's soup cans, one for every flavour available. The cans are almost identical, only the labels change. Warhol wanted us to think about how we buy the same things over and over and how advertising surrounds us everywhere. He turned an ordinary supermarket item into a world-famous artwork."
+              ],
+              [
+                "Iconic Warhol series elevating a commercial product to artistic subject, founding Pop Art.",
+                "Campbell's Soup Cans is the work that made Andy Warhol famous. Presented in 1962, the series of 32 canvases reproduces Campbell's soup cans, erasing the boundary between art and consumer product and ushering in American Pop Art.",
+                "First shown in 1962 at the Ferus Gallery in Los Angeles, Campbell's Soup Cans comprises 32 canvases, one for each soup variety. Warhol adopts serial repetition and advertising language to challenge the hierarchies between high art and commercial culture. The work marks the birth of Pop Art as a movement and launches Warhol's inquiry into the relationship between consumption, identity and artistic production."
+              ],
+              [
+                "Foundational Pop Art work, 1962: Warhol collapses the distinction between commercial object and artwork.",
+                "Campbell's Soup Cans is the inaugural gesture of American Pop Art. Warhol applies industrial production logic to art, using serial repetition to drain the subject of aura and redefine the relationship between originality and reproducibility.",
+                "With Campbell's Soup Cans Warhol makes a radical move: importing the language of merchandise into art, abolishing the distinction between commercial product and aesthetic object. The 32 canvases adopt industrial seriality as a compositional principle, anticipating reflections on technical reproducibility and the exhaustion of artistic aura. The work dialogues with the Duchampian readymade tradition but shifts its focus from conceptual provocation to the analysis of consumer society as a semiotic system."
+              ],
+              [
+                "Foundational Pop Art gesture redefining the nexus of commodity, aura and artistic production under late capitalism.",
+                "Campbell's Soup Cans enacts the emptying of Benjaminian aura through industrial seriality. Warhol transforms the surface of the commercial product into a pictorial surface, placing the equivalence of consumption and aesthetic contemplation at the heart of reflection on art in late capitalism.",
+                "Campbell's Soup Cans is the manifesto of a new ontology of the artwork. Warhol dissolves the distinction between original and copy by adopting seriality as a generative principle rather than degraded reproduction. The subject — the can — functions as an empty signifier absorbing and returning the codes of consumer society. The work anticipates the postmodern turn in aesthetics: art no longer represents the real but replicates its productive mechanisms, positioning itself as simulacrum in the Baudrillardian sense. Warhol's gesture remains seminal for every contemporary reflection on commodity, image and value."
+              ]
+            ],
+            "fr": [
+              [
+                "Plein de boîtes de soupe colorées, toutes pareilles mais avec des étiquettes différentes.",
+                "Cette œuvre montre plein de boîtes de soupe Campbell's côte à côte — celles que l'on trouve au supermarché ! L'artiste Andy Warhol les a peintes pour montrer que les objets du quotidien peuvent devenir de l'art.",
+                "Andy Warhol a peint 32 boîtes de soupe Campbell's, une pour chaque saveur disponible. Les boîtes sont presque identiques, seules les étiquettes changent. Warhol voulait nous faire réfléchir à notre façon d'acheter toujours les mêmes choses et à la publicité qui nous entoure partout. Il a transformé un objet banal du supermarché en une œuvre mondialement célèbre."
+              ],
+              [
+                "Série emblématique de Warhol élevant un produit commercial au rang de sujet artistique, fondant le Pop Art.",
+                "Campbell's Soup Cans est l'œuvre qui a rendu Andy Warhol célèbre. Présentée en 1962, la série de 32 toiles reproduit les boîtes de soupe Campbell's, effaçant la frontière entre art et produit de consommation et inaugurant le Pop Art américain.",
+                "Exposée pour la première fois en 1962 à la Ferus Gallery de Los Angeles, Campbell's Soup Cans comprend 32 toiles, une par variété de soupe. Warhol adopte la répétition sérielle et le langage publicitaire pour remettre en question les hiérarchies entre art savant et culture commerciale. L'œuvre marque la naissance du Pop Art comme mouvement et inaugure la réflexion de Warhol sur le rapport entre consommation, identité et production artistique."
+              ],
+              [
+                "Œuvre fondatrice du Pop Art, 1962 : Warhol abolit la distinction entre objet commercial et œuvre d'art.",
+                "Campbell's Soup Cans est le geste inaugural du Pop Art américain. Warhol applique la logique de la production industrielle à l'art, utilisant la répétition sérielle pour vider le sujet de son aura et redéfinir le rapport entre originalité et reproductibilité.",
+                "Avec Campbell's Soup Cans, Warhol accomplit un geste radical : importer le langage de la marchandise dans l'art en abolissant la distinction entre produit commercial et objet esthétique. Les 32 toiles adoptent la sérialité industrielle comme principe compositionnel, anticipant les réflexions sur la reproductibilité technique et l'épuisement de l'aura artistique. L'œuvre dialogue avec la tradition du readymade duchampien mais en déplace le centre de la provocation conceptuelle vers l'analyse de la société de consommation comme système sémiotique."
+              ],
+              [
+                "Geste fondateur du Pop Art redéfinissant le lien entre marchandise, aura et production artistique dans le capitalisme avancé.",
+                "Campbell's Soup Cans opère le vidage de l'aura benjaminienne par la sérialité industrielle. Warhol transforme la surface du produit commercial en surface picturale, plaçant l'équivalence entre consommation et contemplation esthétique au cœur de la réflexion sur l'art dans le capitalisme tardif.",
+                "Campbell's Soup Cans est le manifeste d'une nouvelle ontologie de l'œuvre d'art. Warhol dissout la distinction entre original et copie en adoptant la sérialité comme principe génératif et non comme reproduction dégradée. Le sujet — la boîte — fonctionne comme signifiant vide absorbant et restituant les codes de la société de consommation. L'œuvre anticipe le tournant postmoderne en esthétique : l'art ne représente plus le réel mais en réplique les mécanismes productifs, se posant comme simulacre au sens baudrillardien. Le geste de Warhol reste séminal pour toute réflexion contemporaine sur marchandise, image et valeur."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Andy Warhol",
+          "licenza": "",
+          "correnteArtistica": "Pop Art",
+          "anno": "1962"
+        },
+        {
+          "nome": "Radiant Baby",
+          "stanza": "stanza 2",
+          "pos": {
+            "x": 0.5,
+            "y": 0.6
+          },
+          "connessi": [
+            "Campbell's Soup Cans",
+            "Companion"
+          ],
+          "descrizioni": [
+            [
+              "Un bambino che brilla circondato da raggi di luce, disegnato con linee semplici e allegre.",
+              "Questo disegno mostra un bambino a gattoni circondato da linee luminose, come se brillasse. Keith Haring lo disegnava ovunque: è il suo simbolo di gioia e speranza.",
+              "Il Radiant Baby è uno dei disegni più famosi di Keith Haring: un bambino a gattoni circondato da raggi di energia. Haring lo disegnava sui muri della metropolitana di New York con il gesso. Rappresenta l'innocenza, la purezza e la speranza nel futuro. Le linee sono semplici e colorate, come nei cartoni animati, perché Haring voleva che l'arte fosse per tutti."
+            ],
+            [
+              "Figura iconica di Keith Haring: un neonato radiante che simboleggia vitalità, innocenza e speranza.",
+              "Il Radiant Baby è il motivo più riconoscibile di Keith Haring, apparso per la prima volta nella metropolitana di New York nei primi anni Ottanta. Il bambino a gattoni circondato da raggi di energia rappresenta purezza e potenziale umano, in un linguaggio grafico accessibile e universale.",
+              "Nato come disegno a gesso nella metropolitana di New York, il Radiant Baby è diventato il simbolo dell'intera produzione di Keith Haring. La figura del neonato radiante sintetizza i temi centrali dell'artista — vitalità, innocenza, speranza — in un linguaggio che fonde l'estetica del fumetto con l'urgenza della street art. Haring credeva nell'arte come strumento democratico e il Radiant Baby ne è l'espressione più pura."
+            ],
+            [
+              "Motivo fondamentale di Haring, sintesi della sua poetica tra arte pubblica, attivismo e linguaggio pop.",
+              "Il Radiant Baby rappresenta il nucleo della pratica di Haring: la ricerca di un linguaggio visivo universale che superi le barriere di classe e cultura. Nato nella subway newyorkese, il motivo condensa vitalità e vulnerabilità in una forma immediatamente riconoscibile.",
+              "Il Radiant Baby incarna la filosofia artistica di Keith Haring: arte pubblica, democratica, accessibile. Apparso nei primi anni Ottanta sui pannelli pubblicitari vuoti della metropolitana di New York, il motivo trascende la street art per diventare icona pop globale. La figura del neonato radiante opera come geroglifico contemporaneo — leggibile trasversalmente a culture e generazioni — e sintetizza la tensione tra vulnerabilità e potenza vitale che attraversa l'intera opera di Haring."
+            ],
+            [
+              "Archetipo visivo dell'opera di Haring, all'incrocio tra semiotica pop, arte pubblica e impegno civile.",
+              "Il Radiant Baby funziona come significante fluttuante nell'opera di Haring: simbolo di nascita e potenziale, ma anche di fragilità nell'era dell'AIDS. La sua ubiquità — dai muri della subway ai musei — problematizza il rapporto tra arte pubblica e istituzione.",
+              "Il Radiant Baby è il fulcro semiotico dell'opera di Haring: un geroglifico post-pop che condensa in forma minimale una molteplicità di significati — nascita, energia, vulnerabilità, speranza. La sua genesi nella subway newyorkese ne fa un paradigma dell'arte pubblica come pratica democratica, mentre la sua successiva museificazione riflette le tensioni tra accessibilità e mercificazione che Haring stesso ha problematizzato. Nel contesto della crisi dell'AIDS che colpì l'artista, il Radiant Baby acquisisce una dimensione elegiaca: celebrazione della vita nella consapevolezza della sua precarietà."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A glowing baby surrounded by rays of light, drawn with simple cheerful lines.",
+                "This drawing shows a crawling baby surrounded by bright lines, as if it were shining. Keith Haring drew it everywhere — it is his symbol of joy and hope.",
+                "The Radiant Baby is one of Keith Haring's most famous drawings: a crawling baby surrounded by rays of energy. Haring drew it in chalk on New York subway walls. It stands for innocence, purity and hope for the future. The lines are simple and colourful, like a cartoon, because Haring wanted art to be for everyone."
+              ],
+              [
+                "Iconic Keith Haring figure: a radiant infant symbolising vitality, innocence and hope.",
+                "The Radiant Baby is Haring's most recognisable motif, first appearing in the New York subway in the early 1980s. The crawling baby surrounded by energy rays represents purity and human potential in an accessible, universal graphic language.",
+                "Born as a chalk drawing in the New York subway, the Radiant Baby became the symbol of Keith Haring's entire output. The radiant infant distils the artist's core themes — vitality, innocence, hope — in a language that blends comic-book aesthetics with street-art urgency. Haring believed in art as a democratic tool, and the Radiant Baby is its purest expression."
+              ],
+              [
+                "Core Haring motif, synthesis of his poetics between public art, activism and pop language.",
+                "The Radiant Baby represents the nucleus of Haring's practice: the search for a universal visual language transcending barriers of class and culture. Born in the New York subway, the motif condenses vitality and vulnerability into an instantly recognisable form.",
+                "The Radiant Baby embodies Keith Haring's artistic philosophy: public, democratic, accessible art. Appearing in the early 1980s on empty advertising panels in the New York subway, the motif transcends street art to become a global pop icon. The radiant infant operates as a contemporary hieroglyph — legible across cultures and generations — and synthesises the tension between vulnerability and vital power running through Haring's entire oeuvre."
+              ],
+              [
+                "Visual archetype of Haring's work, at the crossroads of pop semiotics, public art and civic engagement.",
+                "The Radiant Baby functions as a floating signifier in Haring's work: symbol of birth and potential, but also of fragility in the AIDS era. Its ubiquity — from subway walls to museums — problematises the relationship between public art and institution.",
+                "The Radiant Baby is the semiotic fulcrum of Haring's work: a post-pop hieroglyph condensing a multiplicity of meanings in minimal form — birth, energy, vulnerability, hope. Its genesis in the New York subway makes it a paradigm of public art as democratic practice, while its subsequent museification reflects the tensions between accessibility and commodification that Haring himself problematised. In the context of the AIDS crisis that struck the artist, the Radiant Baby acquires an elegiac dimension: a celebration of life in the awareness of its precariousness."
+              ]
+            ],
+            "fr": [
+              [
+                "Un bébé lumineux entouré de rayons de lumière, dessiné avec des lignes simples et joyeuses.",
+                "Ce dessin montre un bébé à quatre pattes entouré de traits lumineux, comme s'il brillait. Keith Haring le dessinait partout : c'est son symbole de joie et d'espoir.",
+                "Le Radiant Baby est l'un des dessins les plus célèbres de Keith Haring : un bébé à quatre pattes entouré de rayons d'énergie. Haring le dessinait à la craie sur les murs du métro de New York. Il représente l'innocence, la pureté et l'espoir en l'avenir. Les lignes sont simples et colorées, comme dans un dessin animé, car Haring voulait que l'art soit accessible à tous."
+              ],
+              [
+                "Figure emblématique de Keith Haring : un nourrisson radieux symbolisant vitalité, innocence et espoir.",
+                "Le Radiant Baby est le motif le plus reconnaissable de Haring, apparu dans le métro new-yorkais au début des années 1980. Le bébé à quatre pattes entouré de rayons d'énergie représente la pureté et le potentiel humain dans un langage graphique accessible et universel.",
+                "Né comme dessin à la craie dans le métro de New York, le Radiant Baby est devenu le symbole de toute la production de Keith Haring. Le nourrisson radieux condense les thèmes centraux de l'artiste — vitalité, innocence, espoir — dans un langage mêlant esthétique de la bande dessinée et urgence du street art. Haring croyait en l'art comme outil démocratique, et le Radiant Baby en est l'expression la plus pure."
+              ],
+              [
+                "Motif fondamental de Haring, synthèse de sa poétique entre art public, activisme et langage pop.",
+                "Le Radiant Baby représente le noyau de la pratique de Haring : la recherche d'un langage visuel universel dépassant les barrières de classe et de culture. Né dans le métro new-yorkais, le motif condense vitalité et vulnérabilité en une forme immédiatement reconnaissable.",
+                "Le Radiant Baby incarne la philosophie artistique de Keith Haring : art public, démocratique, accessible. Apparu au début des années 1980 sur les panneaux publicitaires vides du métro de New York, le motif transcende le street art pour devenir icône pop mondiale. Le nourrisson radieux fonctionne comme un hiéroglyphe contemporain — lisible à travers cultures et générations — et synthétise la tension entre vulnérabilité et puissance vitale qui traverse toute l'œuvre de Haring."
+              ],
+              [
+                "Archétype visuel de l'œuvre de Haring, au croisement de la sémiotique pop, de l'art public et de l'engagement civique.",
+                "Le Radiant Baby fonctionne comme signifiant flottant dans l'œuvre de Haring : symbole de naissance et de potentiel, mais aussi de fragilité à l'ère du sida. Son ubiquité — des murs du métro aux musées — problématise le rapport entre art public et institution.",
+                "Le Radiant Baby est le pivot sémiotique de l'œuvre de Haring : un hiéroglyphe post-pop condensant en forme minimale une multiplicité de sens — naissance, énergie, vulnérabilité, espoir. Sa genèse dans le métro new-yorkais en fait un paradigme de l'art public comme pratique démocratique, tandis que sa muséification ultérieure reflète les tensions entre accessibilité et marchandisation que Haring lui-même a problématisées. Dans le contexte de la crise du sida qui a frappé l'artiste, le Radiant Baby acquiert une dimension élégiaque : célébration de la vie dans la conscience de sa précarité."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Keith Haring",
+          "licenza": "",
+          "correnteArtistica": "Pop Art",
+          "anno": "1990"
+        },
+        {
+          "nome": "Companion",
+          "stanza": "stanza 2",
+          "pos": {
+            "x": 0.78,
+            "y": 0.35
+          },
+          "connessi": [
+            "Campbell's Soup Cans",
+            "Radiant Baby"
+          ],
+          "descrizioni": [
+            [
+              "Una grande scultura a forma di pupazzo con le orecchie da topolino e gli occhi a X.",
+              "Questo personaggio si chiama Companion ed è stato creato dall'artista KAWS. Ha le orecchie da topolino e gli occhi a X, come se fosse stordito. A volte è in piedi, a volte seduto con la testa tra le mani, come quando siamo tristi.",
+              "Companion è una scultura creata dall'artista americano KAWS. Sembra un pupazzo gigante con le orecchie simili a quelle di Topolino e due X al posto degli occhi. Il personaggio viene mostrato in pose diverse: a volte è in piedi, a volte seduto con la testa tra le mani. KAWS ha creato Companion per farci riflettere sulle emozioni che proviamo tutti — tristezza, solitudine, bisogno di compagnia — usando un linguaggio che ricorda i cartoni animati."
+            ],
+            [
+              "Scultura di KAWS che reinterpreta l'estetica dei cartoni animati per esplorare solitudine e vulnerabilità contemporanea.",
+              "Companion è il personaggio più noto di KAWS: una figura antropomorfa con orecchie da topo e occhi a X, a metà tra giocattolo e scultura. Nelle sue diverse pose — eretto, accasciato, disteso — Companion esprime malinconia e alienazione attraverso il linguaggio della cultura pop.",
+              "Creato nel 1999, Companion è la figura più iconica di KAWS. La scultura combina l'estetica dei cartoon — orecchie da topo, mani a guanto — con gesti carichi di emotività: il personaggio si copre il volto, si rannicchia, giace a terra. KAWS utilizza il linguaggio familiare dei giocattoli e dei personaggi animati per affrontare temi di solitudine, alienazione e vulnerabilità, rendendo universale un messaggio emotivo profondo."
+            ],
+            [
+              "Figura centrale nella produzione di KAWS, all'incrocio tra design, scultura e critica della cultura pop.",
+              "Companion sintetizza la pratica di KAWS: l'appropriazione e la sovversione dei codici visivi della cultura mainstream. Le X sugli occhi, cifra stilistica dell'artista, trasformano il personaggio cartoon in maschera mortuaria pop, creando un cortocircuito tra familiarità e perturbamento.",
+              "Companion rappresenta il fulcro della ricerca di KAWS: un personaggio che assorbe e restituisce i codici della cultura di massa — giocattoli, cartoon, merchandising — caricandoli di una dimensione emotiva inattesa. Le X sugli occhi funzionano come memento mori pop, mentre le pose del personaggio — accasciato, prostrato — introducono un registro elegiaco nel linguaggio apparentemente leggero del design commerciale. L'opera problematizza il confine tra arte e prodotto, originale e multiplo."
+            ],
+            [
+              "Opera paradigmatica della dissoluzione del confine tra arte alta e cultura di massa nel contemporaneo.",
+              "Companion opera una doppia sovversione: appropriandosi dei codici del cartoon commerciale li ricarica di pathos, mentre simultaneamente interroga le gerarchie tra scultura, design e merchandising nel sistema dell'arte globale.",
+              "Companion incarna la condizione postmoderna dell'oggetto artistico: simultaneamente scultura, giocattolo, multiplo e icona pop. KAWS mobilita l'estetica della cultura di massa — la familiarità rassicurante del cartoon — per poi sovvertirla attraverso le X mortuarie e la gestualità malinconica. L'opera si colloca in una genealogia che va dal readymade duchampiano alla Brillo Box warholiana, ma ne radicalizza le premesse: non più l'oggetto comune elevato ad arte, ma il personaggio commerciale trasformato in veicolo di autenticità emotiva. Companion interroga la possibilità stessa dell'esperienza estetica autentica nell'epoca della riproducibilità totale."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A big sculpture shaped like a toy with mouse ears and X eyes.",
+                "This character is called Companion and was created by the artist KAWS. It has mouse ears and X-shaped eyes, as if stunned. Sometimes it stands up, sometimes it sits with its head in its hands, like when we are sad.",
+                "Companion is a sculpture by the American artist KAWS. It looks like a giant toy with ears like Mickey Mouse and two Xs instead of eyes. The character is shown in different poses: sometimes standing, sometimes sitting with its head in its hands. KAWS created Companion to make us think about the feelings we all share — sadness, loneliness, the need for company — using a language borrowed from cartoons."
+              ],
+              [
+                "KAWS sculpture reinterpreting cartoon aesthetics to explore contemporary loneliness and vulnerability.",
+                "Companion is KAWS's best-known character: an anthropomorphic figure with mouse ears and X eyes, halfway between toy and sculpture. In its various poses — standing, slumped, lying down — Companion expresses melancholy and alienation through the language of pop culture.",
+                "Created in 1999, Companion is KAWS's most iconic figure. The sculpture combines cartoon aesthetics — mouse ears, gloved hands — with emotionally charged gestures: the character covers its face, curls up, lies on the ground. KAWS uses the familiar language of toys and animated characters to address loneliness, alienation and vulnerability, making a profound emotional message universally accessible."
+              ],
+              [
+                "Central figure in KAWS's output, at the intersection of design, sculpture and pop-culture critique.",
+                "Companion synthesises KAWS's practice: the appropriation and subversion of mainstream visual codes. The X eyes, the artist's signature mark, turn the cartoon character into a pop death mask, short-circuiting familiarity and unease.",
+                "Companion is the fulcrum of KAWS's inquiry: a character that absorbs and returns the codes of mass culture — toys, cartoons, merchandising — charging them with unexpected emotional depth. The X eyes function as a pop memento mori, while the character's poses — slumped, prostrate — introduce an elegiac register into the ostensibly light language of commercial design. The work problematises the boundary between art and product, original and multiple."
+              ],
+              [
+                "Paradigmatic work of the dissolution of the boundary between high art and mass culture in the contemporary.",
+                "Companion performs a double subversion: appropriating commercial cartoon codes it recharges them with pathos, while simultaneously questioning the hierarchies between sculpture, design and merchandising in the global art system.",
+                "Companion embodies the postmodern condition of the art object: simultaneously sculpture, toy, multiple and pop icon. KAWS mobilises the aesthetics of mass culture — the reassuring familiarity of the cartoon — only to subvert them through mortuary Xs and melancholic gestures. The work belongs to a genealogy stretching from the Duchampian readymade to the Warholian Brillo Box, but radicalises their premises: no longer the common object elevated to art, but the commercial character transformed into a vehicle of emotional authenticity. Companion questions the very possibility of authentic aesthetic experience in the age of total reproducibility."
+              ]
+            ],
+            "fr": [
+              [
+                "Une grande sculpture en forme de jouet avec des oreilles de souris et des yeux en X.",
+                "Ce personnage s'appelle Companion et a été créé par l'artiste KAWS. Il a des oreilles de souris et des yeux en forme de X, comme s'il était étourdi. Parfois il est debout, parfois assis la tête dans les mains, comme quand on est triste.",
+                "Companion est une sculpture de l'artiste américain KAWS. Il ressemble à un jouet géant avec des oreilles comme Mickey Mouse et deux X à la place des yeux. Le personnage est montré dans différentes poses : parfois debout, parfois assis la tête dans les mains. KAWS a créé Companion pour nous faire réfléchir aux émotions que nous partageons tous — la tristesse, la solitude, le besoin de compagnie — en utilisant un langage emprunté aux dessins animés."
+              ],
+              [
+                "Sculpture de KAWS réinterprétant l'esthétique des dessins animés pour explorer la solitude et la vulnérabilité contemporaines.",
+                "Companion est le personnage le plus connu de KAWS : une figure anthropomorphe aux oreilles de souris et aux yeux en X, à mi-chemin entre jouet et sculpture. Dans ses différentes poses — debout, affalé, couché — Companion exprime mélancolie et aliénation à travers le langage de la culture pop.",
+                "Créé en 1999, Companion est la figure la plus emblématique de KAWS. La sculpture associe l'esthétique du cartoon — oreilles de souris, mains gantées — à des gestes chargés d'émotion : le personnage se couvre le visage, se recroqueville, gît au sol. KAWS utilise le langage familier des jouets et des personnages animés pour aborder solitude, aliénation et vulnérabilité, rendant un message émotionnel profond universellement accessible."
+              ],
+              [
+                "Figure centrale de la production de KAWS, au croisement du design, de la sculpture et de la critique de la culture pop.",
+                "Companion synthétise la pratique de KAWS : l'appropriation et la subversion des codes visuels du mainstream. Les X sur les yeux, marque de fabrique de l'artiste, transforment le personnage de cartoon en masque mortuaire pop, créant un court-circuit entre familiarité et malaise.",
+                "Companion est le pivot de la recherche de KAWS : un personnage qui absorbe et restitue les codes de la culture de masse — jouets, cartoons, merchandising — en les chargeant d'une profondeur émotionnelle inattendue. Les yeux en X fonctionnent comme un memento mori pop, tandis que les poses du personnage — affalé, prostré — introduisent un registre élégiaque dans le langage apparemment léger du design commercial. L'œuvre problématise la frontière entre art et produit, original et multiple."
+              ],
+              [
+                "Œuvre paradigmatique de la dissolution de la frontière entre art savant et culture de masse dans le contemporain.",
+                "Companion opère une double subversion : en s'appropriant les codes du cartoon commercial il les recharge de pathos, tout en interrogeant les hiérarchies entre sculpture, design et merchandising dans le système de l'art mondial.",
+                "Companion incarne la condition postmoderne de l'objet artistique : simultanément sculpture, jouet, multiple et icône pop. KAWS mobilise l'esthétique de la culture de masse — la familiarité rassurante du cartoon — pour la subvertir par les X mortuaires et la gestuelle mélancolique. L'œuvre s'inscrit dans une généalogie allant du readymade duchampien à la Brillo Box warholienne, mais en radicalise les prémisses : non plus l'objet commun élevé au rang d'art, mais le personnage commercial transformé en véhicule d'authenticité émotionnelle. Companion interroge la possibilité même de l'expérience esthétique authentique à l'époque de la reproductibilité totale."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "KAWS",
+          "licenza": "",
+          "correnteArtistica": "Neo-Pop",
+          "anno": "1999"
+        },
+        {
+          "nome": "Pivot",
+          "stanza": "stanza 3",
+          "pos": {
+            "x": 0.25,
+            "y": 0.3
+          },
+          "connessi": [
+            "Untitled (Skull)"
+          ],
+          "descrizioni": [
+            [
+              "Una scritta divertente su come fingere di essere morto per evitare situazioni imbarazzanti.",
+              "L'opera è un testo scritto che dice 'Pivot out of awkward social situations by pretending to be dead'. Vuol dire: esci da situazioni imbarazzanti facendo finta di essere morto! È buffo ma fa anche un po' pensare.",
+              "Questa opera è fatta solo di parole: la scritta dice 'Pivot out of awkward social situations by pretending to be dead', cioè 'Esci dalle situazioni sociali imbarazzanti facendo finta di essere morto'. Sembra una battuta, ma in realtà parla di come a volte ci sentiamo così a disagio con gli altri da voler scomparire. L'artista usa l'umorismo per parlare di emozioni che tutti conosciamo."
+            ],
+            [
+              "Testo ironico di Robbie Williams sull'ansia sociale, tra umorismo nero e vulnerabilità emotiva.",
+              "L'opera presenta una frase provocatoria sull'evitare le situazioni sociali scomode fingendosi morti. Attraverso un umorismo tagliente, l'artista affronta il tema dell'ansia sociale e del disagio nelle relazioni interpersonali con disarmante onestà.",
+              "Pivot è un'opera testuale che gioca sul confine tra battuta e confessione. La frase — fingere di essere morto per sfuggire al disagio sociale — utilizza l'iperbole comica per rendere universale un'esperienza di vulnerabilità. L'artista Robbie Williams esplora il territorio dell'ansia sociale e dell'inadeguatezza, trasformando il testo in uno specchio in cui il pubblico riconosce le proprie insicurezze."
+            ],
+            [
+              "Opera testuale che esplora il confine tra umorismo autoironico e denuncia del disagio psicologico contemporaneo.",
+              "Pivot utilizza la forma aforistica per condensare una riflessione sull'ansia sociale: l'iperbole del fingersi morto diventa metafora dell'alienazione relazionale nell'epoca della performance sociale permanente.",
+              "L'opera si inserisce in una tradizione di arte testuale che va da Jenny Holzer a David Shrigley, ma la declina in chiave intimista. La frase funziona come meccanismo di riconoscimento: il pubblico ride e simultaneamente si identifica con il disagio descritto. La scelta del testo come medium elimina ogni filtro estetico, mettendo a nudo la vulnerabilità psicologica in una società che premia l'estroversione e la performance sociale continua."
+            ],
+            [
+              "Intervento testuale che problematizza l'ansia sociale come condizione strutturale della contemporaneità iperconnessa.",
+              "Pivot opera nella zona liminale tra comicità e patologia, dove l'umorismo autoironico diventa strategia di sopravvivenza psichica. L'opera interroga il rapporto tra performatività sociale, autenticità e salute mentale nel contesto dell'ipervisibilità digitale.",
+              "L'opera mobilita l'aforisma come dispositivo critico per interrogare la condizione del soggetto contemporaneo, costretto alla performance sociale permanente. Il desiderio iperbolico di annullamento — fingersi morto — rivela il costo psichico dell'obbligo alla socievolezza nell'era della visibilità digitale. Il testo, nella sua brutalità umoristica, decostruisce la narrazione del sé sociale come costruzione performativa, riecheggiando le analisi di Goffman sulla presentazione del sé nella vita quotidiana e aggiornandole al contesto della società dell'ansia."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A funny text about pretending to be dead to escape awkward situations.",
+                "The artwork is a written sentence saying 'Pivot out of awkward social situations by pretending to be dead'. It means: get out of embarrassing moments by playing dead! It is funny but also makes you think.",
+                "This artwork is made only of words: it reads 'Pivot out of awkward social situations by pretending to be dead'. It sounds like a joke, but it is really about how sometimes we feel so uncomfortable around others that we want to disappear. The artist uses humour to talk about feelings we all know."
+              ],
+              [
+                "Witty Robbie Williams text on social anxiety, between dark humour and emotional vulnerability.",
+                "The work presents a provocative sentence about avoiding awkward social situations by playing dead. Through sharp humour the artist addresses social anxiety and relational discomfort with disarming honesty.",
+                "Pivot is a text-based work playing on the line between joke and confession. The phrase — playing dead to escape social discomfort — uses comic hyperbole to universalise an experience of vulnerability. Artist Robbie Williams explores the territory of social anxiety and inadequacy, turning the text into a mirror in which the audience recognises its own insecurities."
+              ],
+              [
+                "Text work exploring the boundary between self-deprecating humour and critique of contemporary psychological distress.",
+                "Pivot uses the aphoristic form to condense a reflection on social anxiety: the hyperbole of playing dead becomes a metaphor for relational alienation in the era of permanent social performance.",
+                "The work belongs to a tradition of text art from Jenny Holzer to David Shrigley, but inflects it in an intimate key. The phrase functions as a recognition device: the audience laughs and simultaneously identifies with the discomfort described. The choice of text as medium strips away every aesthetic filter, laying bare psychological vulnerability in a society that rewards extroversion and continuous social performance."
+              ],
+              [
+                "Text intervention problematising social anxiety as a structural condition of hyper-connected contemporaneity.",
+                "Pivot operates in the liminal zone between comedy and pathology, where self-deprecating humour becomes a strategy for psychic survival. The work questions the relationship between social performativity, authenticity and mental health in the context of digital hyper-visibility.",
+                "The work mobilises the aphorism as a critical device to interrogate the condition of the contemporary subject, compelled to permanent social performance. The hyperbolic desire for annihilation — playing dead — reveals the psychic cost of mandatory sociability in the age of digital visibility. The text, in its humorous brutality, deconstructs the narrative of the social self as performative construction, echoing Goffman's analyses of self-presentation in everyday life and updating them to the context of the anxiety society."
+              ]
+            ],
+            "fr": [
+              [
+                "Un texte drôle sur le fait de faire le mort pour échapper aux situations gênantes.",
+                "L'œuvre est une phrase écrite disant 'Pivot out of awkward social situations by pretending to be dead'. Cela veut dire : sortez des moments gênants en faisant semblant d'être mort ! C'est drôle mais ça fait aussi réfléchir.",
+                "Cette œuvre est faite uniquement de mots : elle dit 'Pivot out of awkward social situations by pretending to be dead', c'est-à-dire 'Sortez des situations sociales gênantes en faisant semblant d'être mort'. Cela ressemble à une blague, mais en réalité cela parle de ce moment où l'on se sent si mal à l'aise avec les autres qu'on voudrait disparaître. L'artiste utilise l'humour pour parler d'émotions que nous connaissons tous."
+              ],
+              [
+                "Texte ironique de Robbie Williams sur l'anxiété sociale, entre humour noir et vulnérabilité émotionnelle.",
+                "L'œuvre présente une phrase provocatrice sur le fait d'éviter les situations sociales gênantes en faisant le mort. À travers un humour incisif, l'artiste aborde l'anxiété sociale et le malaise relationnel avec une honnêteté désarmante.",
+                "Pivot est une œuvre textuelle jouant sur la frontière entre blague et confession. La phrase — faire le mort pour échapper au malaise social — utilise l'hyperbole comique pour universaliser une expérience de vulnérabilité. L'artiste Robbie Williams explore le territoire de l'anxiété sociale et de l'inadéquation, transformant le texte en miroir où le public reconnaît ses propres insécurités."
+              ],
+              [
+                "Œuvre textuelle explorant la frontière entre humour autodérisoire et dénonciation du mal-être psychologique contemporain.",
+                "Pivot utilise la forme aphoristique pour condenser une réflexion sur l'anxiété sociale : l'hyperbole du faire-le-mort devient métaphore de l'aliénation relationnelle à l'ère de la performance sociale permanente.",
+                "L'œuvre s'inscrit dans une tradition d'art textuel allant de Jenny Holzer à David Shrigley, mais la décline sur un mode intimiste. La phrase fonctionne comme dispositif de reconnaissance : le public rit et s'identifie simultanément au malaise décrit. Le choix du texte comme médium élimine tout filtre esthétique, mettant à nu la vulnérabilité psychologique dans une société qui récompense l'extraversion et la performance sociale continue."
+              ],
+              [
+                "Intervention textuelle problématisant l'anxiété sociale comme condition structurelle de la contemporanéité hyperconnectée.",
+                "Pivot opère dans la zone liminale entre comique et pathologie, où l'humour autodérisoire devient stratégie de survie psychique. L'œuvre interroge le rapport entre performativité sociale, authenticité et santé mentale dans le contexte de l'hypervisibilité numérique.",
+                "L'œuvre mobilise l'aphorisme comme dispositif critique pour interroger la condition du sujet contemporain, contraint à la performance sociale permanente. Le désir hyperbolique d'annulation — faire le mort — révèle le coût psychique de la sociabilité obligatoire à l'ère de la visibilité numérique. Le texte, dans sa brutalité humoristique, déconstruit le récit du soi social comme construction performative, faisant écho aux analyses de Goffman sur la présentation de soi dans la vie quotidienne et les actualisant au contexte de la société de l'anxiété."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Robbie Williams",
+          "licenza": "",
+          "correnteArtistica": "Arte Contemporanea",
+          "anno": "2022"
+        },
+        {
+          "nome": "Untitled (Skull)",
+          "stanza": "stanza 3",
+          "pos": {
+            "x": 0.8,
+            "y": 0.4
+          },
+          "connessi": [
+            "Pivot"
+          ],
+          "descrizioni": [
+            [
+              "Un teschio coloratissimo dipinto con tanti colori vivaci e scritte misteriose.",
+              "Questo quadro mostra un grande teschio pieno di colori accesi — rosso, giallo, blu, nero — con scritte e simboli tutt'intorno. L'artista Basquiat mescolava parole e disegni per esprimere emozioni forti.",
+              "Jean-Michel Basquiat ha dipinto questo teschio usando tantissimi colori e aggiungendo parole, frecce e simboli dappertutto. I suoi quadri sembrano disordinati ma in realtà ogni segno ha un significato. Il teschio ci fa pensare alla vita e alla morte, ma i colori vivaci lo rendono pieno di energia. Basquiat dipingeva come un bambino arrabbiato e geniale allo stesso tempo."
+            ],
+            [
+              "Teschio neo-espressionista di Basquiat, intriso di energia primordiale e riferimenti culturali stratificati.",
+              "I teschi sono un motivo ricorrente nell'opera di Jean-Michel Basquiat. Dipinti con pennellate aggressive e colori vivaci, mescolano simboli, testo e anatomia in composizioni che esprimono vitalità e mortalità con uguale intensità.",
+              "Untitled (Skull) appartiene alla serie di teschi che Basquiat ha realizzato nei primi anni Ottanta. L'opera combina una rappresentazione quasi anatomica del cranio con scritte, cancellature e simboli sovrapposti in un caos controllato. Basquiat attinge a fonti eterogenee — arte africana, anatomia medica, graffiti, cultura hip-hop — per creare un linguaggio visivo unico che parla di identità, razza, potere e mortalità."
+            ],
+            [
+              "Opera emblematica del neo-espressionismo di Basquiat, sintesi di cultura urbana, diaspora africana e critica del sistema dell'arte.",
+              "I teschi di Basquiat funzionano come autoritratti simbolici e memento mori contemporanei. La stratificazione di segni — anatomia, testo, simboli — riflette la condizione dell'artista nero nel sistema dell'arte bianco: simultaneamente visibile e cancellato.",
+              "Untitled (Skull) condensa i temi centrali della pratica di Basquiat: la tensione tra visibilità e cancellazione, vita e morte, cultura alta e underground. Il teschio opera come palinsesto — strati di pittura, testo e segni si sovrappongono e si cancellano reciprocamente, mimando i processi di costruzione e distruzione dell'identità. L'opera riflette la posizione liminale di Basquiat: artista di strada elevato a star del sistema, corpo nero esposto allo sguardo del mercato, genio che utilizza il primitivismo strategico come arma critica."
+            ],
+            [
+              "Opera che problematizza l'intersezione tra identità razziale, mortalità e sistema dell'arte nel contesto del neo-espressionismo newyorkese.",
+              "Il teschio di Basquiat funziona come dispositivo critico multistrato: autoritratto, vanitas, commento sulla mercificazione dell'artista nero. La dialettica tra costruzione e cancellazione del segno mima la violenza epistemica subita dall'identità afroamericana nel canone occidentale.",
+              "Untitled (Skull) è un nodo critico nell'opera di Basquiat, dove convergono questioni di razza, mortalità e potere simbolico. Il teschio — tradizionalmente vanitas nella pittura occidentale — viene risignificato attraverso la lente della diaspora africana: non più memento mori europeo ma maschera rituale, oggetto di potere, luogo di negoziazione identitaria. La stratificazione e la cancellazione dei segni operano come metafora della storia nera — scritta, sovrascritta, cancellata. L'opera interroga il paradosso della posizione di Basquiat nel mercato: il corpo nero come feticcio del primitivismo che il sistema dell'arte simultaneamente celebra e consuma."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A very colourful skull painted with bright colours and mysterious writing.",
+                "This painting shows a big skull full of vivid colours — red, yellow, blue, black — with writing and symbols all around. The artist Basquiat mixed words and drawings to express strong emotions.",
+                "Jean-Michel Basquiat painted this skull using lots of colours and adding words, arrows and symbols everywhere. His paintings look messy but every mark has a meaning. The skull makes us think of life and death, yet the bright colours fill it with energy. Basquiat painted like an angry genius child."
+              ],
+              [
+                "Neo-Expressionist Basquiat skull, steeped in primal energy and layered cultural references.",
+                "Skulls are a recurring motif in Jean-Michel Basquiat's work. Painted with aggressive brushstrokes and vivid colours, they blend symbols, text and anatomy in compositions expressing vitality and mortality with equal intensity.",
+                "Untitled (Skull) belongs to the skull series Basquiat produced in the early 1980s. The work combines a near-anatomical depiction of the cranium with overlapping writing, erasures and symbols in controlled chaos. Basquiat draws on diverse sources — African art, medical anatomy, graffiti, hip-hop culture — to create a unique visual language addressing identity, race, power and mortality."
+              ],
+              [
+                "Emblematic work of Basquiat's neo-expressionism, synthesising urban culture, the African diaspora and art-system critique.",
+                "Basquiat's skulls function as symbolic self-portraits and contemporary memento mori. The layering of signs — anatomy, text, symbols — reflects the condition of the Black artist in the white art system: simultaneously visible and erased.",
+                "Untitled (Skull) condenses the core themes of Basquiat's practice: the tension between visibility and erasure, life and death, high culture and underground. The skull operates as palimpsest — layers of paint, text and marks overlap and cancel each other, mimicking the processes of identity construction and destruction. The work reflects Basquiat's liminal position: street artist elevated to system star, Black body exposed to the market's gaze, a genius wielding strategic primitivism as a critical weapon."
+              ],
+              [
+                "Work problematising the intersection of racial identity, mortality and the art system within New York neo-expressionism.",
+                "Basquiat's skull functions as a multi-layered critical device: self-portrait, vanitas, commentary on the commodification of the Black artist. The dialectic between construction and erasure of the mark mimics the epistemic violence suffered by African-American identity within the Western canon.",
+                "Untitled (Skull) is a critical node in Basquiat's oeuvre, where questions of race, mortality and symbolic power converge. The skull — traditionally a vanitas in Western painting — is re-signified through the lens of the African diaspora: no longer a European memento mori but a ritual mask, an object of power, a site of identity negotiation. The layering and erasure of signs operate as a metaphor for Black history — written, overwritten, erased. The work interrogates the paradox of Basquiat's market position: the Black body as fetish of a primitivism the art system simultaneously celebrates and consumes."
+              ]
+            ],
+            "fr": [
+              [
+                "Un crâne très coloré peint avec des couleurs vives et des écritures mystérieuses.",
+                "Ce tableau montre un grand crâne plein de couleurs vives — rouge, jaune, bleu, noir — avec des écritures et des symboles tout autour. L'artiste Basquiat mélangeait mots et dessins pour exprimer des émotions fortes.",
+                "Jean-Michel Basquiat a peint ce crâne en utilisant plein de couleurs et en ajoutant des mots, des flèches et des symboles partout. Ses tableaux ont l'air désordonnés mais chaque marque a un sens. Le crâne fait penser à la vie et à la mort, mais les couleurs vives le remplissent d'énergie. Basquiat peignait comme un enfant génial et en colère à la fois."
+              ],
+              [
+                "Crâne néo-expressionniste de Basquiat, imprégné d'énergie primordiale et de références culturelles stratifiées.",
+                "Les crânes sont un motif récurrent chez Jean-Michel Basquiat. Peints avec des coups de pinceau agressifs et des couleurs vives, ils mêlent symboles, texte et anatomie dans des compositions exprimant vitalité et mortalité avec une intensité égale.",
+                "Untitled (Skull) appartient à la série de crânes réalisés par Basquiat au début des années 1980. L'œuvre associe une représentation quasi anatomique du crâne à des écritures, ratures et symboles superposés dans un chaos maîtrisé. Basquiat puise à des sources hétérogènes — art africain, anatomie médicale, graffiti, culture hip-hop — pour créer un langage visuel unique abordant identité, race, pouvoir et mortalité."
+              ],
+              [
+                "Œuvre emblématique du néo-expressionnisme de Basquiat, synthèse de culture urbaine, diaspora africaine et critique du système de l'art.",
+                "Les crânes de Basquiat fonctionnent comme autoportraits symboliques et memento mori contemporains. La stratification des signes — anatomie, texte, symboles — reflète la condition de l'artiste noir dans le système de l'art blanc : simultanément visible et effacé.",
+                "Untitled (Skull) condense les thèmes centraux de la pratique de Basquiat : la tension entre visibilité et effacement, vie et mort, culture savante et underground. Le crâne fonctionne comme palimpseste — couches de peinture, texte et signes se superposent et s'annulent mutuellement, mimant les processus de construction et de destruction identitaires. L'œuvre reflète la position liminale de Basquiat : artiste de rue élevé au rang de star du système, corps noir exposé au regard du marché, génie maniant le primitivisme stratégique comme arme critique."
+              ],
+              [
+                "Œuvre problématisant l'intersection entre identité raciale, mortalité et système de l'art dans le néo-expressionnisme new-yorkais.",
+                "Le crâne de Basquiat fonctionne comme dispositif critique multicouche : autoportrait, vanité, commentaire sur la marchandisation de l'artiste noir. La dialectique entre construction et effacement du signe mime la violence épistémique subie par l'identité afro-américaine dans le canon occidental.",
+                "Untitled (Skull) est un nœud critique dans l'œuvre de Basquiat, où convergent questions de race, mortalité et pouvoir symbolique. Le crâne — traditionnellement vanité dans la peinture occidentale — est re-signifié à travers le prisme de la diaspora africaine : non plus memento mori européen mais masque rituel, objet de pouvoir, lieu de négociation identitaire. La stratification et l'effacement des signes opèrent comme métaphore de l'histoire noire — écrite, réécrite, effacée. L'œuvre interroge le paradoxe de la position de Basquiat sur le marché : le corps noir comme fétiche d'un primitivisme que le système de l'art célèbre et consume simultanément."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Jean-Michel Basquiat",
+          "licenza": "",
+          "correnteArtistica": "Neo-Espressionismo",
+          "anno": "1981"
+        },
+        {
+          "nome": "Infinity Mirror Room",
+          "stanza": "stanza 4",
+          "pos": {
+            "x": 0.5052151587701613,
+            "y": 0.45806640625
+          },
+          "connessi": [],
+          "descrizioni": [
+            [
+              "Una stanza magica piena di specchi e luci che sembrano non finire mai.",
+              "Quando entri in questa stanza sembra di fluttuare nello spazio! Ci sono specchi ovunque e tante piccole luci colorate che si riflettono all'infinito. È come essere dentro un cielo stellato che non finisce mai.",
+              "L'Infinity Mirror Room è una stanza creata dall'artista giapponese Yayoi Kusama. Le pareti, il pavimento e il soffitto sono ricoperti di specchi, e all'interno sono appese tante piccole luci LED colorate. Grazie ai riflessi, le luci si moltiplicano all'infinito e sembra di essere immersi in un universo senza confini. Kusama ha creato questo spazio per farci sentire piccoli e meravigliati davanti all'immensità."
+            ],
+            [
+              "Installazione immersiva di Yayoi Kusama: una stanza di specchi che dissolve i confini tra spazio reale e infinito.",
+              "L'Infinity Mirror Room è un ambiente immersivo creato da Yayoi Kusama. Specchi e luci LED generano una moltiplicazione infinita dello spazio, immergendo il visitatore in un'esperienza sensoriale che dissolve i confini tra corpo, spazio e riflessione.",
+              "Le Infinity Mirror Rooms sono tra le creazioni più celebri di Yayoi Kusama. L'artista utilizza specchi e luci per creare ambienti che simulano l'infinito, avvolgendo il visitatore in un'esperienza totalizzante. Nate dalla sua ossessione per la ripetizione e l'annullamento dell'io, queste stanze traducono in forma spaziale i temi centrali della sua ricerca: dissoluzione dell'ego, cosmologia personale e la tensione tra finito e infinito."
+            ],
+            [
+              "Installazione ambientale che traduce in esperienza immersiva la poetica dell'obliterazione dell'io di Kusama.",
+              "Le Infinity Mirror Rooms rappresentano la sintesi spaziale della ricerca di Kusama sull'infinito e l'auto-obliterazione. Lo specchio moltiplica il reale in una regressione infinita che dissolve i confini tra soggetto e spazio, corpo e cosmo.",
+              "Le Infinity Mirror Rooms costituiscono il vertice della pratica di Kusama: la trasposizione ambientale della sua visione cosmica. Nate negli anni Sessanta nel contesto dell'arte ambientale e della performance, queste installazioni trasformano il visitatore da spettatore a elemento dell'opera. La moltiplicazione speculare opera come metafora dell'obliterazione dell'io — tema centrale nella poetica di Kusama — creando un'esperienza fenomenologica che oscilla tra estasi e vertigine. L'opera dialoga con la tradizione del sublime romantico, aggiornandola attraverso la tecnologia e la sensibilità contemporanea."
+            ],
+            [
+              "Opera paradigmatica dell'arte immersiva, all'incrocio tra fenomenologia della percezione, poetica dell'infinito e dissoluzione del soggetto.",
+              "Le Infinity Mirror Rooms operano sulla soglia tra esperienza estetica e stato alterato di coscienza. La regressione speculare infinita produce una desoggettivazione che riecheggia tanto il sublime kantiano quanto la pratica meditativa buddhista cara a Kusama.",
+              "Le Infinity Mirror Rooms rappresentano la convergenza di biografia, filosofia e tecnologia nella pratica di Kusama. L'ossessione per i pattern ripetitivi — radicata nelle allucinazioni che l'artista sperimenta fin dall'infanzia — si traduce in un dispositivo spaziale che produce l'esperienza dell'auto-obliterazione: il visitatore, moltiplicato all'infinito dagli specchi, perde i propri confini corporei in una vertigine cosmica. L'opera si colloca nella tradizione del Gesamtkunstwerk, ma ne sovverte la premessa totalitaria: non è l'artista che impone la propria visione, ma lo spazio che dissolve ogni soggettività, inclusa quella autoriale. Nel contesto della cultura dell'immagine digitale, le Mirror Rooms anticipano paradossalmente l'estetica del selfie, creando un cortocircuito tra contemplazione mistica e narcisismo contemporaneo."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A magical room full of mirrors and lights that seem to go on forever.",
+                "When you step into this room it feels like floating in space! There are mirrors everywhere and lots of little coloured lights reflected endlessly. It is like being inside a starry sky that never ends.",
+                "The Infinity Mirror Room is a room created by the Japanese artist Yayoi Kusama. The walls, floor and ceiling are covered in mirrors, and inside hang many small coloured LED lights. Thanks to the reflections the lights multiply endlessly, and it feels like being immersed in a boundless universe. Kusama created this space to make us feel small and amazed before the vastness."
+              ],
+              [
+                "Immersive Yayoi Kusama installation: a mirror room dissolving the boundaries between real space and infinity.",
+                "The Infinity Mirror Room is an immersive environment by Yayoi Kusama. Mirrors and LED lights generate an infinite multiplication of space, plunging the visitor into a sensory experience that dissolves the boundaries between body, space and reflection.",
+                "The Infinity Mirror Rooms are among Yayoi Kusama's most celebrated creations. The artist uses mirrors and lights to build environments simulating infinity, enveloping the visitor in a totalising experience. Born from her obsession with repetition and self-obliteration, these rooms translate the core themes of her practice into spatial form: ego dissolution, personal cosmology and the tension between finite and infinite."
+              ],
+              [
+                "Environmental installation translating Kusama's poetics of self-obliteration into an immersive experience.",
+                "The Infinity Mirror Rooms are the spatial synthesis of Kusama's inquiry into infinity and self-obliteration. The mirror multiplies reality in an infinite regression dissolving the boundaries between subject and space, body and cosmos.",
+                "The Infinity Mirror Rooms represent the apex of Kusama's practice: the environmental transposition of her cosmic vision. Emerging in the 1960s within the context of environmental art and performance, these installations transform the visitor from spectator to component of the work. The mirrored multiplication acts as a metaphor for ego obliteration — a central theme in Kusama's poetics — creating a phenomenological experience oscillating between ecstasy and vertigo. The work dialogues with the Romantic sublime tradition, updating it through technology and contemporary sensibility."
+              ],
+              [
+                "Paradigmatic immersive artwork at the crossroads of the phenomenology of perception, the poetics of infinity and the dissolution of the subject.",
+                "The Infinity Mirror Rooms operate on the threshold between aesthetic experience and altered state of consciousness. The infinite mirrored regression produces a de-subjectivation echoing both the Kantian sublime and the Buddhist meditative practice dear to Kusama.",
+                "The Infinity Mirror Rooms represent the convergence of biography, philosophy and technology in Kusama's practice. The obsession with repetitive patterns — rooted in hallucinations the artist has experienced since childhood — translates into a spatial device producing the experience of self-obliteration: the visitor, multiplied endlessly by mirrors, loses bodily boundaries in a cosmic vertigo. The work belongs to the Gesamtkunstwerk tradition but subverts its totalitarian premise: it is not the artist imposing a vision but the space dissolving every subjectivity, including the authorial one. In the context of digital image culture, the Mirror Rooms paradoxically anticipate selfie aesthetics, short-circuiting mystical contemplation and contemporary narcissism."
+              ]
+            ],
+            "fr": [
+              [
+                "Une salle magique pleine de miroirs et de lumières qui semblent ne jamais finir.",
+                "Quand on entre dans cette salle, on a l'impression de flotter dans l'espace ! Il y a des miroirs partout et plein de petites lumières colorées qui se reflètent à l'infini. C'est comme être dans un ciel étoilé sans fin.",
+                "L'Infinity Mirror Room est une salle créée par l'artiste japonaise Yayoi Kusama. Les murs, le sol et le plafond sont recouverts de miroirs, et à l'intérieur pendent de nombreuses petites lumières LED colorées. Grâce aux reflets, les lumières se multiplient à l'infini et on se sent plongé dans un univers sans limites. Kusama a créé cet espace pour nous faire sentir petits et émerveillés face à l'immensité."
+              ],
+              [
+                "Installation immersive de Yayoi Kusama : une salle de miroirs dissolvant les frontières entre espace réel et infini.",
+                "L'Infinity Mirror Room est un environnement immersif de Yayoi Kusama. Miroirs et lumières LED génèrent une multiplication infinie de l'espace, plongeant le visiteur dans une expérience sensorielle qui dissout les frontières entre corps, espace et reflet.",
+                "Les Infinity Mirror Rooms comptent parmi les créations les plus célèbres de Yayoi Kusama. L'artiste utilise miroirs et lumières pour créer des environnements simulant l'infini, enveloppant le visiteur dans une expérience totalisante. Nées de son obsession pour la répétition et l'annulation du moi, ces salles traduisent en forme spatiale les thèmes centraux de sa recherche : dissolution de l'ego, cosmologie personnelle et tension entre fini et infini."
+              ],
+              [
+                "Installation environnementale traduisant en expérience immersive la poétique de l'oblitération du moi de Kusama.",
+                "Les Infinity Mirror Rooms représentent la synthèse spatiale de la recherche de Kusama sur l'infini et l'auto-oblitération. Le miroir multiplie le réel en une régression infinie dissolvant les frontières entre sujet et espace, corps et cosmos.",
+                "Les Infinity Mirror Rooms constituent le sommet de la pratique de Kusama : la transposition environnementale de sa vision cosmique. Apparues dans les années 1960 dans le contexte de l'art environnemental et de la performance, ces installations transforment le visiteur de spectateur en composante de l'œuvre. La multiplication spéculaire fonctionne comme métaphore de l'oblitération du moi — thème central de la poétique de Kusama — créant une expérience phénoménologique oscillant entre extase et vertige. L'œuvre dialogue avec la tradition du sublime romantique, l'actualisant par la technologie et la sensibilité contemporaine."
+              ],
+              [
+                "Œuvre immersive paradigmatique au croisement de la phénoménologie de la perception, de la poétique de l'infini et de la dissolution du sujet.",
+                "Les Infinity Mirror Rooms opèrent au seuil entre expérience esthétique et état modifié de conscience. La régression spéculaire infinie produit une désubjectivation faisant écho tant au sublime kantien qu'à la pratique méditative bouddhiste chère à Kusama.",
+                "Les Infinity Mirror Rooms représentent la convergence de biographie, philosophie et technologie dans la pratique de Kusama. L'obsession des motifs répétitifs — enracinée dans les hallucinations que l'artiste connaît depuis l'enfance — se traduit en un dispositif spatial produisant l'expérience de l'auto-oblitération : le visiteur, multiplié à l'infini par les miroirs, perd ses limites corporelles dans un vertige cosmique. L'œuvre s'inscrit dans la tradition du Gesamtkunstwerk mais en subvertit la prémisse totalitaire : ce n'est pas l'artiste qui impose sa vision mais l'espace qui dissout toute subjectivité, y compris celle de l'auteur. Dans le contexte de la culture de l'image numérique, les Mirror Rooms anticipent paradoxalement l'esthétique du selfie, court-circuitant contemplation mystique et narcissisme contemporain."
+              ]
+            ]
+          },
+          "objectType": "text",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Yayoi Kusama",
+          "licenza": "",
+          "correnteArtistica": "Arte Contemporanea",
+          "anno": "1965"
+        },
+        {
+          "nome": "Beanfield",
+          "stanza": "stanza 5",
+          "pos": {
+            "x": 0.35,
+            "y": 0.45
+          },
+          "connessi": [
+            "Barcode",
+            "Love Is in the Air"
+          ],
+          "descrizioni": [
+            [
+              "Poliziotti in tenuta antisommossa in un campo di fiori gialli.",
+              "L'opera mostra dei poliziotti con caschi e scudi in mezzo a un bellissimo campo di fiori gialli. Sembra strano vederli lì! Banksy vuole farci pensare a cosa succede quando la forza si scontra con la natura.",
+              "In Beanfield, Banksy ha dipinto dei poliziotti in tenuta antisommossa che avanzano attraverso un campo di fiori gialli, come girasoli. Il contrasto è fortissimo: da una parte la violenza e l'autorità, dall'altra la bellezza e la pace della natura. L'opera ci fa pensare a come il potere a volte distrugge le cose più belle e semplici, e a come la natura continui a resistere."
+            ],
+            [
+              "Banksy contrappone forze dell'ordine in assetto antisommossa alla bellezza di un campo fiorito, denunciando l'abuso di potere.",
+              "Beanfield mostra poliziotti antisommossa che attraversano un campo di fiori, creando un contrasto stridente tra violenza istituzionale e bellezza naturale. L'opera evoca la repressione delle proteste e il rapporto conflittuale tra autorità e libertà individuale.",
+              "Beanfield di Banksy raffigura un plotone di poliziotti in tenuta antisommossa che avanza in un campo di fiori gialli. Il titolo fa riferimento alla Battaglia di Beanfield del 1985, quando la polizia britannica caricò violentemente un convoglio di viaggiatori New Age diretti a Stonehenge. L'opera denuncia la brutalità dello Stato contro chi vive ai margini, usando il contrasto visivo tra i fiori e le divise per rendere immediatamente percepibile l'assurdità della violenza istituzionale."
+            ],
+            [
+              "Stencil che rielabora la Battaglia di Beanfield del 1985, esponendo la violenza strutturale dello Stato contro le comunità marginali.",
+              "Beanfield opera come memoria visiva della repressione statale: i poliziotti antisommossa nel campo fiorito sintetizzano la brutalità dell'ordine costituito contro le controculture. Il contrasto formale tra natura e divisa militarizzata amplifica la denuncia.",
+              "Beanfield si inserisce nel corpus di opere di Banksy dedicate alla critica del potere statale. Il riferimento alla Battaglia di Beanfield del 1985 — quando la polizia del Wiltshire assaltò brutalmente un convoglio di viaggiatori — ancora l'opera a un evento storico specifico, ma il linguaggio visivo ne universalizza il messaggio. La giustapposizione di poliziotti antisommossa e campo fiorito crea un'immagine che trascende il contesto originario per diventare icona della violenza del potere contro la bellezza, la libertà e le forme di vita alternative."
+            ],
+            [
+              "Opera che problematizza il monopolio statale della violenza e la repressione delle forme di vita non conformi.",
+              "Beanfield mobilita la memoria della repressione per interrogare la normalizzazione della violenza istituzionale nelle democrazie liberali. Il campo fiorito funziona come eterotopia foucaultiana — spazio altro, minacciato dall'ordine che non può tollerare ciò che sfugge al suo controllo.",
+              "Beanfield rappresenta una riflessione sulla biopolitica del controllo: lo Stato che penetra nello spazio naturale per eliminare forme di vita non conformi. Il riferimento alla Battaglia di Beanfield del 1985 situa l'opera nella storia della repressione delle controculture britanniche, ma la composizione trascende l'evento specifico. Il campo fiorito opera come eterotopia foucaultiana — luogo altro, spazio di possibilità — invaso dall'apparato repressivo. L'opera interroga il paradosso delle democrazie liberali: la libertà proclamata e simultaneamente negata a chi ne incarna le forme più radicali. La bellezza dei fiori, lungi dall'essere decorativa, funziona come atto di accusa: ciò che lo Stato distrugge è sempre, in ultima analisi, una promessa di felicità."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "Riot police in a field of yellow flowers.",
+                "The artwork shows policemen with helmets and shields standing in a beautiful field of yellow flowers. It looks strange to see them there! Banksy wants us to think about what happens when force meets nature.",
+                "In Beanfield, Banksy painted riot police advancing through a field of yellow flowers, like sunflowers. The contrast is striking: on one side violence and authority, on the other the beauty and peace of nature. The work makes us think about how power sometimes destroys the most beautiful and simple things, and how nature keeps resisting."
+              ],
+              [
+                "Banksy sets riot police against a flowering field, denouncing abuse of power.",
+                "Beanfield shows riot police crossing a field of flowers, creating a jarring contrast between institutional violence and natural beauty. The work evokes the repression of protest and the fraught relationship between authority and individual freedom.",
+                "Banksy's Beanfield depicts a squad of riot police advancing into a field of yellow flowers. The title refers to the 1985 Battle of the Beanfield, when British police violently charged a convoy of New Age travellers headed for Stonehenge. The work denounces state brutality against those living on the margins, using the visual contrast between flowers and uniforms to make the absurdity of institutional violence immediately palpable."
+              ],
+              [
+                "Stencil reworking the 1985 Battle of the Beanfield, exposing structural state violence against marginal communities.",
+                "Beanfield operates as visual memory of state repression: riot police in a flowering field synthesise the brutality of the established order against countercultures. The formal contrast between nature and militarised uniform amplifies the denunciation.",
+                "Beanfield belongs to the body of Banksy works devoted to critiquing state power. The reference to the 1985 Battle of the Beanfield — when Wiltshire police brutally assaulted a travellers' convoy — anchors the work in a specific historical event, but its visual language universalises the message. The juxtaposition of riot police and flowering field creates an image transcending the original context to become an icon of power's violence against beauty, freedom and alternative ways of living."
+              ],
+              [
+                "Work problematising the state monopoly on violence and the repression of non-conforming ways of life.",
+                "Beanfield mobilises the memory of repression to question the normalisation of institutional violence in liberal democracies. The flowering field functions as a Foucauldian heterotopia — an other space, threatened by an order that cannot tolerate what escapes its control.",
+                "Beanfield is a reflection on the biopolitics of control: the state penetrating natural space to eliminate non-conforming ways of life. The reference to the 1985 Battle of the Beanfield situates the work in the history of British counter-culture repression, but the composition transcends the specific event. The flowering field operates as a Foucauldian heterotopia — an other place, a space of possibility — invaded by the repressive apparatus. The work interrogates the paradox of liberal democracies: freedom proclaimed and simultaneously denied to those who embody its most radical forms. The beauty of the flowers, far from decorative, functions as an indictment: what the state destroys is always, ultimately, a promise of happiness."
+              ]
+            ],
+            "fr": [
+              [
+                "Des policiers anti-émeute dans un champ de fleurs jaunes.",
+                "L'œuvre montre des policiers avec casques et boucliers au milieu d'un magnifique champ de fleurs jaunes. C'est étrange de les voir là ! Banksy veut nous faire réfléchir à ce qui arrive quand la force rencontre la nature.",
+                "Dans Beanfield, Banksy a peint des policiers anti-émeute avançant à travers un champ de fleurs jaunes, comme des tournesols. Le contraste est saisissant : d'un côté la violence et l'autorité, de l'autre la beauté et la paix de la nature. L'œuvre nous fait penser à la façon dont le pouvoir détruit parfois les choses les plus belles et les plus simples, et à la résistance continue de la nature."
+              ],
+              [
+                "Banksy oppose les forces de l'ordre en tenue anti-émeute à la beauté d'un champ fleuri, dénonçant l'abus de pouvoir.",
+                "Beanfield montre des policiers anti-émeute traversant un champ de fleurs, créant un contraste saisissant entre violence institutionnelle et beauté naturelle. L'œuvre évoque la répression des manifestations et le rapport conflictuel entre autorité et liberté individuelle.",
+                "Beanfield de Banksy représente un peloton de policiers anti-émeute avançant dans un champ de fleurs jaunes. Le titre fait référence à la Bataille de Beanfield de 1985, lorsque la police britannique chargea violemment un convoi de voyageurs New Age se dirigeant vers Stonehenge. L'œuvre dénonce la brutalité de l'État contre ceux qui vivent en marge, utilisant le contraste visuel entre fleurs et uniformes pour rendre immédiatement perceptible l'absurdité de la violence institutionnelle."
+              ],
+              [
+                "Pochoir revisitant la Bataille de Beanfield de 1985, exposant la violence structurelle de l'État contre les communautés marginales.",
+                "Beanfield fonctionne comme mémoire visuelle de la répression étatique : les policiers anti-émeute dans le champ fleuri synthétisent la brutalité de l'ordre établi contre les contre-cultures. Le contraste formel entre nature et uniforme militarisé amplifie la dénonciation.",
+                "Beanfield s'inscrit dans le corpus d'œuvres de Banksy consacrées à la critique du pouvoir étatique. La référence à la Bataille de Beanfield de 1985 — lorsque la police du Wiltshire assaillit brutalement un convoi de voyageurs — ancre l'œuvre dans un événement historique précis, mais le langage visuel en universalise le message. La juxtaposition de policiers anti-émeute et de champ fleuri crée une image transcendant le contexte d'origine pour devenir icône de la violence du pouvoir contre la beauté, la liberté et les formes de vie alternatives."
+              ],
+              [
+                "Œuvre problématisant le monopole étatique de la violence et la répression des formes de vie non conformes.",
+                "Beanfield mobilise la mémoire de la répression pour interroger la normalisation de la violence institutionnelle dans les démocraties libérales. Le champ fleuri fonctionne comme hétérotopie foucaldienne — espace autre, menacé par un ordre qui ne peut tolérer ce qui échappe à son contrôle.",
+                "Beanfield est une réflexion sur la biopolitique du contrôle : l'État pénétrant l'espace naturel pour éliminer les formes de vie non conformes. La référence à la Bataille de Beanfield de 1985 situe l'œuvre dans l'histoire de la répression des contre-cultures britanniques, mais la composition transcende l'événement précis. Le champ fleuri opère comme hétérotopie foucaldienne — lieu autre, espace de possibilité — envahi par l'appareil répressif. L'œuvre interroge le paradoxe des démocraties libérales : la liberté proclamée et simultanément refusée à ceux qui en incarnent les formes les plus radicales. La beauté des fleurs, loin d'être décorative, fonctionne comme acte d'accusation : ce que l'État détruit est toujours, en dernière analyse, une promesse de bonheur."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Banksy",
+          "licenza": "",
+          "correnteArtistica": "Street Art",
+          "anno": "2009"
+        },
+        {
+          "nome": "Barcode",
+          "stanza": "stanza 5",
+          "pos": {
+            "x": 0.7,
+            "y": 0.5
+          },
+          "connessi": [
+            "Beanfield",
+            "Laugh Now"
+          ],
+          "descrizioni": [
+            [
+              "Un leopardo che scappa da una gabbia fatta di linee nere come un codice a barre.",
+              "L'opera mostra un leopardo che sta uscendo da una gabbia formata dalle linee di un codice a barre, quelli che si trovano su tutti i prodotti. È come se l'animale si liberasse dal commercio e tornasse libero!",
+              "In Barcode, Banksy ha disegnato un leopardo che fugge da una gabbia le cui sbarre sono le linee di un codice a barre. Il codice a barre è il simbolo del commercio: si trova su tutto quello che compriamo. Banksy ci dice che il consumismo è come una prigione per la natura e per gli esseri viventi. Il leopardo che scappa rappresenta il desiderio di libertà e di ritorno alla natura."
+            ],
+            [
+              "Stencil di Banksy: un leopardo evade da una gabbia-codice a barre, metafora della prigionia del consumismo.",
+              "Barcode raffigura un leopardo che fugge attraverso le sbarre di un codice a barre piegato. L'opera gioca sulla doppia lettura: il codice come gabbia commerciale e l'animale come istinto naturale che resiste alla mercificazione della vita.",
+              "Barcode di Banksy mostra un grande felino che si libera da una gabbia le cui sbarre formano un codice a barre. L'immagine è una potente metafora del rapporto tra natura e capitalismo: il codice a barre, simbolo universale della merce, diventa prigione dalla quale la vita selvaggia tenta di evadere. L'opera denuncia la riduzione di ogni cosa — animali, natura, esseri umani — a prodotto commerciale."
+            ],
+            [
+              "Opera che esplora la tensione tra natura e mercificazione attraverso il simbolo del codice a barre come dispositivo di controllo.",
+              "Barcode sintetizza la critica di Banksy al capitalismo consumista: il codice a barre — strumento di catalogazione e controllo della merce — diventa gabbia da cui l'animale selvaggio evade. L'opera opera su più livelli: critica ambientalista, denuncia del consumismo e affermazione della libertà come istinto irriducibile.",
+              "Barcode rappresenta una delle immagini più incisive di Banksy sulla mercificazione totale. Il codice a barre — tecnologia di identificazione e tracciamento delle merci — viene trasformato in struttura carceraria, rivelando la natura disciplinare del sistema commerciale. Il leopardo che evade incarna la resistenza della vita alla sua riduzione a commodity. L'opera si collega alla tradizione della critica situazionista dello spettacolo e della merce, aggiornandola al contesto del capitalismo globale e della crisi ecologica."
+            ],
+            [
+              "Opera che problematizza la biopolitica del capitalismo globale attraverso la metafora della merce come dispositivo di cattura.",
+              "Barcode articola una critica della razionalità strumentale capitalista: il codice a barre come paradigma del potere che identifica, classifica e cattura. L'evasione del leopardo rappresenta l'eccedenza della vita rispetto a qualsiasi sistema di codificazione.",
+              "Barcode condensa in un'immagine la dialettica tra cattura e fuga che struttura il rapporto tra capitalismo e vita. Il codice a barre — dispositivo di identificazione che trasforma ogni entità in unità mercantile tracciabile — diventa sineddoche del sistema economico come apparato di cattura nel senso deleuzo-guattariano. Il leopardo evaso è la linea di fuga, l'eccedenza vitale che resiste alla codificazione totale. L'opera interroga la possibilità di una vita non interamente sussunta dalla logica della merce, ponendo la questione ecologica come questione simultaneamente economica e ontologica: la mercificazione della natura non è solo sfruttamento, ma ridefinizione del vivente come risorsa calcolabile."
+            ]
+          ],
+          "descrizioniI18n": {
+            "en": [
+              [
+                "A leopard escaping from a cage made of barcode lines.",
+                "The artwork shows a leopard breaking out of a cage formed by the lines of a barcode — the kind found on every product. It is as if the animal is freeing itself from commerce and returning to the wild!",
+                "In Barcode, Banksy drew a leopard fleeing a cage whose bars are the lines of a barcode. The barcode is a symbol of commerce: it appears on everything we buy. Banksy tells us that consumerism is like a prison for nature and living beings. The escaping leopard represents the desire for freedom and a return to nature."
+              ],
+              [
+                "Banksy stencil: a leopard escapes a barcode cage, a metaphor for the prison of consumerism.",
+                "Barcode depicts a leopard fleeing through the bars of a bent barcode. The work plays on a double reading: the code as commercial cage and the animal as natural instinct resisting the commodification of life.",
+                "Banksy's Barcode shows a big cat breaking free from a cage whose bars form a barcode. The image is a powerful metaphor for the relationship between nature and capitalism: the barcode, universal symbol of merchandise, becomes a prison from which wild life attempts to escape. The work denounces the reduction of everything — animals, nature, human beings — to a commercial product."
+              ],
+              [
+                "Work exploring the tension between nature and commodification through the barcode as a device of control.",
+                "Barcode synthesises Banksy's critique of consumer capitalism: the barcode — a tool for cataloguing and controlling merchandise — becomes a cage from which the wild animal escapes. The work operates on multiple levels: environmentalist critique, denunciation of consumerism and affirmation of freedom as an irreducible instinct.",
+                "Barcode is one of Banksy's most incisive images of total commodification. The barcode — a technology for identifying and tracking goods — is transformed into a carceral structure, revealing the disciplinary nature of the commercial system. The escaping leopard embodies life's resistance to its reduction to commodity. The work connects with the Situationist tradition of critiquing the spectacle and the commodity, updating it to the context of global capitalism and ecological crisis."
+              ],
+              [
+                "Work problematising the biopolitics of global capitalism through the metaphor of merchandise as a capture device.",
+                "Barcode articulates a critique of capitalist instrumental rationality: the barcode as a paradigm of the power that identifies, classifies and captures. The leopard's escape represents life's surplus over any system of codification.",
+                "Barcode condenses into a single image the dialectic of capture and flight structuring the relationship between capitalism and life. The barcode — an identification device transforming every entity into a traceable mercantile unit — becomes synecdoche for the economic system as an apparatus of capture in the Deleuzian-Guattarian sense. The escaped leopard is the line of flight, the vital surplus resisting total codification. The work interrogates the possibility of a life not entirely subsumed by commodity logic, posing the ecological question as simultaneously economic and ontological: the commodification of nature is not merely exploitation but a redefinition of the living as calculable resource."
+              ]
+            ],
+            "fr": [
+              [
+                "Un léopard qui s'échappe d'une cage faite de lignes de code-barres.",
+                "L'œuvre montre un léopard sortant d'une cage formée par les lignes d'un code-barres — ceux que l'on trouve sur tous les produits. C'est comme si l'animal se libérait du commerce pour retrouver la liberté !",
+                "Dans Barcode, Banksy a dessiné un léopard fuyant une cage dont les barreaux sont les lignes d'un code-barres. Le code-barres est le symbole du commerce : il se trouve sur tout ce que nous achetons. Banksy nous dit que le consumérisme est comme une prison pour la nature et les êtres vivants. Le léopard qui s'échappe représente le désir de liberté et le retour à la nature."
+              ],
+              [
+                "Pochoir de Banksy : un léopard s'évade d'une cage-code-barres, métaphore de la prison du consumérisme.",
+                "Barcode représente un léopard fuyant à travers les barreaux d'un code-barres plié. L'œuvre joue sur une double lecture : le code comme cage commerciale et l'animal comme instinct naturel résistant à la marchandisation de la vie.",
+                "Barcode de Banksy montre un grand félin se libérant d'une cage dont les barreaux forment un code-barres. L'image est une puissante métaphore du rapport entre nature et capitalisme : le code-barres, symbole universel de la marchandise, devient prison d'où la vie sauvage tente de s'évader. L'œuvre dénonce la réduction de tout — animaux, nature, êtres humains — à un produit commercial."
+              ],
+              [
+                "Œuvre explorant la tension entre nature et marchandisation à travers le code-barres comme dispositif de contrôle.",
+                "Barcode synthétise la critique de Banksy contre le capitalisme consumériste : le code-barres — outil de catalogage et de contrôle de la marchandise — devient cage d'où l'animal sauvage s'évade. L'œuvre opère à plusieurs niveaux : critique environnementaliste, dénonciation du consumérisme et affirmation de la liberté comme instinct irréductible.",
+                "Barcode est l'une des images les plus incisives de Banksy sur la marchandisation totale. Le code-barres — technologie d'identification et de traçage des marchandises — est transformé en structure carcérale, révélant la nature disciplinaire du système commercial. Le léopard qui s'évade incarne la résistance de la vie à sa réduction en marchandise. L'œuvre se rattache à la tradition situationniste de critique du spectacle et de la marchandise, l'actualisant au contexte du capitalisme mondial et de la crise écologique."
+              ],
+              [
+                "Œuvre problématisant la biopolitique du capitalisme mondial à travers la métaphore de la marchandise comme dispositif de capture.",
+                "Barcode articule une critique de la rationalité instrumentale capitaliste : le code-barres comme paradigme du pouvoir qui identifie, classe et capture. L'évasion du léopard représente l'excédent de la vie par rapport à tout système de codification.",
+                "Barcode condense en une image la dialectique de capture et de fuite qui structure le rapport entre capitalisme et vie. Le code-barres — dispositif d'identification transformant toute entité en unité marchande traçable — devient synecdoque du système économique comme appareil de capture au sens deleuzo-guattarien. Le léopard évadé est la ligne de fuite, l'excédent vital résistant à la codification totale. L'œuvre interroge la possibilité d'une vie non entièrement subsumée par la logique marchande, posant la question écologique comme simultanément économique et ontologique : la marchandisation de la nature n'est pas seulement exploitation mais redéfinition du vivant comme ressource calculable."
+              ]
+            ]
+          },
+          "objectType": "normal",
+          "textTitle": "",
+          "textBody": "",
+          "autore": "Banksy",
+          "licenza": "",
+          "correnteArtistica": "Street Art",
+          "anno": "2004"
         }
       ],
       "percorsi": [
         {
-          "nome": "Percorso Base",
+          "nome": "Highlights Moco",
           "prezzo": 0,
           "oggetti": [
-            "Vaso Antico",
-            "Quadro Astratto",
-            "Oggetto 3"
+            "Girl with Balloon",
+            "Campbell's Soup Cans",
+            "Infinity Mirror Room"
+          ]
+        },
+        {
+          "nome": "Banksy Tour",
+          "prezzo": 5,
+          "oggetti": [
+            "Girl with Balloon",
+            "Love Is in the Air",
+            "Laugh Now",
+            "Beanfield",
+            "Barcode"
+          ]
+        },
+        {
+          "nome": "Pop & Street Art",
+          "prezzo": 7.5,
+          "oggetti": [
+            "Girl with Balloon",
+            "Laugh Now",
+            "Campbell's Soup Cans",
+            "Radiant Baby",
+            "Companion",
+            "Barcode"
+          ]
+        },
+        {
+          "nome": "Emozioni e Percezione",
+          "prezzo": 6,
+          "oggetti": [
+            "Pivot",
+            "Untitled (Skull)",
+            "Infinity Mirror Room"
+          ]
+        },
+        {
+          "nome": "Percorso Completo",
+          "prezzo": 12.9,
+          "oggetti": [
+            "Girl with Balloon",
+            "Love Is in the Air",
+            "Laugh Now",
+            "Campbell's Soup Cans",
+            "Radiant Baby",
+            "Companion",
+            "Pivot",
+            "Untitled (Skull)",
+            "Infinity Mirror Room",
+            "Beanfield",
+            "Barcode"
           ]
         }
       ]
