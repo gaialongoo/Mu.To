@@ -928,7 +928,7 @@
         "w": 260,
         "h": 210,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%201/immagini/preview?v=1778784313344",
         "bgTipo": "preview"
       },
       "stanza 2": {
@@ -937,7 +937,7 @@
         "w": 260,
         "h": 210,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%202/immagini/preview?v=1778784442787",
         "bgTipo": "preview"
       },
       "stanza 3": {
@@ -946,7 +946,7 @@
         "w": 300,
         "h": 230,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%203/immagini/preview?v=1778784834939",
         "bgTipo": "preview"
       },
       "WC": {
@@ -955,7 +955,7 @@
         "w": 170,
         "h": 150,
         "tipo": "bagno",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/WC/immagini/preview?v=1778785348651",
         "bgTipo": "preview"
       },
       "stanza 4": {
@@ -964,7 +964,7 @@
         "w": 330,
         "h": 240,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%204/immagini/preview?v=1778784645584",
         "bgTipo": "preview"
       },
       "stanza 5": {
@@ -973,7 +973,7 @@
         "w": 290,
         "h": 220,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%205/immagini/preview?v=1778784965009",
         "bgTipo": "preview"
       },
       "stanza 6": {
@@ -982,7 +982,7 @@
         "w": 300,
         "h": 230,
         "tipo": "normale",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/stanza%206/immagini/preview?v=1778785064311",
         "bgTipo": "preview"
       },
       "SHOP": {

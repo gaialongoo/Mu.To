@@ -1032,8 +1032,8 @@
           "nome": "Collana funeraria",
           "stanza": "stanza 1",
           "pos": {
-            "x": 0.1423076923076923,
-            "y": 0.8238095238095238
+            "x": 0.14615384615384616,
+            "y": 0.680952380952381
           },
           "connessi": [
             "Amuleti protettivi",
@@ -1119,8 +1119,8 @@
           "nome": "Amuleti protettivi",
           "stanza": "stanza 1",
           "pos": {
-            "x": 0.1076923076923077,
-            "y": 0.2761904761904762
+            "x": 0.13846153846153847,
+            "y": 0.2904761904761905
           },
           "connessi": [
             "Collana funeraria",
@@ -1206,8 +1206,8 @@
           "nome": "Papiri amministrativi",
           "stanza": "stanza 1",
           "pos": {
-            "x": 0.8884615384615384,
-            "y": 0.4857142857142857
+            "x": 0.8115384615384615,
+            "y": 0.49047619047619045
           },
           "connessi": [
             "Collana funeraria",
@@ -1293,8 +1293,8 @@
           "nome": "Scettro faraonico",
           "stanza": "stanza 2",
           "pos": {
-            "x": 0.18076923076923077,
-            "y": 0.20952380952380953
+            "x": 0.13846153846153847,
+            "y": 0.2904761904761905
           },
           "connessi": [
             "Statue di faraoni",
@@ -1380,8 +1380,8 @@
           "nome": "Statue di faraoni",
           "stanza": "stanza 2",
           "pos": {
-            "x": 0.19615384615384615,
-            "y": 0.8
+            "x": 0.1423076923076923,
+            "y": 0.6714285714285714
           },
           "connessi": [
             "Scettro faraonico",
@@ -1467,8 +1467,8 @@
           "nome": "Tavole rituali",
           "stanza": "stanza 2",
           "pos": {
-            "x": 0.8538461538461538,
-            "y": 0.7952380952380952
+            "x": 0.8192307692307692,
+            "y": 0.6714285714285714
           },
           "connessi": [
             "Statue di faraoni",
@@ -1554,8 +1554,8 @@
           "nome": "Mummia umana",
           "stanza": "stanza 3",
           "pos": {
-            "x": 0.16,
-            "y": 0.26992771314538044
+            "x": 0.18333333333333332,
+            "y": 0.23949293053668477
           },
           "connessi": [
             "Mummie animali",
@@ -1641,8 +1641,8 @@
           "nome": "Mummie animali",
           "stanza": "stanza 3",
           "pos": {
-            "x": 0.8233333333333334,
-            "y": 0.2655798870584239
+            "x": 0.8166666666666667,
+            "y": 0.23949293053668477
           },
           "connessi": [
             "Mummia umana",
@@ -1728,8 +1728,8 @@
           "nome": "Libro dei Morti",
           "stanza": "stanza 3",
           "pos": {
-            "x": 0.49333333333333335,
-            "y": 0.8525364087975543
+            "x": 0.49666666666666665,
+            "y": 0.7873190174932065
           },
           "connessi": [
             "Mummia umana",
@@ -1815,8 +1815,8 @@
           "nome": "Maschera funeraria",
           "stanza": "stanza 4",
           "pos": {
-            "x": 0.22727272727272727,
-            "y": 0.8370831807454427
+            "x": 0.14545454545454545,
+            "y": 0.7120831807454427
           },
           "connessi": [
             "Collari funerari",
@@ -1902,8 +1902,8 @@
           "nome": "Collari funerari",
           "stanza": "stanza 4",
           "pos": {
-            "x": 0.806060606060606,
-            "y": 0.2370831807454427
+            "x": 0.8484848484848485,
+            "y": 0.26208318074544273
           },
           "connessi": [
             "Maschera funeraria",
@@ -1989,8 +1989,8 @@
           "nome": "Oggetti di protezione",
           "stanza": "stanza 4",
           "pos": {
-            "x": 0.8363636363636363,
-            "y": 0.8620831807454427
+            "x": 0.8454545454545455,
+            "y": 0.7162498474121094
           },
           "connessi": [
             "Maschera funeraria",
@@ -2076,8 +2076,8 @@
           "nome": "Sarcofago decorato",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.2954023690059267,
-            "y": 0.8563637473366478
+            "x": 0.18160926555765086,
+            "y": 0.783636474609375
           },
           "connessi": [
             "Vasi canopi",
@@ -2163,8 +2163,8 @@
           "nome": "Vasi canopi",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.2057471965921336,
-            "y": 0.17909102006392044
+            "x": 0.18160926555765086,
+            "y": 0.20636374733664772
           },
           "connessi": [
             "Sarcofago decorato",
@@ -2250,8 +2250,8 @@
           "nome": "Corredo funerario",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.8126437483162715,
-            "y": 0.874545565518466
+            "x": 0.8367816793507543,
+            "y": 0.783636474609375
           },
           "connessi": [
             "Sarcofago decorato",
@@ -2337,8 +2337,8 @@
           "nome": "Scettri rituali",
           "stanza": "stanza 6",
           "pos": {
-            "x": 0.16222218831380208,
-            "y": 0.18231838060461958
+            "x": 0.17888885498046875,
+            "y": 0.19536185886548912
           },
           "connessi": [
             "Scettro faraonico",
@@ -2424,8 +2424,8 @@
           "nome": "Simboli di Maat",
           "stanza": "stanza 6",
           "pos": {
-            "x": 0.8355555216471354,
-            "y": 0.18666620669157608
+            "x": 0.8088888549804687,
+            "y": 0.19536185886548912
           },
           "connessi": [
             "Scettri rituali",
@@ -2511,8 +2511,8 @@
           "nome": "Statue di divinità",
           "stanza": "stanza 6",
           "pos": {
-            "x": 0.18555552164713543,
-            "y": 0.86927490234375
+            "x": 0.17555552164713542,
+            "y": 0.786666206691576
           },
           "connessi": [
             "Simboli di Maat",
