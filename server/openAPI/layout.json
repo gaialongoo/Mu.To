@@ -1,274 +1,4 @@
 {
-  "Museo di Torino": {
-    "grid": {
-      "IN": {
-        "row": 0,
-        "col": 1,
-        "tipo": "ingresso"
-      },
-      "stanza 1": {
-        "row": 1,
-        "col": 1,
-        "tipo": "normale"
-      },
-      "stanza 2": {
-        "row": 2,
-        "col": 1,
-        "tipo": "normale"
-      },
-      "stanza 4": {
-        "row": 2,
-        "col": 0,
-        "tipo": "servizio"
-      },
-      "stanza 3": {
-        "row": 3,
-        "col": 1,
-        "tipo": "normale"
-      },
-      "WC": {
-        "row": 2,
-        "col": 2,
-        "tipo": "bagno"
-      },
-      "SHOP": {
-        "row": 3,
-        "col": 2,
-        "tipo": "servizio"
-      },
-      "OUT": {
-        "row": 4,
-        "col": 1,
-        "tipo": "uscita"
-      }
-    },
-    "corridoi": [
-      {
-        "a": "stanza 3",
-        "b": "SHOP",
-        "x": 675,
-        "y": 1200.5,
-        "w": 188,
-        "h": 52,
-        "aDoor": {
-          "side": "E",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "WC",
-        "b": "SHOP"
-      },
-      {
-        "a": "stanza 2",
-        "b": "WC",
-        "aDoor": {
-          "side": "E",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "W",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "IN",
-        "b": "stanza 1",
-        "aDoor": {
-          "side": "S",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "N",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "stanza 2",
-        "b": "stanza 3",
-        "x": 525,
-        "y": 919,
-        "w": 76,
-        "h": 156,
-        "aDoor": {
-          "side": "S",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "N",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "stanza 4",
-        "b": "stanza 2",
-        "aDoor": {
-          "side": "E",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "W",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "stanza 1",
-        "b": "stanza 2",
-        "x": 473,
-        "y": 628,
-        "w": 40,
-        "h": 113,
-        "aDoor": {
-          "side": "S",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "N",
-          "offset": 0.5
-        }
-      },
-      {
-        "a": "SHOP",
-        "b": "OUT",
-        "aDoor": {
-          "side": "E",
-          "offset": 0.5
-        },
-        "bDoor": {
-          "side": "W",
-          "offset": 0.5
-        }
-      }
-    ],
-    "rooms": {
-      "IN": {
-        "x": 473,
-        "y": 203,
-        "w": 172,
-        "h": 159,
-        "tipo": "ingresso",
-        "bgImage": null,
-        "bgTipo": "preview"
-      },
-      "stanza 1": {
-        "x": 449,
-        "y": 446,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
-      },
-      "stanza 2": {
-        "x": 445,
-        "y": 739,
-        "w": 220,
-        "h": 180,
-        "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
-      },
-      "stanza 4": {
-        "x": -43,
-        "y": 716,
-        "w": 355,
-        "h": 239,
-        "tipo": "normale",
-        "bgImage": "/api/musei/Museo%20di%20Torino/stanze/stanza%204/immagini/preview?v=1776521580934",
-        "bgTipo": "preview"
-      },
-      "stanza 3": {
-        "x": 241,
-        "y": 1073,
-        "w": 432,
-        "h": 303,
-        "tipo": "normale",
-        "bgImage": "/api/musei/Museo%20di%20Torino/stanze/stanza%203/immagini/preview?v=1776522286540",
-        "bgTipo": "preview"
-      },
-      "WC": {
-        "x": 780,
-        "y": 760,
-        "w": 220,
-        "h": 180,
-        "tipo": "bagno",
-        "bgImage": null,
-        "bgTipo": "preview"
-      },
-      "SHOP": {
-        "x": 864,
-        "y": 1134,
-        "w": 220,
-        "h": 180,
-        "tipo": "servizio",
-        "bgImage": null,
-        "bgTipo": "preview"
-      },
-      "OUT": {
-        "x": 1200,
-        "y": 1141,
-        "w": 220,
-        "h": 180,
-        "tipo": "uscita",
-        "bgImage": null,
-        "bgTipo": "preview"
-      }
-    },
-    "labelI18n": {
-      "stanze": {
-        "IN": {
-          "en": "Entrance",
-          "fr": "Entrée"
-        },
-        "stanza 1": {
-          "en": "Room 1",
-          "fr": "Salle 1"
-        },
-        "stanza 2": {
-          "en": "Room 2",
-          "fr": "Salle 2"
-        },
-        "stanza 3": {
-          "en": "Room 3",
-          "fr": "Salle 3"
-        },
-        "stanza 4": {
-          "en": "Room 4",
-          "fr": "Salle 4"
-        },
-        "WC": {
-          "en": "Restrooms",
-          "fr": "Toilettes"
-        },
-        "SHOP": {
-          "en": "Shop",
-          "fr": "Boutique"
-        },
-        "OUT": {
-          "en": "Exit",
-          "fr": "Sortie"
-        }
-      },
-      "percorsi": {
-        "Percorso essenziale": {
-          "en": "Essential tour",
-          "fr": "Parcours essentiel"
-        },
-        "Percorso egizio": {
-          "en": "Egyptian tour",
-          "fr": "Parcours égyptien"
-        },
-        "Percorso del potere": {
-          "en": "Power and symbols tour",
-          "fr": "Parcours du pouvoir"
-        },
-        "Percorso completo": {
-          "en": "Complete tour",
-          "fr": "Parcours complet"
-        }
-      }
-    }
-  },
   "Moco museum": {
     "grid": {
       "IN": {
@@ -593,6 +323,762 @@
         "Emozioni e Percezione": {
           "en": "Emotions & Perception",
           "fr": "Émotions & Perception"
+        },
+        "Percorso Completo": {
+          "en": "Complete Tour",
+          "fr": "Parcours Complet"
+        }
+      }
+    }
+  },
+  "Museo di Tim Burton": {
+    "grid": {
+      "IN": {
+        "row": 0,
+        "col": 1,
+        "tipo": "ingresso"
+      },
+      "stanza 1": {
+        "row": 1,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "stanza 2": {
+        "row": 1,
+        "col": 2,
+        "tipo": "normale"
+      },
+      "stanza 3": {
+        "row": 2,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 4": {
+        "row": 3,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "WC": {
+        "row": 3,
+        "col": 2,
+        "tipo": "bagno"
+      },
+      "stanza 5": {
+        "row": 4,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 6": {
+        "row": 5,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "SHOP": {
+        "row": 5,
+        "col": 2,
+        "tipo": "servizio"
+      },
+      "OUT": {
+        "row": 6,
+        "col": 1,
+        "tipo": "uscita"
+      }
+    },
+    "corridoi": [
+      {
+        "a": "IN",
+        "b": "stanza 1",
+        "x": 380,
+        "y": 130,
+        "w": 40,
+        "h": 148,
+        "aDoor": {
+          "side": "W",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "IN",
+        "b": "stanza 2",
+        "x": 580,
+        "y": 130,
+        "w": 40,
+        "h": 140,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 1",
+        "b": "stanza 2",
+        "x": 419.7833251953125,
+        "y": 373,
+        "w": 63,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 1",
+        "b": "stanza 3",
+        "x": 306.7833251953125,
+        "y": 508,
+        "w": 40,
+        "h": 141.6500244140625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.7
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.3
+        }
+      },
+      {
+        "a": "stanza 2",
+        "b": "stanza 3",
+        "x": 555.7833251953125,
+        "y": 500,
+        "w": 40,
+        "h": 149.6500244140625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.3
+        },
+        "bDoor": {
+          "side": "E",
+          "offset": 0.3
+        }
+      },
+      {
+        "a": "stanza 3",
+        "b": "stanza 4",
+        "x": 365,
+        "y": 817.6500244140625,
+        "w": 40,
+        "h": 86.4166259765625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.3
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 3",
+        "b": "WC",
+        "x": 630,
+        "y": 749.6500244140625,
+        "w": 115,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.8
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 4",
+        "b": "stanza 5",
+        "x": 481,
+        "y": 1052.066650390625,
+        "w": 126.0166015625,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.7
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.3
+        }
+      },
+      {
+        "a": "stanza 5",
+        "b": "stanza 6",
+        "x": 701.0166015625,
+        "y": 1246.11669921875,
+        "w": 40,
+        "h": 60.033203125,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.3
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 5",
+        "b": "SHOP",
+        "x": 967.0166015625,
+        "y": 1168.11669921875,
+        "w": 40,
+        "h": 148.533203125,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.7
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 6",
+        "b": "OUT",
+        "x": 734.2334594726562,
+        "y": 1536.14990234375,
+        "w": 40,
+        "h": 115.849853515625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.7
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "SHOP",
+        "b": "OUT",
+        "x": 979.7667236328125,
+        "y": 1506.64990234375,
+        "w": 40,
+        "h": 145.349853515625,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      }
+    ],
+    "rooms": {
+      "IN": {
+        "x": 400,
+        "y": 60,
+        "w": 200,
+        "h": 140,
+        "tipo": "ingresso",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 1": {
+        "x": 109.7833251953125,
+        "y": 278,
+        "w": 310,
+        "h": 230,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 2": {
+        "x": 482.7833251953125,
+        "y": 270,
+        "w": 310,
+        "h": 230,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 3": {
+        "x": 280,
+        "y": 577.6500244140625,
+        "w": 350,
+        "h": 240,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 4": {
+        "x": 171,
+        "y": 904.066650390625,
+        "w": 310,
+        "h": 240,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "WC": {
+        "x": 745,
+        "y": 691.066650390625,
+        "w": 170,
+        "h": 150,
+        "tipo": "bagno",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 5": {
+        "x": 607.0166015625,
+        "y": 986.11669921875,
+        "w": 380,
+        "h": 260,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 6": {
+        "x": 537.2334594726562,
+        "y": 1306.14990234375,
+        "w": 310,
+        "h": 230,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "SHOP": {
+        "x": 879.7667236328125,
+        "y": 1316.64990234375,
+        "w": 240,
+        "h": 190,
+        "tipo": "servizio",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "OUT": {
+        "x": 709.4500732421875,
+        "y": 1651.999755859375,
+        "w": 317,
+        "h": 218,
+        "tipo": "uscita",
+        "bgImage": null,
+        "bgTipo": "preview"
+      }
+    },
+    "labelI18n": {
+      "stanze": {
+        "IN": {
+          "en": "Entrance",
+          "fr": "Entrée"
+        },
+        "stanza 1": {
+          "en": "Origins of Modern Gothic",
+          "fr": "Origines du Gothique Moderne"
+        },
+        "stanza 2": {
+          "en": "The Romantic Outsider",
+          "fr": "L'Outsider Romantique"
+        },
+        "stanza 3": {
+          "en": "Identity & Distorted Biographies",
+          "fr": "Identité & Biographies Distordues"
+        },
+        "stanza 4": {
+          "en": "Theatrical Gothic",
+          "fr": "Gothique Théâtral"
+        },
+        "stanza 5": {
+          "en": "Animation & Tender Death",
+          "fr": "Animation & Mort Tendre"
+        },
+        "stanza 6": {
+          "en": "Distorted & Childlike Worlds",
+          "fr": "Mondes Distordus & Enfantins"
+        },
+        "WC": {
+          "en": "Restrooms",
+          "fr": "Toilettes"
+        },
+        "SHOP": {
+          "en": "Shop",
+          "fr": "Boutique"
+        },
+        "OUT": {
+          "en": "Exit",
+          "fr": "Sortie"
+        }
+      },
+      "percorsi": {
+        "Highlights Burton": {
+          "en": "Burton Highlights",
+          "fr": "Incontournables Burton"
+        },
+        "Gotico Burtoniano": {
+          "en": "Burtonian Gothic",
+          "fr": "Gothique Burtonien"
+        },
+        "Animazione e Fantasia": {
+          "en": "Animation & Fantasy",
+          "fr": "Animation & Fantaisie"
+        },
+        "L'Outsider": {
+          "en": "The Outsider",
+          "fr": "L'Outsider"
+        },
+        "Percorso Completo": {
+          "en": "Complete Tour",
+          "fr": "Parcours Complet"
+        }
+      }
+    }
+  },
+  "Museo Egizio di Torino": {
+    "grid": {
+      "IN": {
+        "row": 0,
+        "col": 1,
+        "tipo": "ingresso"
+      },
+      "stanza 1": {
+        "row": 1,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 2": {
+        "row": 2,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 3": {
+        "row": 3,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "WC": {
+        "row": 3,
+        "col": 2,
+        "tipo": "bagno"
+      },
+      "stanza 4": {
+        "row": 4,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 5": {
+        "row": 5,
+        "col": 1,
+        "tipo": "normale"
+      },
+      "stanza 6": {
+        "row": 6,
+        "col": 0,
+        "tipo": "normale"
+      },
+      "SHOP": {
+        "row": 7,
+        "col": 0,
+        "tipo": "servizio"
+      },
+      "OUT": {
+        "row": 7,
+        "col": 1,
+        "tipo": "uscita"
+      }
+    },
+    "corridoi": [
+      {
+        "a": "IN",
+        "b": "stanza 1",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 1",
+        "b": "stanza 2",
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 2",
+        "b": "WC",
+        "x": 680,
+        "y": 695,
+        "w": 128,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 3",
+        "b": "stanza 4",
+        "x": 364,
+        "y": 1072.9166259765625,
+        "w": 98,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.8
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.3
+        }
+      },
+      {
+        "a": "stanza 2",
+        "b": "stanza 4",
+        "x": 530,
+        "y": 820,
+        "w": 40,
+        "h": 129.10003662109375,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 4",
+        "b": "stanza 5",
+        "x": 607,
+        "y": 1189.1000366210938,
+        "w": 40,
+        "h": 74.49993896484375,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 5",
+        "b": "stanza 6",
+        "x": 228.33334350585938,
+        "y": 1397.5999755859375,
+        "w": 203.99996948242188,
+        "h": 40,
+        "aDoor": {
+          "side": "W",
+          "offset": 0.7
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "stanza 6",
+        "b": "SHOP",
+        "x": 208.33334350585938,
+        "y": 1548.0667724609375,
+        "w": 40,
+        "h": 85.3831787109375,
+        "aDoor": {
+          "side": "S",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "N",
+          "offset": 0.5
+        }
+      },
+      {
+        "a": "SHOP",
+        "b": "OUT",
+        "x": 327.3333435058594,
+        "y": 1693.449951171875,
+        "w": 167.99996948242188,
+        "h": 40,
+        "aDoor": {
+          "side": "E",
+          "offset": 0.5
+        },
+        "bDoor": {
+          "side": "W",
+          "offset": 0.5
+        }
+      }
+    ],
+    "rooms": {
+      "IN": {
+        "x": 450,
+        "y": 80,
+        "w": 200,
+        "h": 140,
+        "tipo": "ingresso",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 1": {
+        "x": 420,
+        "y": 310,
+        "w": 260,
+        "h": 210,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 2": {
+        "x": 420,
+        "y": 610,
+        "w": 260,
+        "h": 210,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 3": {
+        "x": 64,
+        "y": 908.9166259765625,
+        "w": 300,
+        "h": 230,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "WC": {
+        "x": 808,
+        "y": 643,
+        "w": 170,
+        "h": 150,
+        "tipo": "bagno",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 4": {
+        "x": 462,
+        "y": 949.1000366210938,
+        "w": 330,
+        "h": 240,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 5": {
+        "x": 432.33331298828125,
+        "y": 1263.5999755859375,
+        "w": 290,
+        "h": 220,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "stanza 6": {
+        "x": 78.33334350585938,
+        "y": 1318.0667724609375,
+        "w": 300,
+        "h": 230,
+        "tipo": "normale",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "SHOP": {
+        "x": 127.33334350585938,
+        "y": 1633.449951171875,
+        "w": 200,
+        "h": 160,
+        "tipo": "servizio",
+        "bgImage": null,
+        "bgTipo": "preview"
+      },
+      "OUT": {
+        "x": 495.33331298828125,
+        "y": 1607.4500732421875,
+        "w": 200,
+        "h": 160,
+        "tipo": "uscita",
+        "bgImage": null,
+        "bgTipo": "preview"
+      }
+    },
+    "labelI18n": {
+      "stanze": {
+        "IN": {
+          "en": "Entrance",
+          "fr": "Entrée"
+        },
+        "stanza 1": {
+          "en": "Daily Life & Personal Identity",
+          "fr": "Vie Quotidienne & Identité"
+        },
+        "stanza 2": {
+          "en": "Royalty & Divine Power",
+          "fr": "Royauté & Pouvoir Divin"
+        },
+        "stanza 3": {
+          "en": "Death, Transformation & Afterlife",
+          "fr": "Mort, Transformation & Au-delà"
+        },
+        "stanza 4": {
+          "en": "Body Protection & Eternity",
+          "fr": "Protection du Corps & Éternité"
+        },
+        "stanza 5": {
+          "en": "The Container of Eternity",
+          "fr": "Le Conteneur de l'Éternité"
+        },
+        "stanza 6": {
+          "en": "Temple of Cosmic Control",
+          "fr": "Temple du Contrôle Cosmique"
+        },
+        "WC": {
+          "en": "Restrooms",
+          "fr": "Toilettes"
+        },
+        "SHOP": {
+          "en": "Shop",
+          "fr": "Boutique"
+        },
+        "OUT": {
+          "en": "Exit",
+          "fr": "Sortie"
+        }
+      },
+      "percorsi": {
+        "Highlights Egizio": {
+          "en": "Egyptian Highlights",
+          "fr": "Incontournables Égyptiens"
+        },
+        "Vita e Morte": {
+          "en": "Life & Death",
+          "fr": "Vie & Mort"
+        },
+        "Potere Divino": {
+          "en": "Divine Power",
+          "fr": "Pouvoir Divin"
+        },
+        "Magia e Protezione": {
+          "en": "Magic & Protection",
+          "fr": "Magie & Protection"
         },
         "Percorso Completo": {
           "en": "Complete Tour",
