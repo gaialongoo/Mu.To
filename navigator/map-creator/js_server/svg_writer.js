@@ -186,6 +186,13 @@ function routeBetween(o, t, stanze, corridoi) {
     const toDoor = resolveDoorPoint(B, A, c);
     for (const p of corridorTransitPoints(c, fromDoor, toDoor)) pushPoint(p);
     pushPoint(toDoor);
+
+    // Attraversa la stanza con due porte diverse (es. stanza 6: corridoio orizzontale + verticale).
+    if (i + 1 < path.length - 1) {
+      const C = path[i + 2];
+      const nextFromDoor = resolveDoorPoint(B, C, corrMap.get(`${B.nome}->${C.nome}`));
+      for (const p of roomTransitPoints(B, toDoor, nextFromDoor)) pushPoint(p);
+    }
   }
 
   pushPoint(t.pos);
@@ -193,17 +200,14 @@ function routeBetween(o, t, stanze, corridoi) {
 }
 
 function resolveDoorPoint(room, otherRoom, corr) {
-  if (corr) {
-    // Routing dinamico: usa sempre geometria reale stanza<->corridoio.
-    // Non usare pA/pB (derivati da aDoor/bDoor) per evitare passaggi forzati.
-    const geomDoor = inferDoorFromCorridorRect(room, corr);
-    if (geomDoor) return geomDoor;
+  if (corr && otherRoom) {
+    const door = inferDoorFromCorridorRect(room, corr, otherRoom);
+    if (door) return door;
   }
-  // Fallback estremo solo se manca del tutto il corridoio/geom.
   return room.porta[inferLegacySide(room, otherRoom)];
 }
 
-function inferDoorFromCorridorRect(room, corr) {
+function inferDoorFromCorridorRect(room, corr, otherRoom = null) {
   if (!room || !corr) return null;
   const rx0 = room.x, rx1 = room.x + room.w;
   const ry0 = room.y, ry1 = room.y + room.h;
@@ -211,6 +215,21 @@ function inferDoorFromCorridorRect(room, corr) {
   const cy0 = corr.y, cy1 = corr.y + corr.h;
   const ox = Math.max(0, Math.min(rx1, cx1) - Math.max(rx0, cx0));
   const oy = Math.max(0, Math.min(ry1, cy1) - Math.max(ry0, cy0));
+
+  // Corridoio che invade la stanza: usa il lato verso l'altra stanza (non il bordo
+  // geometricamente più vicino, che può essere N mentre il corridoio è in basso).
+  if (ox > 0 && oy > 0 && otherRoom) {
+    const side = inferLegacySide(room, otherRoom);
+    const corrCx = (cx0 + cx1) / 2;
+    const corrCy = (cy0 + cy1) / 2;
+    if (side === "N" || side === "S") {
+      const x = Math.max(rx0, cx0) + ox / 2;
+      return [x, side === "N" ? ry0 : ry1];
+    }
+    const y = Math.max(ry0, cy0) + oy / 2;
+    return [side === "W" ? rx0 : rx1, y];
+  }
+
   const PENALTY = 1e6;
   const dN = Math.abs(cy1 - ry0) + (ox > 0 ? 0 : PENALTY);
   const dS = Math.abs(cy0 - ry1) + (ox > 0 ? 0 : PENALTY);
@@ -242,6 +261,22 @@ function corridorTransitPoints(corr, fromDoor, toDoor) {
   }
   const x = corr.x + corr.w / 2;
   return [[x, fromDoor[1]], [x, toDoor[1]]];
+}
+
+function roomTransitPoints(room, inDoor, outDoor) {
+  if (!room || !inDoor || !outDoor) return [];
+  if (inDoor[0] === outDoor[0] || inDoor[1] === outDoor[1]) return [outDoor];
+
+  const bendA = [inDoor[0], outDoor[1]];
+  const bendB = [outDoor[0], inDoor[1]];
+  const center = [room.x + room.w / 2, room.y + room.h / 2];
+  const distA =
+    Math.abs(bendA[0] - center[0]) + Math.abs(bendA[1] - center[1]);
+  const distB =
+    Math.abs(bendB[0] - center[0]) + Math.abs(bendB[1] - center[1]);
+  const bend = distA <= distB ? bendA : bendB;
+
+  return [bend, outDoor];
 }
 
 function inferLegacySide(fromRoom, toRoom) {
