@@ -11,6 +11,8 @@ server/openAPI/.env
 qr_dump/
 server/openAPI/qr_dump/
 
-# TLS keys (cert pubblici si possono committare, le chiavi mai)
+# TLS BFF — generare in locale (vedi README, sezione HTTPS sul BFF)
+navigator/UI/bff/cert/
+
+# TLS keys altrove (OpenAPI, ecc.)
 *.key
-navigator/UI/bff/cert/bff.key

@@ -83,8 +83,8 @@ iOS Safari rifiuta `getUserMedia` (e quindi lo scanner QR del navigator)
 quando la pagina e' servita in chiaro. Per questo il BFF puo' partire **direttamente in HTTPS**
 usando un certificato self-signed locale.
 
-Un certificato gia' pronto e' in `navigator/UI/bff/cert/bff.crt`
-(la chiave `bff.key` e' ignorata da git). E' generato per:
+I file `navigator/UI/bff/cert/bff.{crt,key}` **non sono nel repo**
+(ogni sviluppatore li genera in locale). Il certificato va creato per:
 
 - `localhost`, `127.0.0.1`
 - l'IP LAN della macchina di sviluppo (es. `192.168.1.144`)
