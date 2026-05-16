@@ -6,6 +6,8 @@ class Stanza {
     this.tipo = "normale";
     this.bgImage = null;
     this.bgTipo = "preview";
+    this.labelX = 0.5;
+    this.labelY = 0.09;
     this.oggetti = [];
 
     this.row = 0;

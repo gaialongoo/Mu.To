@@ -128,11 +128,14 @@ rect.corridoio {
   stroke-width: 2;
 }
 
-/* Titoli stanze: neri, maiuscolo solo visivo (textContent originale per i18n/url) */
+/* Titoli stanze: maiuscolo solo visivo (textContent originale per i18n/url) */
 #svg-host svg text.stanza-label {
-  fill: #000000 !important;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+#svg-host svg text.stanza-label:not([fill]) {
+  fill: #000000 !important;
 }
 
 #svg-host svg circle.oggetto {

@@ -228,6 +228,9 @@ function generaSvg(data, layout, edgeMode, edgeFocus, virtualObjects = {}) {
       s.tipo = info.tipo || "normale";
       s.bgImage = typeof info.bgImage === "string" ? info.bgImage : null;
       s.bgTipo = info.bgTipo || "preview";
+      s.labelX = typeof info.labelX === "number" ? info.labelX : undefined;
+      s.labelY = typeof info.labelY === "number" ? info.labelY : undefined;
+      s.labelPos = info.labelPos || null;
       stanzeMap[nome] = s;
     }
   } else if (gridObj) {

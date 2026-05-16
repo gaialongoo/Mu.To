@@ -23,6 +23,48 @@ function roomPatternId(nome, v = 0) {
   return `room-bg-${safeName}-${v}`;
 }
 
+const DEFAULT_LABEL_X = 0.5;
+const DEFAULT_LABEL_Y = 0.09;
+
+const LEGACY_LABEL_POS = {
+  "top-center": { labelX: 0.5, labelY: 0.09 },
+  "top-left": { labelX: 0.08, labelY: 0.09 },
+  "top-right": { labelX: 0.92, labelY: 0.09 },
+  center: { labelX: 0.5, labelY: 0.5 },
+  "bottom-center": { labelX: 0.5, labelY: 0.91 },
+  "bottom-left": { labelX: 0.08, labelY: 0.91 },
+  "bottom-right": { labelX: 0.92, labelY: 0.91 },
+};
+
+function normalizeLabelRel(n, fallback = 0.5) {
+  if (typeof n !== "number" || Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function resolveLabelRel(room) {
+  if (typeof room?.labelX === "number" || typeof room?.labelY === "number") {
+    return {
+      labelX: normalizeLabelRel(room.labelX, DEFAULT_LABEL_X),
+      labelY: normalizeLabelRel(room.labelY, DEFAULT_LABEL_Y),
+    };
+  }
+  const legacy = LEGACY_LABEL_POS[String(room?.labelPos || "").trim()];
+  if (legacy) return legacy;
+  return { labelX: DEFAULT_LABEL_X, labelY: DEFAULT_LABEL_Y };
+}
+
+function roomLabelLayout(room) {
+  const x = room.x ?? 0;
+  const y = room.y ?? 0;
+  const w = room.w ?? 220;
+  const h = room.h ?? 180;
+  const { labelX, labelY } = resolveLabelRel(room);
+  const lx = x + w * labelX;
+  const ly = y + h * labelY;
+  const textAnchor = labelX <= 0.15 ? "start" : labelX >= 0.85 ? "end" : "middle";
+  return { x: lx, y: ly, textAnchor, dominantBaseline: "middle" };
+}
+
 // ---------- SVG ----------
 
 function svgHeader(title, w, h) {
@@ -329,7 +371,8 @@ function draw(svg, stanze, corridoi, oggetti, edgeMode = "all", edgeFocus = null
       ? `url(#${roomPatternId(s.nome, v)})`
       : "#fff";
     svg += `\n<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="8" class="${cls}" fill="${roomFill}"/>`;
-    svg += `\n<text x="${s.x + s.w / 2}" y="${s.y + 16}" class="stanza-label" text-anchor="middle">${s.nome}</text>`;
+    const lbl = roomLabelLayout(s);
+    svg += `\n<text x="${lbl.x}" y="${lbl.y}" class="stanza-label" text-anchor="${lbl.textAnchor}" dominant-baseline="${lbl.dominantBaseline}">${escapeXml(s.nome)}</text>`;
   }
 
   // ---------- PERCORSI ----------

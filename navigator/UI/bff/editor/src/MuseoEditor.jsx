@@ -150,6 +150,64 @@ function doorPoint(room, doorSpec, fallbackSide) {
   return [room.x + room.w, room.y + room.h * offset];
 }
 
+const DEFAULT_LABEL_X = 0.5;
+const DEFAULT_LABEL_Y = 0.09;
+const ROOM_LABEL_FILL = "#2c3e50";
+
+const LEGACY_LABEL_POS = {
+  "top-center": { labelX: 0.5, labelY: 0.09 },
+  "top-left": { labelX: 0.08, labelY: 0.09 },
+  "top-right": { labelX: 0.92, labelY: 0.09 },
+  center: { labelX: 0.5, labelY: 0.5 },
+  "bottom-center": { labelX: 0.5, labelY: 0.91 },
+  "bottom-left": { labelX: 0.08, labelY: 0.91 },
+  "bottom-right": { labelX: 0.92, labelY: 0.91 },
+};
+
+function normalizeLabelRel(n, fallback = 0.5) {
+  if (typeof n !== "number" || Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function resolveLabelRel(room) {
+  if (typeof room?.labelX === "number" || typeof room?.labelY === "number") {
+    return {
+      labelX: normalizeLabelRel(room.labelX, DEFAULT_LABEL_X),
+      labelY: normalizeLabelRel(room.labelY, DEFAULT_LABEL_Y),
+    };
+  }
+  const legacy = LEGACY_LABEL_POS[String(room?.labelPos || "").trim()];
+  if (legacy) return legacy;
+  return { labelX: DEFAULT_LABEL_X, labelY: DEFAULT_LABEL_Y };
+}
+
+function roomLabelLayout(room) {
+  const x = room.x ?? 0;
+  const y = room.y ?? 0;
+  const w = room.w ?? DEFAULT_ROOM_W;
+  const h = room.h ?? DEFAULT_ROOM_H;
+  const { labelX, labelY } = resolveLabelRel(room);
+  const lx = x + w * labelX;
+  const ly = y + h * labelY;
+  const textAnchor = labelX <= 0.15 ? "start" : labelX >= 0.85 ? "end" : "middle";
+  return { x: lx, y: ly, textAnchor, dominantBaseline: "middle" };
+}
+
+function roomToLayoutEntry(s) {
+  const { labelX, labelY } = resolveLabelRel(s);
+  return {
+    x: s.x,
+    y: s.y,
+    w: s.w,
+    h: s.h,
+    tipo: s.tipo,
+    bgImage: s.bgImage ?? null,
+    bgTipo: s.bgTipo ?? "preview",
+    labelX,
+    labelY,
+  };
+}
+
 const TIPO_COLORS = {
   normale:  { fill: "#ffffff", stroke: "#2c3e50" },
   ingresso: { fill: "#ffffff", stroke: "#2ecc71" },
@@ -1065,6 +1123,7 @@ export default function MuseoEditor() {
             tipo:v.tipo??"normale",
             bgImage: v.bgImage ?? null,
             bgTipo: v.bgTipo ?? "preview",
+            ...resolveLabelRel(v),
           }))
         : layout?.grid
           ? Object.entries(layout.grid).map(([n,v])=>({
@@ -1076,6 +1135,8 @@ export default function MuseoEditor() {
               tipo:v.tipo??"normale",
               bgImage: null,
               bgTipo: "preview",
+              labelX: DEFAULT_LABEL_X,
+              labelY: DEFAULT_LABEL_Y,
             }))
           : [];
       const labelI18n =
@@ -1158,7 +1219,7 @@ export default function MuseoEditor() {
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,
         { method:"PUT", body:JSON.stringify({
-            rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
+            rooms: Object.fromEntries(museo.stanze.map(s => [s.nome, roomToLayoutEntry(s)])),
             corridoi,
             labelI18n: museo.labelI18n && typeof museo.labelI18n === "object" ? museo.labelI18n : { ...EMPTY_LABEL_I18N },
           })
@@ -1238,7 +1299,7 @@ export default function MuseoEditor() {
       await apiFetch(`/musei/${encodeURIComponent(vecchio)}`, { method:"PUT", body:JSON.stringify({ nome:nuovoNomeMuseo }) });
       const corridoi = normalizeCorridoi(museo.stanze, museo.corridoi);
       await apiFetch(`/musei/${encodeURIComponent(nuovoNomeMuseo)}/layout`, { method:"PUT", body:JSON.stringify({
-        rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
+        rooms: Object.fromEntries(museo.stanze.map(s => [s.nome, roomToLayoutEntry(s)])),
         corridoi
       }) });
       setMuseList(l => l.map(n => n===vecchio ? nuovoNomeMuseo : n));
@@ -1374,7 +1435,7 @@ export default function MuseoEditor() {
         }
         const labelI18n = { ...baseLi, stanze: stanzeMap };
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({
-          rooms: Object.fromEntries(nuove.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
+          rooms: Object.fromEntries(nuove.map(s => [s.nome, roomToLayoutEntry(s)])),
           corridoi,
           labelI18n,
         })});
@@ -1436,7 +1497,7 @@ export default function MuseoEditor() {
         const stanzeAgg = museo.stanze.filter(s=>s.nome!==selected.nome);
         const corridoiAgg = normalizeCorridoi(stanzeAgg, museo.corridoi.filter(c => c.a !== selected.nome && c.b !== selected.nome));
         await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`, { method:"PUT", body:JSON.stringify({
-          rooms: Object.fromEntries(stanzeAgg.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
+          rooms: Object.fromEntries(stanzeAgg.map(s => [s.nome, roomToLayoutEntry(s)])),
           corridoi: corridoiAgg
         }) });
         await syncPercorsiToApi(museo.percorsi, percorsiAggiornati, museo.nome);
@@ -1579,11 +1640,22 @@ export default function MuseoEditor() {
     const tipo = ["normale", "ingresso", "uscita", "bagno", "servizio"].includes(tipoRaw.trim())
       ? tipoRaw.trim()
       : "normale";
-    const nuova = { nome:n, x: centerX - w / 2, y: centerY - h / 2, w, h, tipo, bgImage: null, bgTipo: "preview" };
+    const nuova = {
+      nome: n,
+      x: centerX - w / 2,
+      y: centerY - h / 2,
+      w,
+      h,
+      tipo,
+      bgImage: null,
+      bgTipo: "preview",
+      labelX: DEFAULT_LABEL_X,
+      labelY: DEFAULT_LABEL_Y,
+    };
     setMuseo(m=>({...m,stanze:[...m.stanze,nuova]}));
     setSelected({type:"stanza",nome:n}); setMode("select");
     try {
-      const rooms = Object.fromEntries([...museo.stanze, nuova].map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}]));
+      const rooms = Object.fromEntries([...museo.stanze, nuova].map(s => [s.nome, roomToLayoutEntry(s)]));
       await apiFetch(`/musei/${encodeURIComponent(museo.nome)}/layout`,{method:"PUT",body:JSON.stringify({rooms, corridoi: normalizeCorridoi([...museo.stanze,nuova], museo.corridoi || [])})});
       showToast(`✓ Stanza "${n}" creata`);
     } catch(err){showToast(`⚠ Stanza solo locale (${err.message})`,false);}
@@ -1792,7 +1864,7 @@ export default function MuseoEditor() {
   // ─── EXPORT ───────────────────────────────────────────────────────────
   const exportData = useMemo(() => ({
     layout: {
-      rooms: Object.fromEntries(museo.stanze.map(s=>[s.nome,{x:s.x,y:s.y,w:s.w,h:s.h,tipo:s.tipo,bgImage:s.bgImage ?? null,bgTipo:s.bgTipo ?? "preview"}])),
+      rooms: Object.fromEntries(museo.stanze.map(s => [s.nome, roomToLayoutEntry(s)])),
       corridoi: normalizeCorridoi(museo.stanze, museo.corridoi),
     },
     museo:  { nome: museo.nome, oggetti: museo.oggetti, percorsi: museo.percorsi },
@@ -2153,6 +2225,7 @@ export default function MuseoEditor() {
             const roomFill = typeof s.bgImage === "string" && s.bgImage.trim()
               ? `url(#${roomPatternId(s.nome, v)})`
               : tc.fill;
+            const lbl = roomLabelLayout({ ...s, ...p });
             return (
               <g key={s.nome} style={{cursor:"pointer"}} onClick={e=>onRoomClick(e,s.nome)}>
                 <rect
@@ -2161,7 +2234,15 @@ export default function MuseoEditor() {
                   style={{filter:sel?"drop-shadow(0 0 8px #f39c1288)":inPercorso?"drop-shadow(0 0 6px #e67e2266)":undefined}}
                   onPointerDown={(e)=>{ e.stopPropagation(); startDragRoom(e, s.nome, "move"); }}
                 />
-                <text x={p.x+p.w/2} y={p.y+20} textAnchor="middle" style={{font:"bold 14px Arial",fill:"#2c3e50",pointerEvents:"none"}}>{s.nome}</text>
+                <text
+                  x={lbl.x}
+                  y={lbl.y}
+                  textAnchor={lbl.textAnchor}
+                  dominantBaseline={lbl.dominantBaseline}
+                  style={{ font: "bold 14px Arial", fill: ROOM_LABEL_FILL, pointerEvents: "none" }}
+                >
+                  {s.nome}
+                </text>
                 {sel && (
                   <rect
                     x={p.x + p.w - 12}
@@ -2351,6 +2432,40 @@ export default function MuseoEditor() {
               <select value={selItem.tipo} onChange={e=>updStanza(selItem.nome,{tipo:e.target.value})} style={INP}>
                 {["normale","ingresso","uscita","bagno","servizio"].map(t=><option key={t}>{t}</option>)}
               </select>
+              <FLabel>Posizione nome — larghezza</FLabel>
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={resolveLabelRel(selItem).labelX}
+                  onChange={e => updStanza(selItem.nome, { labelX: +e.target.value })}
+                  style={{ width: "100%" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: THEME.textFaint, marginTop: 4 }}>
+                  <span>sinistra</span>
+                  <span>{Math.round(resolveLabelRel(selItem).labelX * 100)}%</span>
+                  <span>destra</span>
+                </div>
+              </div>
+              <FLabel>Posizione nome — altezza</FLabel>
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={resolveLabelRel(selItem).labelY}
+                  onChange={e => updStanza(selItem.nome, { labelY: +e.target.value })}
+                  style={{ width: "100%" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: THEME.textFaint, marginTop: 4 }}>
+                  <span>alto</span>
+                  <span>{Math.round(resolveLabelRel(selItem).labelY * 100)}%</span>
+                  <span>basso</span>
+                </div>
+              </div>
               {mode==="addObject" && (
                 <div style={{marginBottom:10,padding:"8px 10px",background:THEME.surface,border:`1px solid ${THEME.border}`,borderRadius:6}}>
                   <FLabel>Nuovo oggetto: tipo</FLabel>
