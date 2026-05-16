@@ -59,6 +59,7 @@ class SistemaMusei {
           licenza: ogg.licenza || "",
           correnteArtistica: ogg.correnteArtistica || "",
           anno: ogg.anno || "",
+          prezzo: ogg.prezzo != null ? ogg.prezzo : undefined,
         })),
         percorsi: museo.percorsi || []
       };

@@ -7,6 +7,7 @@ const { caricaMuseiDaJSON } = require("./parser_musei.js");
 const { SistemaMusei } = require("./sistema_musei.js");
 const { upsertMuseo, syncMuseiSuMongo } = require("./mongo_upload.js");
 const { syncLayoutSuMongo } = require("./layout_upload.js");
+const { getOggettoMarketplacePrezzo } = require("./marketplace_object_prices.js");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: __dirname + "/.env" });
@@ -92,6 +93,20 @@ function normalizePrezzo(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.round(parsed * 100) / 100;
+}
+
+function resolveOggettoPrezzo(museoNome, oggetto = {}) {
+  if (String(oggetto?.objectType || "normal").toLowerCase() === "text") return 0;
+  const fromData = normalizePrezzo(oggetto?.prezzo);
+  if (fromData > 0) return fromData;
+  return getOggettoMarketplacePrezzo(museoNome, oggetto?.nome);
+}
+
+function enrichOggettoForApi(museoNome, oggetto = {}) {
+  return {
+    ...oggetto,
+    prezzo: resolveOggettoPrezzo(museoNome, oggetto),
+  };
 }
 
 function clampInt(value, min, max) {
@@ -2420,7 +2435,7 @@ async function startServer(cliOptions) {
         museo: nomeMuseo,
         oggetto: nomeOggetto,
         stanza: stanzaOggetto,
-        prezzo: MARKETPLACE_OBJECT_FIXED_PRICE,
+        prezzo: resolveOggettoPrezzo(nomeMuseo, oggetto),
         status: "pending",
         note: "",
         decidedBy: "",
@@ -3544,7 +3559,7 @@ async function startServer(cliOptions) {
       indirizzo: museo.indirizzo || "",
       palazzo: museo.palazzo || "",
       istruzioniAccesso: museo.istruzioniAccesso || "",
-      oggetti: Array.from(museo.oggetti.values()),
+      oggetti: Array.from(museo.oggetti.values()).map((o) => enrichOggettoForApi(museo.nome, o)),
       percorsi: museo.percorsi || [],
       labelI18n,
     });
@@ -3591,7 +3606,7 @@ async function startServer(cliOptions) {
     if (!oggetto) return res.status(404).json({ error: "Oggetto non trovato" });
 
     console.log(`Restituisco oggetto '${oggetto.nome}' del museo '${museo.nome}'`);
-    res.json(oggetto);
+    res.json(enrichOggettoForApi(museo.nome, oggetto));
   });
 
   // 4️⃣ Percorso BFS tra oggetti

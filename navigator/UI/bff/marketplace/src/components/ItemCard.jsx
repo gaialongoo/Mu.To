@@ -10,7 +10,7 @@ export default function ItemCard({
   onRequestPurchase,
   purchaseLabel,
   purchaseDisabled = false,
-  fixedPriceLabel = "",
+  priceLabel = "",
 }) {
   const nD = Array.isArray(oggetto.descrizioni) ? oggetto.descrizioni.length : 0;
   const nC = Array.isArray(oggetto.connessi) ? oggetto.connessi.length : 0;
@@ -27,6 +27,9 @@ export default function ItemCard({
         position: "relative",
         animation: `fadeUp 0.4s ease ${delay}s backwards`,
         cursor: "default",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-5px)";
@@ -55,7 +58,7 @@ export default function ItemCard({
       </div>
 
       {/* Body */}
-      <div style={{ padding: "20px 22px 14px" }}>
+      <div style={{ padding: "20px 22px 14px", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{
           fontFamily: "var(--font-head)",
           fontSize: 14,
@@ -77,7 +80,7 @@ export default function ItemCard({
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Anno: {oggetto.anno || "N/D"}</span>
         </div>
 
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minHeight: 52, alignContent: "flex-start" }}>
           {oggetto.stanza && (
             <span style={{
               background: "rgba(255,255,255,0.04)",
@@ -116,17 +119,18 @@ export default function ItemCard({
         </div>
       </div>
 
-      <div style={{ padding: "10px 22px 18px", display: "grid", gap: 8 }}>
+      <div style={{ padding: "10px 22px 18px", display: "grid", gap: 8, marginTop: "auto" }}>
         {!isTextObject && (
           <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            Prezzo fisso: <span style={{ color: "var(--green)" }}>{fixedPriceLabel || "—"}</span>
+            Prezzo: <span style={{ color: "var(--green)" }}>{priceLabel || "—"}</span>
           </div>
         )}
-        <div style={{ display: "grid", gap: 8, gridTemplateColumns: isTextObject ? "1fr" : "1fr 1fr" }}>
+        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
           <button
             onClick={() => onView?.(oggetto)}
             style={{
               width: "100%",
+              minHeight: 34,
               padding: "8px 10px",
               background: "transparent",
               border: "1px solid var(--border)",
@@ -142,28 +146,31 @@ export default function ItemCard({
           >
             Visualizza
           </button>
-          {!isTextObject && (
-            <button
-              onClick={() => onRequestPurchase?.(oggetto)}
-              disabled={purchaseDisabled}
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                background: "var(--green-dim)",
-                border: "1px solid rgba(92,191,128,0.3)",
-                borderRadius: "var(--radius)",
-                cursor: purchaseDisabled ? "not-allowed" : "pointer",
-                fontFamily: "var(--font-head)",
-                fontSize: 9,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--green)",
-                opacity: purchaseDisabled ? 0.7 : 1,
-              }}
-            >
-              {purchaseLabel || "Richiedi"}
-            </button>
-          )}
+          <button
+            onClick={() => !isTextObject && onRequestPurchase?.(oggetto)}
+            disabled={isTextObject || purchaseDisabled}
+            aria-hidden={isTextObject}
+            tabIndex={isTextObject ? -1 : 0}
+            style={{
+              width: "100%",
+              minHeight: 34,
+              padding: "8px 10px",
+              background: "var(--green-dim)",
+              border: "1px solid rgba(92,191,128,0.3)",
+              borderRadius: "var(--radius)",
+              cursor: isTextObject || purchaseDisabled ? "not-allowed" : "pointer",
+              fontFamily: "var(--font-head)",
+              fontSize: 9,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--green)",
+              opacity: isTextObject ? 0 : (purchaseDisabled ? 0.7 : 1),
+              visibility: isTextObject ? "hidden" : "visible",
+              pointerEvents: isTextObject ? "none" : "auto",
+            }}
+          >
+            {purchaseLabel || "Richiedi"}
+          </button>
         </div>
       </div>
     </div>

@@ -91,10 +91,12 @@ function formatPrezzo(prezzo, mp) {
   return `${amount.toFixed(2).replace(".", ",")} EUR`;
 }
 
-function formatFixedEuro(prezzo) {
+function formatEuroAmount(prezzo) {
   const amount = Number(prezzo);
   if (!Number.isFinite(amount) || amount <= 0) return "0,00 EUR";
-  return `${amount.toFixed(2).replace(".", ",")} EUR`;
+  const [intPart, dec = "00"] = amount.toFixed(2).split(".");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${grouped},${dec} EUR`;
 }
 
 function encodeSharePayload(payload) {
@@ -223,46 +225,54 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
   const disabled = !included && !canView && buying;
   const title = displayNome || percorso.nome;
   const canStart = included || canView;
+  const showBuy = !included && !canView;
+  const btnBase = {
+    padding: "8px 10px",
+    borderRadius: "var(--radius)",
+    fontFamily: "var(--font-head)",
+    fontSize: 9,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    transition: "all 0.2s",
+    width: "100%",
+    minHeight: 34,
+  };
   return (
     <div style={{
       background: "var(--bg-card)", border: "1px solid var(--border)",
       borderRadius: "var(--radius-lg)", overflow: "hidden",
       animation: `fadeUp 0.4s ease ${delay}s backwards`,
+      display: "flex",
+      flexDirection: "column",
+      height: "100%",
     }}>
       <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-      <div style={{ padding: "20px 22px 14px" }}>
+      <div style={{ padding: "20px 22px 14px", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ fontFamily: "var(--font-head)", fontSize: 14, fontWeight: 500, letterSpacing: "0.07em", color: "var(--text)", marginBottom: 10 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--text-dim)" }}>{(percorso.oggetti || []).length} {mp("worksCount")}</div>
           <div style={{ fontSize: 11, letterSpacing: "0.06em", color: included ? "var(--green)" : "var(--text)", fontFamily: "var(--font-head)" }}>{formatPrezzo(prezzo, mp)}</div>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minHeight: 52, alignContent: "flex-start" }}>
           {(percorso.oggetti || []).slice(0, 3).map((n) => (
             <span key={n} style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-head)" }}>{n}</span>
           ))}
           {percorso.oggetti?.length > 3 && <span style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid rgba(92,191,128,0.18)", padding: "3px 9px", borderRadius: 2, fontSize: 9, letterSpacing: "0.14em", fontFamily: "var(--font-head)" }}>+{percorso.oggetti.length - 3}</span>}
         </div>
       </div>
-      <div style={{ padding: "10px 22px 18px" }}>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ padding: "10px 22px 18px", marginTop: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           <button
             onClick={() => onView?.(percorso)}
             disabled={!canView}
             style={{
-              flex: 1,
-            padding: "8px 10px",
-            background: "transparent",
-            border: `1px solid ${canView ? "var(--border)" : "rgba(255,255,255,0.08)"}`,
-            borderRadius: "var(--radius)",
-            cursor: canView ? "pointer" : "not-allowed",
-            fontFamily: "var(--font-head)",
-            fontSize: 9,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color: canView ? "var(--green)" : "var(--text-faint)",
-            transition: "all 0.2s",
-            opacity: canView ? 1 : 0.7,
-          }}
+              ...btnBase,
+              background: "transparent",
+              border: `1px solid ${canView ? "var(--border)" : "rgba(255,255,255,0.08)"}`,
+              cursor: canView ? "pointer" : "not-allowed",
+              color: canView ? "var(--green)" : "var(--text-faint)",
+              opacity: canView ? 1 : 0.7,
+            }}
           >
             {mp("view")}
           </button>
@@ -270,45 +280,34 @@ function VisitCard({ percorso, canView, onView, onStart, onBuy, buying, delay, m
             onClick={() => onStart?.(percorso)}
             disabled={!canStart}
             style={{
-              flex: 1,
-              padding: "8px 10px",
+              ...btnBase,
               background: canStart ? "var(--green)" : "transparent",
               border: `1px solid ${canStart ? "var(--green)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius: "var(--radius)",
               cursor: canStart ? "pointer" : "not-allowed",
-              fontFamily: "var(--font-head)",
-              fontSize: 9,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
               color: canStart ? "#0d0d0d" : "var(--text-faint)",
-              transition: "all 0.2s",
               opacity: canStart ? 1 : 0.7,
             }}
           >
             {mp("startRoute")}
           </button>
-          {!included && !canView && (
-            <button
-              onClick={() => onBuy?.(percorso)}
-              disabled={disabled}
-              style={{
-                flex: 1,
-                padding: "8px 10px",
-                background: "var(--green-dim)",
-                border: "1px solid rgba(92,191,128,0.3)",
-                borderRadius: "var(--radius)",
-                cursor: disabled ? "not-allowed" : "pointer",
-                fontFamily: "var(--font-head)",
-                fontSize: 9,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--green)",
-                opacity: disabled ? 0.7 : 1,
-              }}
-            >
-              {buying ? mp("buying") : mp("buy")}
-            </button>
-          )}
+          <button
+            onClick={() => showBuy && onBuy?.(percorso)}
+            disabled={!showBuy || disabled}
+            aria-hidden={!showBuy}
+            tabIndex={showBuy ? 0 : -1}
+            style={{
+              ...btnBase,
+              background: "var(--green-dim)",
+              border: "1px solid rgba(92,191,128,0.3)",
+              cursor: showBuy && !disabled ? "pointer" : "not-allowed",
+              color: "var(--green)",
+              opacity: showBuy ? (disabled ? 0.7 : 1) : 0,
+              visibility: showBuy ? "visible" : "hidden",
+              pointerEvents: showBuy ? "auto" : "none",
+            }}
+          >
+            {buying ? mp("buying") : mp("buy")}
+          </button>
         </div>
       </div>
     </div>
@@ -423,7 +422,7 @@ export default function App() {
   const [objectPurchaseRequests, setObjectPurchaseRequests] = useState([]);
   const [loadingObjectRequests, setLoadingObjectRequests] = useState(false);
   const [requestingObjectName, setRequestingObjectName] = useState(null);
-  const [fixedObjectPrice, setFixedObjectPrice] = useState(0);
+  const [pathPurchaseConfirm, setPathPurchaseConfirm] = useState(null);
   const [stanze,       setStanze]       = useState([]);
   const [search,       setSearch]       = useState("");
   const [stanzaFilter, setStanzaFilter] = useState("");
@@ -581,7 +580,6 @@ export default function App() {
     try {
       const data = await api(`/users/me/oggetti/richieste?museo=${enc(MUSEO)}`, { credentials: "include" });
       setObjectPurchaseRequests(Array.isArray(data.richieste) ? data.richieste : []);
-      setFixedObjectPrice(Number(data.prezzoFisso || 0));
     } catch (e) {
       setObjectPurchaseRequests([]);
       showToast("Errore caricamento richieste oggetti: " + e.message, "error");
@@ -1192,12 +1190,19 @@ export default function App() {
     return { label: mp("requestRejected"), disabled: false };
   }, [latestObjectRequestByName, makeObjectRequestKey, mp]);
 
-  const buyPath = async (percorso) => {
+  const requestBuyPath = (percorso) => {
     if (!percorso?.nome) return;
     if (canAccessPath(percorso)) {
       showToast("Percorso gia disponibile");
       return;
     }
+    setPathPurchaseConfirm(percorso);
+  };
+
+  const confirmBuyPath = async () => {
+    const percorso = pathPurchaseConfirm;
+    if (!percorso?.nome) return;
+    setPathPurchaseConfirm(null);
     setBuyingPath(percorso.nome);
     try {
       await api("/users/me/percorsi/acquista", {
@@ -1206,9 +1211,9 @@ export default function App() {
         body: JSON.stringify({ museo: MUSEO, percorso: percorso.nome }),
       });
       setPurchasedKeys((prev) => new Set([...prev, makePurchaseKey(percorso)]));
-      showToast(`Percorso "${percorso.nome}" acquistato`);
+      showToast(mp("pathPurchaseSuccess").replace("{name}", displayPercorsoNome(percorso.nome) || percorso.nome));
     } catch (e) {
-      showToast("Errore acquisto percorso: " + e.message, "error");
+      showToast(`${mp("pathPurchaseError")} ${e.message}`, "error");
     } finally {
       setBuyingPath(null);
     }
@@ -1532,7 +1537,7 @@ export default function App() {
                       onRequestPurchase={requestObjectPurchase}
                       purchaseLabel={isBusy && requestingObjectName === requestKey ? mp("requestSending") : requestUi.label}
                       purchaseDisabled={isBusy || requestUi.disabled}
-                      fixedPriceLabel={formatFixedEuro(fixedObjectPrice)}
+                      priceLabel={formatEuroAmount(o.prezzo)}
                     />
                       );
                     })()
@@ -1632,7 +1637,7 @@ export default function App() {
                       canView={canAccessPath(p)}
                       onView={openPathDetails}
                       onStart={startNavigatorForRoute}
-                      onBuy={buyPath}
+                      onBuy={requestBuyPath}
                       buying={buyingPath === p.nome}
                       delay={i * 0.06}
                       mp={mp}
@@ -1784,6 +1789,7 @@ export default function App() {
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("artMovement")}</strong> {selectedItem.correnteArtistica || mp("nd")}</p>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7, overflowWrap: "anywhere" }}><strong style={{ color: "var(--text)" }}>{mp("license")}</strong> {selectedItem.licenza || mp("nd")}</p>
                     <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("year")}</strong> {selectedItem.anno || mp("nd")}</p>
+                    <p style={{ color: "var(--text-dim)", fontSize: 14, lineHeight: 1.7 }}><strong style={{ color: "var(--text)" }}>{mp("price")}</strong> <span style={{ color: "var(--green)" }}>{formatEuroAmount(selectedItem.prezzo)}</span></p>
                   </div>
                 </div>
               )}
@@ -2179,6 +2185,54 @@ export default function App() {
             {teacherDashboardLink && (
               <input readOnly value={teacherDashboardLink} style={{ width: "100%", marginTop: 8, padding: "10px 12px", background: "#111", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-dim)" }} />
             )}
+          </div>
+        </div>
+      )}
+
+      {pathPurchaseConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="path-purchase-confirm-title"
+          onClick={(e) => { if (e.target === e.currentTarget && !buyingPath) setPathPurchaseConfirm(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(10,9,7,.92)", backdropFilter: "blur(10px)", zIndex: 735, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div style={{ width: isMobile ? "min(520px, 100%)" : "min(520px, 92vw)", background: "var(--bg-panel)", border: "1px solid rgba(92,191,128,0.35)", borderRadius: 14, padding: isMobile ? "18px 14px" : "22px 20px", position: "relative", boxShadow: "0 24px 80px rgba(0,0,0,0.55)" }}>
+            <button
+              type="button"
+              onClick={() => !buyingPath && setPathPurchaseConfirm(null)}
+              disabled={!!buyingPath}
+              style={{ position: "absolute", top: 10, right: 10, width: 30, height: 30, border: "none", background: "transparent", color: "var(--text-dim)", cursor: buyingPath ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1 }}
+            >
+              ×
+            </button>
+            <p style={{ margin: "0 0 6px", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--green)", fontFamily: "var(--font-head)" }}>{mp("pathPurchaseConfirmTitle")}</p>
+            <h3 id="path-purchase-confirm-title" style={{ margin: "0 0 12px", fontFamily: "var(--font-head)", fontWeight: 400, fontSize: isMobile ? 20 : 24 }}>
+              {displayPercorsoNome(pathPurchaseConfirm.nome) || pathPurchaseConfirm.nome}
+            </h3>
+            <p style={{ margin: "0 0 18px", color: "var(--text-dim)", fontSize: 13, lineHeight: 1.75 }}>
+              {mp("pathPurchaseConfirmBody")
+                .replace("{name}", displayPercorsoNome(pathPurchaseConfirm.nome) || pathPurchaseConfirm.nome)
+                .replace("{price}", formatPrezzo(pathPurchaseConfirm.prezzo, mp))}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setPathPurchaseConfirm(null)}
+                disabled={!!buyingPath}
+                style={{ padding: "9px 14px", border: "1px solid var(--border)", borderRadius: 8, background: "transparent", color: "var(--text-dim)", cursor: buyingPath ? "not-allowed" : "pointer", opacity: buyingPath ? 0.7 : 1 }}
+              >
+                {mp("pathPurchaseCancel")}
+              </button>
+              <button
+                type="button"
+                onClick={confirmBuyPath}
+                disabled={!!buyingPath}
+                style={{ padding: "9px 14px", border: "1px solid var(--green)", borderRadius: 8, background: "var(--green)", color: "#0d0d0d", cursor: buyingPath ? "not-allowed" : "pointer", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", opacity: buyingPath ? 0.7 : 1 }}
+              >
+                {buyingPath === pathPurchaseConfirm.nome ? mp("buying") : mp("pathPurchaseConfirm")}
+              </button>
+            </div>
           </div>
         </div>
       )}

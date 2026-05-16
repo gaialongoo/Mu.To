@@ -92,7 +92,8 @@
           "autore": "Banksy",
           "licenza": "",
           "correnteArtistica": "Street Art",
-          "anno": "2002"
+          "anno": "2002",
+          "prezzo": 38500
         },
         {
           "nome": "Love Is in the Air",
@@ -179,7 +180,8 @@
           "autore": "Banksy",
           "licenza": "",
           "correnteArtistica": "Street Art",
-          "anno": "2003"
+          "anno": "2003",
+          "prezzo": 34200
         },
         {
           "nome": "Laugh Now",
@@ -266,7 +268,8 @@
           "autore": "Banksy",
           "licenza": "",
           "correnteArtistica": "Street Art",
-          "anno": "2002"
+          "anno": "2002",
+          "prezzo": 22800
         },
         {
           "nome": "Campbell's Soup Cans",
@@ -353,7 +356,8 @@
           "autore": "Andy Warhol",
           "licenza": "",
           "correnteArtistica": "Pop Art",
-          "anno": "1962"
+          "anno": "1962",
+          "prezzo": 19500
         },
         {
           "nome": "Radiant Baby",
@@ -440,7 +444,8 @@
           "autore": "Keith Haring",
           "licenza": "",
           "correnteArtistica": "Pop Art",
-          "anno": "1990"
+          "anno": "1990",
+          "prezzo": 9800
         },
         {
           "nome": "Companion",
@@ -527,7 +532,8 @@
           "autore": "KAWS",
           "licenza": "",
           "correnteArtistica": "Neo-Pop",
-          "anno": "1999"
+          "anno": "1999",
+          "prezzo": 15200
         },
         {
           "nome": "Pivot",
@@ -613,7 +619,8 @@
           "autore": "Robbie Williams",
           "licenza": "",
           "correnteArtistica": "Arte Contemporanea",
-          "anno": "2022"
+          "anno": "2022",
+          "prezzo": 4200
         },
         {
           "nome": "Untitled (Skull)",
@@ -699,7 +706,8 @@
           "autore": "Jean-Michel Basquiat",
           "licenza": "",
           "correnteArtistica": "Neo-Espressionismo",
-          "anno": "1981"
+          "anno": "1981",
+          "prezzo": 32000
         },
         {
           "nome": "Infinity Mirror Room",
@@ -870,7 +878,8 @@
           "autore": "Banksy",
           "licenza": "",
           "correnteArtistica": "Street Art",
-          "anno": "2009"
+          "anno": "2009",
+          "prezzo": 26500
         },
         {
           "nome": "Barcode",
@@ -957,7 +966,8 @@
           "autore": "Banksy",
           "licenza": "",
           "correnteArtistica": "Street Art",
-          "anno": "2004"
+          "anno": "2004",
+          "prezzo": 18900
         }
       ],
       "percorsi": [
@@ -1113,7 +1123,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1400 a.C."
+          "anno": "1400 a.C.",
+          "prezzo": 4800
         },
         {
           "nome": "Amuleti protettivi",
@@ -1200,7 +1211,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia",
-          "anno": "1000 a.C."
+          "anno": "1000 a.C.",
+          "prezzo": 2200
         },
         {
           "nome": "Papiri amministrativi",
@@ -1287,7 +1299,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1200 a.C."
+          "anno": "1200 a.C.",
+          "prezzo": 3500
         },
         {
           "nome": "Scettro faraonico",
@@ -1374,7 +1387,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1300 a.C."
+          "anno": "1300 a.C.",
+          "prezzo": 8900
         },
         {
           "nome": "Statue di faraoni",
@@ -1461,7 +1475,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1250 a.C."
+          "anno": "1250 a.C.",
+          "prezzo": 12500
         },
         {
           "nome": "Tavole rituali",
@@ -1548,7 +1563,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1100 a.C."
+          "anno": "1100 a.C.",
+          "prezzo": 4200
         },
         {
           "nome": "Mummia umana",
@@ -1635,7 +1651,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia",
-          "anno": "1000 a.C."
+          "anno": "1000 a.C.",
+          "prezzo": 18500
         },
         {
           "nome": "Mummie animali",
@@ -1722,7 +1739,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Periodo Tolemaico",
-          "anno": "300 a.C."
+          "anno": "300 a.C.",
+          "prezzo": 6200
         },
         {
           "nome": "Libro dei Morti",
@@ -1809,7 +1827,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1275 a.C."
+          "anno": "1275 a.C.",
+          "prezzo": 7800
         },
         {
           "nome": "Maschera funeraria",
@@ -1896,7 +1915,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Terzo Periodo Intermedio",
-          "anno": "900 a.C."
+          "anno": "900 a.C.",
+          "prezzo": 11200
         },
         {
           "nome": "Collari funerari",
@@ -1983,7 +2003,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1350 a.C."
+          "anno": "1350 a.C.",
+          "prezzo": 5400
         },
         {
           "nome": "Oggetti di protezione",
@@ -2070,7 +2091,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia",
-          "anno": "1200 a.C."
+          "anno": "1200 a.C.",
+          "prezzo": 2800
         },
         {
           "nome": "Sarcofago decorato",
@@ -2157,7 +2179,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Terzo Periodo Intermedio",
-          "anno": "1000 a.C."
+          "anno": "1000 a.C.",
+          "prezzo": 16800
         },
         {
           "nome": "Vasi canopi",
@@ -2244,7 +2267,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1250 a.C."
+          "anno": "1250 a.C.",
+          "prezzo": 7200
         },
         {
           "nome": "Corredo funerario",
@@ -2331,7 +2355,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1400 a.C."
+          "anno": "1400 a.C.",
+          "prezzo": 6500
         },
         {
           "nome": "Scettri rituali",
@@ -2418,7 +2443,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Nuovo Regno",
-          "anno": "1500 a.C."
+          "anno": "1500 a.C.",
+          "prezzo": 8200
         },
         {
           "nome": "Simboli di Maat",
@@ -2505,7 +2531,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia",
-          "anno": "1300 a.C."
+          "anno": "1300 a.C.",
+          "prezzo": 3100
         },
         {
           "nome": "Statue di divinità",
@@ -2592,7 +2619,8 @@
           "autore": "",
           "licenza": "",
           "correnteArtistica": "Arte Egizia - Periodo Tardo",
-          "anno": "700 a.C."
+          "anno": "700 a.C.",
+          "prezzo": 9400
         }
       ],
       "percorsi": [
@@ -2759,7 +2787,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Gotico-pop / Cinema fantastico",
-          "anno": "1988"
+          "anno": "1988",
+          "prezzo": 4200
         },
         {
           "nome": "Batman",
@@ -2846,7 +2875,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Gotico-pop / Blockbuster d'autore",
-          "anno": "1989"
+          "anno": "1989",
+          "prezzo": 8900
         },
         {
           "nome": "Edward Scissorhands",
@@ -2933,7 +2963,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Gotico romantico / Cinema d'autore",
-          "anno": "1990"
+          "anno": "1990",
+          "prezzo": 7800
         },
         {
           "nome": "Ed Wood",
@@ -3020,7 +3051,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Biopic d'autore / Cinema indipendente",
-          "anno": "1994"
+          "anno": "1994",
+          "prezzo": 3500
         },
         {
           "nome": "Big Fish",
@@ -3107,7 +3139,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Realismo magico / Cinema d'autore",
-          "anno": "2003"
+          "anno": "2003",
+          "prezzo": 4800
         },
         {
           "nome": "Sleepy Hollow",
@@ -3194,7 +3227,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Horror gotico / Cinema d'autore",
-          "anno": "1999"
+          "anno": "1999",
+          "prezzo": 5200
         },
         {
           "nome": "Sweeney Todd",
@@ -3281,7 +3315,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Musical gotico / Cinema d'autore",
-          "anno": "2007"
+          "anno": "2007",
+          "prezzo": 5800
         },
         {
           "nome": "The Nightmare Before Christmas",
@@ -3368,7 +3403,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Animazione stop-motion / Musical gotico",
-          "anno": "1993"
+          "anno": "1993",
+          "prezzo": 7200
         },
         {
           "nome": "Corpse Bride",
@@ -3455,7 +3491,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Animazione stop-motion / Gotico romantico",
-          "anno": "2005"
+          "anno": "2005",
+          "prezzo": 6400
         },
         {
           "nome": "Frankenweenie",
@@ -3542,7 +3579,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Animazione stop-motion / Horror classico",
-          "anno": "2012"
+          "anno": "2012",
+          "prezzo": 4500
         },
         {
           "nome": "Charlie and the Chocolate Factory",
@@ -3629,7 +3667,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Cinema fantastico / Adattamento letterario",
-          "anno": "2005"
+          "anno": "2005",
+          "prezzo": 5500
         },
         {
           "nome": "Alice in Wonderland",
@@ -3716,7 +3755,8 @@
           "autore": "Tim Burton",
           "licenza": "",
           "correnteArtistica": "Cinema fantastico / Blockbuster d'autore",
-          "anno": "2010"
+          "anno": "2010",
+          "prezzo": 9200
         }
       ],
       "percorsi": [
