@@ -177,7 +177,9 @@
         "h": 150,
         "tipo": "ingresso",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 1": {
         "x": 430,
@@ -186,7 +188,9 @@
         "h": 200,
         "tipo": "normale",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 2": {
         "x": 430,
@@ -195,7 +199,9 @@
         "h": 200,
         "tipo": "normale",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 3": {
         "x": 38.20001220703125,
@@ -204,7 +210,9 @@
         "h": 220,
         "tipo": "normale",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "WC": {
         "x": 794,
@@ -212,8 +220,10 @@
         "w": 180,
         "h": 160,
         "tipo": "bagno",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Moco%20museum/stanze/WC/immagini/preview?v=1779114074580",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 4": {
         "x": 399.58331298828125,
@@ -222,7 +232,9 @@
         "h": 250,
         "tipo": "normale",
         "bgImage": "/api/musei/Moco%20museum/stanze/stanza%204/immagini/preview?v=1778749943826",
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 5": {
         "x": 422.0999755859375,
@@ -231,7 +243,9 @@
         "h": 200,
         "tipo": "normale",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "SHOP": {
         "x": 145.10000610351562,
@@ -239,8 +253,10 @@
         "w": 200,
         "h": 160,
         "tipo": "servizio",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Moco%20museum/stanze/SHOP/immagini/preview?v=1779114377964",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "OUT": {
         "x": 445.0999755859375,
@@ -249,7 +265,9 @@
         "h": 160,
         "tipo": "uscita",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       }
     },
     "labelI18n": {
@@ -657,7 +675,7 @@
         "w": 240,
         "h": 190,
         "tipo": "servizio",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/SHOP/immagini/preview?v=1779114347720",
         "bgTipo": "preview",
         "labelX": 0.5,
         "labelY": 0.09
@@ -905,7 +923,7 @@
         "x": 208.33334350585938,
         "y": 1548.0667724609375,
         "w": 40,
-        "h": 85.3831787109375,
+        "h": 79.4034423828125,
         "aDoor": {
           "side": "S",
           "offset": 0.5
@@ -918,9 +936,9 @@
       {
         "a": "SHOP",
         "b": "OUT",
-        "x": 327.3333435058594,
-        "y": 1693.449951171875,
-        "w": 167.99996948242188,
+        "x": 331.19261169433594,
+        "y": 1687.47021484375,
+        "w": 164.1407012939453,
         "h": 40,
         "aDoor": {
           "side": "E",
@@ -1022,12 +1040,12 @@
         "labelY": 0.05
       },
       "SHOP": {
-        "x": 127.33334350585938,
-        "y": 1633.449951171875,
+        "x": 131.19261169433594,
+        "y": 1627.47021484375,
         "w": 200,
         "h": 160,
         "tipo": "servizio",
-        "bgImage": null,
+        "bgImage": "/api/musei/Museo%20Egizio%20di%20Torino/stanze/SHOP/immagini/preview?v=1779114285952",
         "bgTipo": "preview",
         "labelX": 0.5,
         "labelY": 0.09
