@@ -294,15 +294,56 @@ function inferDoorFromCorridorRect(room, corr, otherRoom = null) {
   return [room.x + room.w, y];
 }
 
+function clampBetween(lo, hi, v) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function corridorLaneCoord(corr, fromDoor, toDoor, axis) {
+  const isY = axis === "y";
+  const c0 = isY ? corr.y : corr.x;
+  const c1 = isY ? corr.y + corr.h : corr.x + corr.w;
+  if (c1 <= c0) return isY ? fromDoor[1] : fromDoor[0];
+
+  const d0 = isY ? fromDoor[1] : fromDoor[0];
+  const d1 = isY ? toDoor[1] : toDoor[0];
+  const inside = [d0, d1].filter((d) => d >= c0 && d <= c1);
+  if (inside.length === 1) return inside[0];
+  if (inside.length === 2) return (inside[0] + inside[1]) / 2;
+
+  const nearestEdge = (d) => (Math.abs(d - c0) <= Math.abs(d - c1) ? c0 : c1);
+  const e0 = nearestEdge(d0);
+  const e1 = nearestEdge(d1);
+  if (e0 === e1) return e0;
+  return clampBetween(c0, c1, (d0 + d1) / 2);
+}
+
+function pointsNear(a, b, eps = 0.5) {
+  if (!a || !b) return false;
+  return Math.hypot(a[0] - b[0], a[1] - b[1]) < eps;
+}
+
 function corridorTransitPoints(corr, fromDoor, toDoor) {
   if (!corr || !fromDoor || !toDoor) return [];
-  // Evita percorsi diagonali nel corridoio quando e' decentrato.
-  if ((corr.w || 0) >= (corr.h || 0)) {
-    const y = corr.y + corr.h / 2;
-    return [[fromDoor[0], y], [toDoor[0], y]];
+  if (pointsNear(fromDoor, toDoor)) return [];
+
+  const horizontal = (corr.w || 0) >= (corr.h || 0);
+  const out = [];
+  if (horizontal) {
+    const y = corridorLaneCoord(corr, fromDoor, toDoor, "y");
+    const midA = [fromDoor[0], y];
+    const midB = [toDoor[0], y];
+    if (!pointsNear(fromDoor, midA)) out.push(midA);
+    if (!pointsNear(midA, midB)) out.push(midB);
+    if (!pointsNear(midB, toDoor)) out.push([...toDoor]);
+  } else {
+    const x = corridorLaneCoord(corr, fromDoor, toDoor, "x");
+    const midA = [x, fromDoor[1]];
+    const midB = [x, toDoor[1]];
+    if (!pointsNear(fromDoor, midA)) out.push(midA);
+    if (!pointsNear(midA, midB)) out.push(midB);
+    if (!pointsNear(midB, toDoor)) out.push([...toDoor]);
   }
-  const x = corr.x + corr.w / 2;
-  return [[x, fromDoor[1]], [x, toDoor[1]]];
+  return out;
 }
 
 function roomTransitPoints(room, inDoor, outDoor) {
@@ -312,10 +353,8 @@ function roomTransitPoints(room, inDoor, outDoor) {
   const bendA = [inDoor[0], outDoor[1]];
   const bendB = [outDoor[0], inDoor[1]];
   const center = [room.x + room.w / 2, room.y + room.h / 2];
-  const distA =
-    Math.abs(bendA[0] - center[0]) + Math.abs(bendA[1] - center[1]);
-  const distB =
-    Math.abs(bendB[0] - center[0]) + Math.abs(bendB[1] - center[1]);
+  const distA = Math.abs(bendA[0] - center[0]) + Math.abs(bendA[1] - center[1]);
+  const distB = Math.abs(bendB[0] - center[0]) + Math.abs(bendB[1] - center[1]);
   const bend = distA <= distB ? bendA : bendB;
 
   return [bend, outDoor];

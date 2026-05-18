@@ -398,84 +398,274 @@ function useLayout(stanze, oggetti, corridoiCfg = []) {
   return { roomPos, corridors, objPos, svgW, svgH, svgMinX: bounds.minX, svgMinY: bounds.minY };
 }
 
-// ─── ROUTING BFS ───────────────────────────────────────────────────────────
+// Routing portato da navigator/map-creator/js_server/svg_writer.js
+
+function hasNumericOffset(door) {
+  return typeof door?.offset === "number" && !Number.isNaN(door.offset);
+}
+
+function legacyPorte(room) {
+  return {
+    N: [room.x + room.w / 2, room.y],
+    S: [room.x + room.w / 2, room.y + room.h],
+    W: [room.x, room.y + room.h / 2],
+    E: [room.x + room.w, room.y + room.h / 2],
+  };
+}
+
+function inferLegacySide(fromRoom, toRoom) {
+  const hasGrid =
+    typeof fromRoom.col === "number" &&
+    typeof toRoom.col === "number" &&
+    typeof fromRoom.row === "number" &&
+    typeof toRoom.row === "number";
+  const gridDiscriminates = hasGrid && (toRoom.col !== fromRoom.col || toRoom.row !== fromRoom.row);
+  if (gridDiscriminates) {
+    if (toRoom.col > fromRoom.col) return "E";
+    if (toRoom.col < fromRoom.col) return "W";
+    if (toRoom.row > fromRoom.row) return "S";
+    return "N";
+  }
+  const dx = (toRoom.x + toRoom.w / 2) - (fromRoom.x + fromRoom.w / 2);
+  const dy = (toRoom.y + toRoom.h / 2) - (fromRoom.y + fromRoom.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "E" : "W";
+  return dy >= 0 ? "S" : "N";
+}
+
+function inferDoorFromCorridorRect(room, corr, otherRoom = null) {
+  if (!room || !corr) return null;
+  const rx0 = room.x, rx1 = room.x + room.w;
+  const ry0 = room.y, ry1 = room.y + room.h;
+  const cx0 = corr.x, cx1 = corr.x + corr.w;
+  const cy0 = corr.y, cy1 = corr.y + corr.h;
+  const ox = Math.max(0, Math.min(rx1, cx1) - Math.max(rx0, cx0));
+  const oy = Math.max(0, Math.min(ry1, cy1) - Math.max(ry0, cy0));
+
+  if (ox > 0 && oy > 0 && otherRoom) {
+    const side = inferLegacySide(room, otherRoom);
+    if (side === "N" || side === "S") {
+      const x = Math.max(rx0, cx0) + ox / 2;
+      return [x, side === "N" ? ry0 : ry1];
+    }
+    const y = Math.max(ry0, cy0) + oy / 2;
+    return [side === "W" ? rx0 : rx1, y];
+  }
+
+  const PENALTY = 1e6;
+  const dN = Math.abs(cy1 - ry0) + (ox > 0 ? 0 : PENALTY);
+  const dS = Math.abs(cy0 - ry1) + (ox > 0 ? 0 : PENALTY);
+  const dW = Math.abs(cx1 - rx0) + (oy > 0 ? 0 : PENALTY);
+  const dE = Math.abs(cx0 - rx1) + (oy > 0 ? 0 : PENALTY);
+  const m = Math.min(dN, dS, dW, dE);
+  if (m === dN) {
+    const x = ox > 0 ? (Math.max(rx0, cx0) + Math.min(rx1, cx1)) / 2 : (cx0 + cx1) / 2;
+    return [x, room.y];
+  }
+  if (m === dS) {
+    const x = ox > 0 ? (Math.max(rx0, cx0) + Math.min(rx1, cx1)) / 2 : (cx0 + cx1) / 2;
+    return [x, room.y + room.h];
+  }
+  if (m === dW) {
+    const y = oy > 0 ? (Math.max(ry0, cy0) + Math.min(ry1, cy1)) / 2 : (cy0 + cy1) / 2;
+    return [room.x, y];
+  }
+  const y = oy > 0 ? (Math.max(ry0, cy0) + Math.min(ry1, cy1)) / 2 : (cy0 + cy1) / 2;
+  return [room.x + room.w, y];
+}
+
+function resolveDoorPoint(room, otherRoom, corr, roomName, otherName) {
+  if (!room || !otherRoom) return null;
+  const hasGeom =
+    corr &&
+    typeof corr.x === "number" &&
+    typeof corr.y === "number" &&
+    typeof corr.w === "number" &&
+    typeof corr.h === "number";
+
+  if (roomName && otherName && corr) {
+    const doorCfg = corr.a === roomName ? corr.aDoor : corr.b === roomName ? corr.bDoor : null;
+    if (doorCfg?.side && hasNumericOffset(doorCfg)) {
+      return doorPoint(room, doorCfg, doorCfg.side);
+    }
+  }
+
+  if (hasGeom) {
+    const geom = inferDoorFromCorridorRect(room, corr, otherRoom);
+    if (geom) return geom;
+  }
+
+  if (roomName && otherName && corr) {
+    const doorCfg = corr.a === roomName ? corr.aDoor : corr.b === roomName ? corr.bDoor : null;
+    if (doorCfg?.side) return doorPoint(room, doorCfg, doorCfg.side);
+  }
+
+  return legacyPorte(room)[inferLegacySide(room, otherRoom)];
+}
+
+function pointsNear(a, b, eps = 0.5) {
+  if (!a || !b) return false;
+  return Math.hypot(a[0] - b[0], a[1] - b[1]) < eps;
+}
+
+function pushPathPoint(pts, p) {
+  if (!p) return;
+  const last = pts[pts.length - 1];
+  if (last && last[0] === p[0] && last[1] === p[1]) return;
+  pts.push([p[0], p[1]]);
+}
+
+function pathFromPoints(pts) {
+  if (!pts || pts.length < 2) return "";
+  const parts = [`M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`];
+  for (let i = 1; i < pts.length; i++) {
+    parts.push(`L ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`);
+  }
+  return parts.join(" ");
+}
+
+function stanzaForRouting(nome, stanze, roomPos) {
+  const s = stanze.find((x) => x.nome === nome);
+  const p = roomPos[nome];
+  if (!s || !p) return null;
+  return { ...s, x: p.x, y: p.y, w: p.w, h: p.h, nome };
+}
+
+function corridoioForRouting(stanze, corr) {
+  if (!corr) return corr;
+  const hasGeom =
+    typeof corr.x === "number" &&
+    typeof corr.y === "number" &&
+    typeof corr.w === "number" &&
+    typeof corr.h === "number";
+  return hasGeom ? corr : withResolvedCorridoioGeom(stanze, corr);
+}
+
 function routedPath(fromRoom, toRoom, fromPos, toPos, stanze, corridors, roomPos) {
   if (!fromPos || !toPos) return null;
-  if (fromRoom === toRoom)
-    return `M ${fromPos[0].toFixed(1)} ${fromPos[1].toFixed(1)} L ${toPos[0].toFixed(1)} ${toPos[1].toFixed(1)}`;
+  if (fromRoom === toRoom) return pathFromPoints([fromPos, toPos]);
+
   const adj = {};
   for (const s of stanze) adj[s.nome] = [];
   for (const c of corridors) {
-    (adj[c.a] = adj[c.a]||[]).push({ to: c.b, corr: c });
-    (adj[c.b] = adj[c.b]||[]).push({ to: c.a, corr: c });
+    (adj[c.a] = adj[c.a] || []).push({ to: c.b, corr: c });
+    (adj[c.b] = adj[c.b] || []).push({ to: c.a, corr: c });
   }
-  const prev = { [fromRoom]: null }, edgeUsed = {}, queue = [fromRoom];
+
+  const prev = { [fromRoom]: null };
+  const edgeUsed = {};
+  const queue = [fromRoom];
   while (queue.length) {
     const cur = queue.shift();
     if (cur === toRoom) break;
-    for (const { to, corr } of (adj[cur] || []))
-      if (!(to in prev)) { prev[to] = cur; edgeUsed[to] = corr; queue.push(to); }
+    for (const { to, corr } of adj[cur] || []) {
+      if (!(to in prev)) {
+        prev[to] = cur;
+        edgeUsed[to] = corr;
+        queue.push(to);
+      }
+    }
   }
-  if (!(toRoom in prev))
-    return `M ${fromPos[0].toFixed(1)} ${fromPos[1].toFixed(1)} L ${toPos[0].toFixed(1)} ${toPos[1].toFixed(1)}`;
+
+  if (!(toRoom in prev)) return pathFromPoints([fromPos, toPos]);
+
   const roomPath = [];
   let cur = toRoom;
-  while (cur != null) { roomPath.push(cur); cur = prev[cur]; }
-  roomPath.reverse();
-  const pts = [[...fromPos]];
-  for (let i = 0; i < roomPath.length - 1; i++) {
-    const A = roomPath[i], B = roomPath[i+1];
-    const corr = edgeUsed[B];
-    const pA = roomPos[A], pB = roomPos[B];
-    let exitA, enterB;
-    // usa porte corridoio se presenti
-    if (corr?.pA && corr?.pB) {
-      if (corr.a === A && corr.b === B) {
-        exitA = corr.pA;
-        enterB = corr.pB;
-      } else {
-        exitA = corr.pB;
-        enterB = corr.pA;
-      }
-    } else {
-      if      (pB.x > pA.x) { exitA=[pA.x+pA.w, pA.y+pA.h/2]; enterB=[pB.x,        pB.y+pB.h/2]; }
-      else if (pB.x < pA.x) { exitA=[pA.x,      pA.y+pA.h/2]; enterB=[pB.x+pB.w,   pB.y+pB.h/2]; }
-      else if (pB.y > pA.y) { exitA=[pA.x+pA.w/2,pA.y+pA.h];  enterB=[pB.x+pB.w/2, pB.y];        }
-      else                   { exitA=[pA.x+pA.w/2,pA.y];      enterB=[pB.x+pB.w/2, pB.y+pB.h];    }
-    }
-    pts.push(exitA, ...corridorTransitPoints(corr, exitA, enterB), enterB);
+  while (cur != null) {
+    roomPath.push(cur);
+    cur = prev[cur];
   }
-  pts.push([...toPos]);
-  return smoothPath(pts);
+  roomPath.reverse();
+
+  const pts = [[...fromPos]];
+
+  for (let i = 0; i < roomPath.length - 1; i++) {
+    const A = roomPath[i];
+    const B = roomPath[i + 1];
+    const corr = corridoioForRouting(stanze, edgeUsed[B]);
+    const roomA = stanzaForRouting(A, stanze, roomPos);
+    const roomB = stanzaForRouting(B, stanze, roomPos);
+    if (!roomA || !roomB || !corr) continue;
+
+    const fromDoor = resolveDoorPoint(roomA, roomB, corr, A, B);
+    pushPathPoint(pts, fromDoor);
+
+    const toDoor = resolveDoorPoint(roomB, roomA, corr, B, A);
+    for (const p of corridorTransitPoints(corr, fromDoor, toDoor)) pushPathPoint(pts, p);
+    pushPathPoint(pts, toDoor);
+
+    if (i + 1 < roomPath.length - 1) {
+      const C = roomPath[i + 2];
+      const roomC = stanzaForRouting(C, stanze, roomPos);
+      const nextCorr = corridoioForRouting(stanze, edgeUsed[C]);
+      const nextFromDoor = resolveDoorPoint(roomB, roomC, nextCorr, B, C);
+      for (const p of roomTransitPoints(roomB, toDoor, nextFromDoor)) pushPathPoint(pts, p);
+    }
+  }
+
+  pushPathPoint(pts, toPos);
+  return pathFromPoints(pts);
+}
+
+function clampBetween(lo, hi, v) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+/** Coordinata lungo l'asse del corridoio allineata alle porte (non al centro del bbox). */
+function corridorLaneCoord(corr, fromDoor, toDoor, axis) {
+  const isY = axis === "y";
+  const c0 = isY ? corr.y : corr.x;
+  const c1 = isY ? corr.y + corr.h : corr.x + corr.w;
+  if (c1 <= c0) return isY ? fromDoor[1] : fromDoor[0];
+
+  const d0 = isY ? fromDoor[1] : fromDoor[0];
+  const d1 = isY ? toDoor[1] : toDoor[0];
+  const inside = [d0, d1].filter((d) => d >= c0 && d <= c1);
+  if (inside.length === 1) return inside[0];
+  if (inside.length === 2) return (inside[0] + inside[1]) / 2;
+
+  const nearestEdge = (d) => (Math.abs(d - c0) <= Math.abs(d - c1) ? c0 : c1);
+  const e0 = nearestEdge(d0);
+  const e1 = nearestEdge(d1);
+  if (e0 === e1) return e0;
+  return clampBetween(c0, c1, (d0 + d1) / 2);
 }
 
 function corridorTransitPoints(corr, fromDoor, toDoor) {
   if (!corr || !fromDoor || !toDoor) return [];
-  // Evita scorciatoie diagonali: attraversa il corridoio lungo il suo asse.
-  if ((corr.w || 0) >= (corr.h || 0)) {
-    const y = corr.y + corr.h / 2;
-    return [[fromDoor[0], y], [toDoor[0], y]];
+  if (pointsNear(fromDoor, toDoor)) return [];
+
+  const horizontal = (corr.w || 0) >= (corr.h || 0);
+  const out = [];
+  if (horizontal) {
+    const y = corridorLaneCoord(corr, fromDoor, toDoor, "y");
+    const midA = [fromDoor[0], y];
+    const midB = [toDoor[0], y];
+    if (!pointsNear(fromDoor, midA)) out.push(midA);
+    if (!pointsNear(midA, midB)) out.push(midB);
+    if (!pointsNear(midB, toDoor)) out.push([...toDoor]);
+  } else {
+    const x = corridorLaneCoord(corr, fromDoor, toDoor, "x");
+    const midA = [x, fromDoor[1]];
+    const midB = [x, toDoor[1]];
+    if (!pointsNear(fromDoor, midA)) out.push(midA);
+    if (!pointsNear(midA, midB)) out.push(midB);
+    if (!pointsNear(midB, toDoor)) out.push([...toDoor]);
   }
-  const x = corr.x + corr.w / 2;
-  return [[x, fromDoor[1]], [x, toDoor[1]]];
+  return out;
 }
 
-function smoothPath(pts) {
-  if (pts.length < 2) return "";
-  const R = 14;
-  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const prev = pts[i-1], cur = pts[i], next = pts[i+1];
-    const d1 = Math.hypot(cur[0]-prev[0], cur[1]-prev[1]);
-    const d2 = Math.hypot(next[0]-cur[0], next[1]-cur[1]);
-    const t1 = d1>0 ? Math.min(R,d1/2)/d1 : 0;
-    const t2 = d2>0 ? Math.min(R,d2/2)/d2 : 0;
-    const p1 = [cur[0]-(cur[0]-prev[0])*t1, cur[1]-(cur[1]-prev[1])*t1];
-    const p2 = [cur[0]+(next[0]-cur[0])*t2, cur[1]+(next[1]-cur[1])*t2];
-    d += ` L ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Q ${cur[0].toFixed(1)} ${cur[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-  }
-  d += ` L ${pts[pts.length-1][0].toFixed(1)} ${pts[pts.length-1][1].toFixed(1)}`;
-  return d;
+function roomTransitPoints(room, inDoor, outDoor) {
+  if (!room || !inDoor || !outDoor) return [];
+  if (inDoor[0] === outDoor[0] || inDoor[1] === outDoor[1]) return [outDoor];
+
+  const bendA = [inDoor[0], outDoor[1]];
+  const bendB = [outDoor[0], inDoor[1]];
+  const center = [room.x + room.w / 2, room.y + room.h / 2];
+  const distA = Math.abs(bendA[0] - center[0]) + Math.abs(bendA[1] - center[1]);
+  const distB = Math.abs(bendB[0] - center[0]) + Math.abs(bendB[1] - center[1]);
+  const bend = distA <= distB ? bendA : bendB;
+
+  return [bend, outDoor];
 }
 
 function buildPercorsoLines(oggettiNomi, oggettiAll, stanze, corridors, roomPos, objPos) {
