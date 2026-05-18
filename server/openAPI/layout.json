@@ -570,7 +570,9 @@
         "h": 116,
         "tipo": "ingresso",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 1": {
         "x": 109.7833251953125,
@@ -578,8 +580,10 @@
         "w": 310,
         "h": 230,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%201/immagini/preview?v=1779111496119",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 2": {
         "x": 482.7833251953125,
@@ -587,8 +591,10 @@
         "w": 310,
         "h": 230,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%202/immagini/preview?v=1779111512372",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 3": {
         "x": 280,
@@ -596,8 +602,10 @@
         "w": 350,
         "h": 240,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%203/immagini/preview?v=1779111673749",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 4": {
         "x": 171,
@@ -605,8 +613,10 @@
         "w": 310,
         "h": 240,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%204/immagini/preview?v=1779111801179",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "WC": {
         "x": 745,
@@ -614,8 +624,10 @@
         "w": 170,
         "h": 150,
         "tipo": "bagno",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/WC/immagini/preview?v=1779111408881",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 5": {
         "x": 607.0166015625,
@@ -623,8 +635,10 @@
         "w": 380,
         "h": 260,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%205/immagini/preview?v=1779111914653",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "stanza 6": {
         "x": 537.2334594726562,
@@ -632,8 +646,10 @@
         "w": 310,
         "h": 230,
         "tipo": "normale",
-        "bgImage": null,
-        "bgTipo": "preview"
+        "bgImage": "/api/musei/Museo%20di%20Tim%20Burton/stanze/stanza%206/immagini/preview?v=1779111526353",
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "SHOP": {
         "x": 879.7667236328125,
@@ -642,7 +658,9 @@
         "h": 190,
         "tipo": "servizio",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       },
       "OUT": {
         "x": 709.4500732421875,
@@ -651,7 +669,9 @@
         "h": 218,
         "tipo": "uscita",
         "bgImage": null,
-        "bgTipo": "preview"
+        "bgTipo": "preview",
+        "labelX": 0.5,
+        "labelY": 0.09
       }
     },
     "labelI18n": {

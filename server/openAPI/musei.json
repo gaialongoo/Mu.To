@@ -2706,8 +2706,8 @@
           "nome": "Beetlejuice",
           "stanza": "stanza 1",
           "pos": {
-            "x": 0.12903235650831654,
-            "y": 0.5260861604110054
+            "x": 0.17719913605720766,
+            "y": 0.49315981657608693
           },
           "connessi": [
             "Batman",
@@ -2794,8 +2794,8 @@
           "nome": "Batman",
           "stanza": "stanza 1",
           "pos": {
-            "x": 0.8709679388230847,
-            "y": 0.547825290845788
+            "x": 0.8280905446698589,
+            "y": 0.4952671216881793
           },
           "connessi": [
             "Beetlejuice",
@@ -2882,8 +2882,8 @@
           "nome": "Edward Scissorhands",
           "stanza": "stanza 2",
           "pos": {
-            "x": 0.8193552324848791,
-            "y": 0.8608687691066577
+            "x": 0.8327904485887097,
+            "y": 0.7644261899201766
           },
           "connessi": [
             "Frankenweenie",
@@ -2970,8 +2970,8 @@
           "nome": "Ed Wood",
           "stanza": "stanza 3",
           "pos": {
-            "x": 0.11652387346540179,
-            "y": 0.5514577229817709
+            "x": 0.1524169921875,
+            "y": 0.4990196228027344
           },
           "connessi": [
             "Big Fish",
@@ -3058,8 +3058,8 @@
           "nome": "Big Fish",
           "stanza": "stanza 3",
           "pos": {
-            "x": 0.899381103515625,
-            "y": 0.5472910563151042
+            "x": 0.8416884068080357,
+            "y": 0.49088134765625
           },
           "connessi": [
             "Ed Wood",
@@ -3146,8 +3146,8 @@
           "nome": "Sleepy Hollow",
           "stanza": "stanza 4",
           "pos": {
-            "x": 0.13155921197706652,
-            "y": 0.5580551147460937
+            "x": 0.1726718041204637,
+            "y": 0.6980178833007813
           },
           "connessi": [
             "Sweeney Todd",
@@ -3234,8 +3234,8 @@
           "nome": "Sweeney Todd",
           "stanza": "stanza 4",
           "pos": {
-            "x": 0.9122044717111896,
-            "y": 0.33305511474609373
+            "x": 0.8282994424143145,
+            "y": 0.29226786295572915
           },
           "connessi": [
             "Sleepy Hollow",
@@ -3322,8 +3322,8 @@
           "nome": "The Nightmare Before Christmas",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.23885995965254933,
-            "y": 0.14955068734975963
+            "x": 0.14476045307360197,
+            "y": 0.20577392578125
           },
           "connessi": [
             "Corpse Bride",
@@ -3410,8 +3410,8 @@
           "nome": "Corpse Bride",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.6862285413240131,
-            "y": 0.8841660719651442
+            "x": 0.6186764365748355,
+            "y": 0.7670635516826924
           },
           "connessi": [
             "The Nightmare Before Christmas",
@@ -3498,8 +3498,8 @@
           "nome": "Frankenweenie",
           "stanza": "stanza 5",
           "pos": {
-            "x": 0.873070646587171,
-            "y": 0.15339684119591346
+            "x": 0.8609386243318257,
+            "y": 0.20629976712740383
           },
           "connessi": [
             "Edward Scissorhands",
@@ -3586,8 +3586,8 @@
           "nome": "Charlie and the Chocolate Factory",
           "stanza": "stanza 6",
           "pos": {
-            "x": 0.13725782825100807,
-            "y": 0.5254346764605978
+            "x": 0.16724499117943548,
+            "y": 0.49570259425951085
           },
           "connessi": [
             "Alice in Wonderland",
@@ -3674,8 +3674,8 @@
           "nome": "Alice in Wonderland",
           "stanza": "stanza 6",
           "pos": {
-            "x": 0.8533870573966734,
-            "y": 0.5254346764605978
+            "x": 0.8272325085055443,
+            "y": 0.499031398607337
           },
           "connessi": [
             "Charlie and the Chocolate Factory",
