@@ -507,18 +507,33 @@ function pointsNear(a, b, eps = 0.5) {
   return Math.hypot(a[0] - b[0], a[1] - b[1]) < eps;
 }
 
+const PATH_BREAK = "BREAK";
+
 function pushPathPoint(pts, p) {
   if (!p) return;
   const last = pts[pts.length - 1];
-  if (last && last[0] === p[0] && last[1] === p[1]) return;
+  if (Array.isArray(last) && last[0] === p[0] && last[1] === p[1]) return;
   pts.push([p[0], p[1]]);
+}
+
+function pushPathBreak(pts) {
+  if (pts[pts.length - 1] === PATH_BREAK) return;
+  pts.push(PATH_BREAK);
 }
 
 function pathFromPoints(pts) {
   if (!pts || pts.length < 2) return "";
-  const parts = [`M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`];
-  for (let i = 1; i < pts.length; i++) {
-    parts.push(`L ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`);
+  const parts = [];
+  let needMove = true;
+  for (const p of pts) {
+    if (p === PATH_BREAK) { needMove = true; continue; }
+    if (!Array.isArray(p)) continue;
+    if (needMove) {
+      parts.push(`M ${p[0].toFixed(1)} ${p[1].toFixed(1)}`);
+      needMove = false;
+    } else {
+      parts.push(`L ${p[0].toFixed(1)} ${p[1].toFixed(1)}`);
+    }
   }
   return parts.join(" ");
 }
@@ -595,10 +610,9 @@ function routedPath(fromRoom, toRoom, fromPos, toPos, stanze, corridors, roomPos
 
     if (i + 1 < roomPath.length - 1) {
       const C = roomPath[i + 2];
-      const roomC = stanzaForRouting(C, stanze, roomPos);
       const nextCorr = corridoioForRouting(stanze, edgeUsed[C]);
-      const nextFromDoor = resolveDoorPoint(roomB, roomC, nextCorr, B, C);
-      for (const p of roomTransitPoints(roomB, toDoor, nextFromDoor)) pushPathPoint(pts, p);
+      const nextFromDoor = resolveDoorPoint(roomB, stanzaForRouting(C, stanze, roomPos), nextCorr, B, C);
+      pushPathPoint(pts, nextFromDoor);
     }
   }
 
@@ -652,20 +666,6 @@ function corridorTransitPoints(corr, fromDoor, toDoor) {
     if (!pointsNear(midB, toDoor)) out.push([...toDoor]);
   }
   return out;
-}
-
-function roomTransitPoints(room, inDoor, outDoor) {
-  if (!room || !inDoor || !outDoor) return [];
-  if (inDoor[0] === outDoor[0] || inDoor[1] === outDoor[1]) return [outDoor];
-
-  const bendA = [inDoor[0], outDoor[1]];
-  const bendB = [outDoor[0], inDoor[1]];
-  const center = [room.x + room.w / 2, room.y + room.h / 2];
-  const distA = Math.abs(bendA[0] - center[0]) + Math.abs(bendA[1] - center[1]);
-  const distB = Math.abs(bendB[0] - center[0]) + Math.abs(bendB[1] - center[1]);
-  const bend = distA <= distB ? bendA : bendB;
-
-  return [bend, outDoor];
 }
 
 function buildPercorsoLines(oggettiNomi, oggettiAll, stanze, corridors, roomPos, objPos) {
