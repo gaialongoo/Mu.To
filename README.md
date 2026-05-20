@@ -28,6 +28,7 @@ Variabili importanti (OpenAPI):
 - `API_KEY`
 - `MONGO_URI`
 - `API_PORT`, `API_HOST`
+- Opzionale bootstrap admin automatico all'avvio del BFF (vedi tabella `ADMIN_BOOTSTRAP_*` piu' sotto): crea **solo se** l'email non esiste gia'.
 
 ---
 
@@ -75,6 +76,11 @@ Poi avvii i tre processi nei terminali separati come prima
 | `API_PORT`, `SVG_PORT`, `BFF_PORT` | 3000/3001/8080 | Porte usate dai servizi e dal proxy. |
 | `BFF_FORCE_HTTP` | `false` | Disattiva TLS sul BFF anche se `cert/bff.{crt,key}` sono presenti. |
 | `BFF_SKIP_QR_BOOTSTRAP` | `false` | Se `true`, non lancia la generazione QR automatica dopo OpenAPI (`BFF_SPAWN_INTERNAL=true`). |
+| `ADMIN_BOOTSTRAP_EMAIL` | _(vuoto)_ | Se impostata **insieme** a `ADMIN_BOOTSTRAP_PASSWORD`, dopo OpenAPI il BFF crea l'admin se l'email non esiste ancora (`utenti.users`). |
+| `ADMIN_BOOTSTRAP_PASSWORD` | _(vuoto)_ | Password iniziale (min 6 caratteri). **Non committare** valori reali; usa solo `.env` sul server. |
+| `ADMIN_BOOTSTRAP_NOME` | `Admin` | Opzionale, nome visualizzato. |
+| `ADMIN_BOOTSTRAP_COGNOME` | `Mu.To` | Opzionale. |
+| `BFF_SKIP_ADMIN_BOOTSTRAP` | `false` | Se `true`, non esegue il bootstrap admin anche se le variabili sopra sono valorizzate. |
 
 ---
 

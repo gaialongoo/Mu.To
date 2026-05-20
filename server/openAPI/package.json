@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "gen:prof-codes": "node scripts/generate_professor_codes.js",
-    "gen:qr": "node scripts/generate_qr_codes.js"
+    "gen:qr": "node scripts/generate_qr_codes.js",
+    "bootstrap:admin": "node scripts/bootstrap_admin_if_missing.js"
   },
   "keywords": [],
   "author": "",

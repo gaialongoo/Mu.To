@@ -20,6 +20,7 @@ import dotenv from "dotenv";
 import { Agent, fetch } from "undici";
 import { startInternalServers, stopInternalServers } from "./lib/childServers.js";
 import { runQrBootstrapAllMuseums } from "./lib/qrBootstrap.js";
+import { runAdminBootstrapIfConfigured } from "./lib/adminBootstrap.js";
 
 // ============================================================
 // PATH
@@ -400,30 +401,36 @@ const spawnInternal =
 let internalHandles = [];
 
 async function bootstrap() {
+  const runPostApiBootstrap = async () => {
+    const skipQrBootstrap =
+      String(process.env.BFF_SKIP_QR_BOOTSTRAP || "").trim().toLowerCase() === "true";
+    if (!skipQrBootstrap) {
+      console.log(
+        "🖼️  Bootstrap QR: tutti i musei da musei.json (skip se gia' su MongoDB)…"
+      );
+      try {
+        await runQrBootstrapAllMuseums();
+        console.log("✅ Bootstrap QR completato.");
+      } catch (e) {
+        console.warn("⚠️  Bootstrap QR fallito (il BFF continua):", e?.message || e);
+      }
+    }
+    try {
+      await runAdminBootstrapIfConfigured();
+    } catch (e) {
+      console.warn("⚠️  Bootstrap admin fallito (il BFF continua):", e?.message || e);
+    }
+  };
+
   if (spawnInternal) {
     try {
-      const skipQrBootstrap =
-        String(process.env.BFF_SKIP_QR_BOOTSTRAP || "").trim().toLowerCase() === "true";
-
       internalHandles = await startInternalServers({
         apiHost: API_CONNECT_HOST,
         apiPort: Number(API_PORT),
         svgHost: SVG_CONNECT_HOST,
         svgPort: Number(SVG_PORT),
         apiBootstrap: process.env.BFF_API_BOOTSTRAP || "disk-override",
-        onApiReady: skipQrBootstrap
-          ? undefined
-          : async () => {
-              console.log(
-                "🖼️  Bootstrap QR: tutti i musei da musei.json (skip se gia' su MongoDB)…"
-              );
-              try {
-                await runQrBootstrapAllMuseums();
-                console.log("✅ Bootstrap QR completato.");
-              } catch (e) {
-                console.warn("⚠️  Bootstrap QR fallito (il BFF continua):", e?.message || e);
-              }
-            },
+        onApiReady: runPostApiBootstrap,
       });
     } catch (err) {
       console.error("💥 Avvio servizi interni fallito:", err?.message || err);
@@ -432,6 +439,11 @@ async function bootstrap() {
     }
   } else {
     console.log("ℹ️  BFF_SPAWN_INTERNAL=false: OpenAPI e SVG NON vengono avviati dal BFF.");
+    try {
+      await runAdminBootstrapIfConfigured();
+    } catch (e) {
+      console.warn("⚠️  Bootstrap admin fallito (il BFF continua):", e?.message || e);
+    }
   }
 
   server.listen(BFF_PORT, BFF_HOST, () => {
