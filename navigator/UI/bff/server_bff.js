@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { Agent, fetch } from "undici";
 import { startInternalServers, stopInternalServers } from "./lib/childServers.js";
+import { runQrBootstrapAllMuseums } from "./lib/qrBootstrap.js";
 
 // ============================================================
 // PATH
@@ -401,12 +402,28 @@ let internalHandles = [];
 async function bootstrap() {
   if (spawnInternal) {
     try {
+      const skipQrBootstrap =
+        String(process.env.BFF_SKIP_QR_BOOTSTRAP || "").trim().toLowerCase() === "true";
+
       internalHandles = await startInternalServers({
         apiHost: API_CONNECT_HOST,
         apiPort: Number(API_PORT),
         svgHost: SVG_CONNECT_HOST,
         svgPort: Number(SVG_PORT),
         apiBootstrap: process.env.BFF_API_BOOTSTRAP || "disk-override",
+        onApiReady: skipQrBootstrap
+          ? undefined
+          : async () => {
+              console.log(
+                "🖼️  Bootstrap QR: tutti i musei da musei.json (skip se gia' su MongoDB)…"
+              );
+              try {
+                await runQrBootstrapAllMuseums();
+                console.log("✅ Bootstrap QR completato.");
+              } catch (e) {
+                console.warn("⚠️  Bootstrap QR fallito (il BFF continua):", e?.message || e);
+              }
+            },
       });
     } catch (err) {
       console.error("💥 Avvio servizi interni fallito:", err?.message || err);

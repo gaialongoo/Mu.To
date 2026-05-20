@@ -74,6 +74,7 @@ Poi avvii i tre processi nei terminali separati come prima
 | `BFF_API_BOOTSTRAP` | `disk-override` | Forwardato a OpenAPI come `--bootstrap-mode`. Valori: `disk-override`, `mongo`. |
 | `API_PORT`, `SVG_PORT`, `BFF_PORT` | 3000/3001/8080 | Porte usate dai servizi e dal proxy. |
 | `BFF_FORCE_HTTP` | `false` | Disattiva TLS sul BFF anche se `cert/bff.{crt,key}` sono presenti. |
+| `BFF_SKIP_QR_BOOTSTRAP` | `false` | Se `true`, non lancia la generazione QR automatica dopo OpenAPI (`BFF_SPAWN_INTERNAL=true`). |
 
 ---
 
@@ -389,7 +390,15 @@ Opzioni:
 node scripts/generate_qr_codes.js   --museo Uffizi   --oggetti statua,dipinto,anfora   --out ./qr_dump/Uffizi   --length 24   --prefix MUTO   --regenerate
 ```
 
-- `--museo` (obbligatorio) — nome del museo cosi' come compare in `musei.json`.
+```bash
+node scripts/generate_qr_codes.js   --all-museums   --skip-existing
+```
+
+Con `BFF_SPAWN_INTERNAL=true`, dopo che **OpenAPI** è in ascolto sulla porta configurata il BFF esegue automaticamente `--all-museums --skip-existing` prima di avviare il server SVG (idem CLI sotto): salta solo ciò che ha **MongoDB + PNG** gia' ok; se mancano solo i PNG rigenera (hash aggiornati). Disattiva con `BFF_SKIP_QR_BOOTSTRAP=true`.
+
+- `--museo` — nome del museo come in `musei.json` (obbligatorio salvo con `--all-museums`).
+- `--all-museums` — elabora tutti i musei in `musei.json`; con piu' musei `--out` viene ignorato e si usa `qr_dump/<museo>/` per ciascuno.
+- `--skip-existing` — salta solo se su MongoDB c'e' un `qr_codes` attivo **e** il PNG esiste gia' in output; se il PNG manca ma il DB ha ancora hash, rimuove i record di quel museo/oggetto e rigenera PNG + nuovo hash.
 - `--oggetti` — lista separata da virgola; default = tutti gli oggetti del museo letti da `musei.json` **escludendo gli item di solo testo** (`objectType="text"`, per cui il viewer non chiede mai il QR).
 - `--out` — cartella di output (default `server/openAPI/qr_dump/<museo>/`).
 - `--length` — lunghezza parte random del secret (default 24, range 8..64).
@@ -408,7 +417,8 @@ qr_dump/Uffizi/
 
 Note:
 - I secret in chiaro vengono **stampati una sola volta** dallo script: salvali subito se ti servono, perche su Mongo e' memorizzato solo l'hash. Per riemettere il QR di un oggetto basta rilanciare lo script con `--regenerate --oggetti <nome>`.
-- La cartella `qr_dump/` e' ignorata da git (vedi `.gitignore`).
+- La cartella `qr_dump/` e' ignorata da git (vedi `.gitignore`). Il manifest viene riscritto **solo se il contenuto cambia**, cosi' tool tipo nodemon che osservano il progetto non entrano in loop al bootstrap QR.
+- Se usi nodemon (o analoghi) sulla cartella `webapp`, escludi comunque `**/server/openAPI/qr_dump/**` dalla watch-list come protezione extra quando generi PNG nuovi.
 - Collection: `musei.qr_codes` (campi: `hash`, `museo`, `oggetto`, `enabled`, `createdAt`).
 
 ---

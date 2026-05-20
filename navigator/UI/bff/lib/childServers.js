@@ -123,6 +123,13 @@ function spawnChild({ name, color, scriptPath, cwd, env = {}, args = [] }) {
  * raggiungibili. L'ordine e' importante: OpenAPI per primo, perche' SVG
  * fa probe su /musei prima di aprire la propria porta.
  *
+ * @param {object} opts
+ * @param {string} opts.apiHost
+ * @param {number} opts.apiPort
+ * @param {string} opts.svgHost
+ * @param {number} opts.svgPort
+ * @param {string} [opts.apiBootstrap]
+ * @param {() => Promise<void>} [opts.onApiReady] eseguito dopo che la porta API accetta connessioni (prima di avviare SVG)
  * @returns Array di { name, child } per il graceful shutdown.
  */
 export async function startInternalServers({
@@ -131,6 +138,7 @@ export async function startInternalServers({
   svgHost,
   svgPort,
   apiBootstrap = "disk-override",
+  onApiReady,
 } = {}) {
   const handles = [];
 
@@ -155,6 +163,10 @@ export async function startInternalServers({
 
   await waitForPort(apiHost, apiPort, { timeoutMs: 90_000 });
   console.log(`✅ OpenAPI pronto su ${apiHost}:${apiPort}`);
+
+  if (typeof onApiReady === "function") {
+    await onApiReady();
+  }
 
   // ---- 2) SVG server ----
   const svgCwd = path.resolve(__dirname, "../../../map-creator/js_server");
