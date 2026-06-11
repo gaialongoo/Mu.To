@@ -36,7 +36,17 @@
     <a class="skip-to-main" href="#marketplace-main">Salta al contenuto principale</a>
 
     <div x-data="marketplace" x-cloak>
-      <main id="marketplace-main" class="mp-page" :aria-label="mp('ariaMainMarketplace')" tabindex="-1">
+      <!-- guard: verifica auth in corso -->
+      <main class="mp-guard" x-show="!authChecked" x-cloak x-text="mp('authChecking')"></main>
+
+      <!-- guard: nessun museo selezionato -->
+      <main class="mp-guard mp-guard-col" x-show="authChecked && !MUSEO" x-cloak>
+        <p class="mp-guard-msg" x-text="mp('noMuseo')"></p>
+        <a class="mp-btn-green-outline" href="/" x-text="mp('backHome')"></a>
+      </main>
+
+      <main id="marketplace-main" class="mp-page" :aria-label="mp('ariaMainMarketplace')" tabindex="-1"
+            x-show="authChecked && MUSEO" x-cloak>
         <div class="mp-shell">
 
           <!-- ── HEADER ─────────────────────────────────────────── -->
@@ -75,11 +85,101 @@
                     @click="openTeacherBuilder()" x-text="mp('createClassPath')"></button>
           </nav>
 
-          <!-- ── TAB: catalogo oggetti (slice 2) ────────────────── -->
+          <!-- ── FILTRI (solo tab oggetti) ──────────────────────── -->
+          <div class="mp-filters" x-show="activeTab === 'items'" x-cloak>
+            <input type="text" class="mp-filter-input mp-filter-grow" x-model="search"
+                   @keydown.enter="applyFilters()" :placeholder="mp('searchPlaceholder')" />
+            <select class="mp-filter-input" x-model="stanzaFilter">
+              <option value="" x-text="mp('allRooms')"></option>
+              <template x-for="s in stanze" :key="s">
+                <option :value="s" x-text="displayStanzaName(s)"></option>
+              </template>
+            </select>
+            <select class="mp-filter-input" x-model="autoreFilter">
+              <option value="" x-text="mp('allAuthors')"></option>
+              <template x-for="a in autori" :key="a"><option :value="a" x-text="a"></option></template>
+            </select>
+            <select class="mp-filter-input" x-model="correnteFilter">
+              <option value="" x-text="mp('allMovements')"></option>
+              <template x-for="c in correntiArtistiche" :key="c"><option :value="c" x-text="c"></option></template>
+            </select>
+            <div class="mp-filter-year">
+              <input type="number" min="1" class="mp-filter-input" x-model="yearFrom" :placeholder="mp('yearFromPh')" />
+              <select class="mp-filter-input" x-model="yearFromEra">
+                <option value="ac" x-text="mp('eraBC')"></option>
+                <option value="dc" x-text="mp('eraAD')"></option>
+              </select>
+            </div>
+            <div class="mp-filter-year">
+              <input type="number" min="1" class="mp-filter-input" x-model="yearTo" :placeholder="mp('yearToPh')" />
+              <select class="mp-filter-input" x-model="yearToEra">
+                <option value="ac" x-text="mp('eraBC')"></option>
+                <option value="dc" x-text="mp('eraAD')"></option>
+              </select>
+            </div>
+            <button class="mp-btn-green-outline" @click="applyFilters()" x-text="mp('filter')"></button>
+            <button class="mp-btn-outline" @click="resetFilters()" x-text="mp('reset')"></button>
+          </div>
+
+          <!-- ── TAB: catalogo oggetti ──────────────────────────── -->
           <section x-show="activeTab === 'items'" x-cloak>
-            <p class="mp-placeholder" x-show="loadingItems">…</p>
-            <p class="mp-placeholder" x-show="!loadingItems"
-               x-text="allOggetti.length + ' oggetti caricati (slice 2)'"></p>
+            <div class="mp-grid">
+              <template x-if="loadingItems">
+                <template x-for="i in 6" :key="i"><div class="mp-skeleton"></div></template>
+              </template>
+              <template x-if="!loadingItems && pagedItems.length === 0">
+                <div class="mp-empty"><p x-text="mp('noItemsFound')"></p></div>
+              </template>
+              <template x-if="!loadingItems">
+                <template x-for="(o, i) in pagedItems" :key="o.nome + '::' + (o.stanza || i)">
+                  <article class="mp-card">
+                    <div class="mp-card-img">
+                      <img :src="previewSrc(o)" :alt="o.nome" @error="$el.style.display='none'" />
+                    </div>
+                    <div class="mp-card-body">
+                      <div class="mp-card-title" x-text="o.nome"></div>
+                      <div class="mp-card-meta">
+                        <span x-text="(Array.isArray(o.descrizioni)?o.descrizioni.length:0) + ' desc · ' + (Array.isArray(o.connessi)?o.connessi.length:0) + ' connessi'"></span>
+                      </div>
+                      <div class="mp-card-attrs">
+                        <span x-text="'Autore: ' + (o.autore || 'N/D')"></span>
+                        <span x-text="'Anno: ' + (o.anno || 'N/D')"></span>
+                      </div>
+                      <div class="mp-tags">
+                        <template x-if="o.stanza">
+                          <span class="mp-tag mp-tag-room" x-text="displayStanzaName(o.stanza) || o.stanza"></span>
+                        </template>
+                        <template x-for="c in (o.connessi || []).slice(0, 2)" :key="c">
+                          <span class="mp-tag mp-tag-green" x-text="c"></span>
+                        </template>
+                        <template x-if="(o.connessi ? o.connessi.length : 0) > 2">
+                          <span class="mp-tag mp-tag-green" x-text="'+' + (o.connessi.length - 2)"></span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="mp-card-foot">
+                      <div class="mp-card-price" x-show="!isTextObject(o)">
+                        Prezzo: <span x-text="priceLabel(o) || '—'"></span>
+                      </div>
+                      <div class="mp-card-actions">
+                        <button class="mp-card-btn mp-card-btn-ghost" @click="openItemDetails(o)">Visualizza</button>
+                        <button class="mp-card-btn mp-card-btn-buy"
+                                x-show="!isTextObject(o)"
+                                :disabled="purchaseDisabled(o)"
+                                @click="requestObjectPurchase(o)"
+                                x-text="purchaseLabel(o)"></button>
+                      </div>
+                    </div>
+                  </article>
+                </template>
+              </template>
+            </div>
+            <nav class="mp-pagination" :aria-label="mp('ariaPagination')" x-show="itemPages > 1">
+              <template x-for="p in itemPages" :key="p">
+                <button class="mp-page-btn" :class="{ 'is-active': p === itemPage }"
+                        @click="itemPage = p" x-text="p"></button>
+              </template>
+            </nav>
           </section>
 
           <!-- ── TAB: visite (slice 3) ──────────────────────────── -->
@@ -116,6 +216,92 @@
             <strong>INFO</strong><br />
             Inviata come header <code>X-API-Key</code> tramite proxy su <code>/api</code>.<br />
             Non viene persistita oltre la sessione.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODALE DETTAGLIO OGGETTO ───────────────────────────── -->
+      <div class="mp-overlay" x-show="selectedItem" x-cloak
+           @click.self="closeItemModal()" @keydown.escape.window="closeItemModal()">
+        <div class="mp-dialog" role="dialog" aria-modal="true" x-show="selectedItem">
+          <button class="mp-dialog-x" @click="closeItemModal()">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('itemLabel')"></p>
+          <h3 class="mp-dialog-title" x-text="selectedItem?.nome"></h3>
+
+          <div class="mp-item-buy" x-show="!isTextObject(selectedItem)">
+            <button class="mp-card-btn mp-card-btn-buy" :disabled="purchaseDisabled(selectedItem)"
+                    @click="requestObjectPurchase(selectedItem)" x-text="purchaseLabel(selectedItem)"></button>
+          </div>
+
+          <div class="mp-dialog-stack">
+            <!-- dettagli -->
+            <div class="mp-panel" x-show="!isTextObject(selectedItem)">
+              <p class="mp-panel-label" x-text="mp('details')"></p>
+              <div class="mp-detail-grid">
+                <p><strong x-text="mp('room')"></strong> <span x-text="(selectedItem?.stanza && displayStanzaName(selectedItem.stanza)) || mp('nd')"></span></p>
+                <p><strong x-text="mp('connected')"></strong> <span x-text="(selectedItem?.connessi || []).join(', ') || mp('none')"></span></p>
+                <p><strong x-text="mp('author')"></strong> <span x-text="selectedItem?.autore || mp('nd')"></span></p>
+                <p><strong x-text="mp('artMovement')"></strong> <span x-text="selectedItem?.correnteArtistica || mp('nd')"></span></p>
+                <p><strong x-text="mp('license')"></strong> <span x-text="selectedItem?.licenza || mp('nd')"></span></p>
+                <p><strong x-text="mp('year')"></strong> <span x-text="selectedItem?.anno || mp('nd')"></span></p>
+                <p><strong x-text="mp('price')"></strong> <span class="mp-green" x-text="fmtEuro(selectedItem?.prezzo)"></span></p>
+              </div>
+            </div>
+
+            <!-- descrizioni -->
+            <div class="mp-panel">
+              <p class="mp-panel-label" x-text="mp('descriptions')"></p>
+              <template x-if="preferredDescription?.text">
+                <p class="mp-desc-text" x-text="preferredDescription.text"></p>
+              </template>
+              <template x-if="!preferredDescription?.text">
+                <p class="mp-desc-text" x-text="mp('noDescription')"></p>
+              </template>
+              <button class="mp-card-btn mp-card-btn-ghost mp-desc-toggle"
+                      @click="showAllDescriptions = !showAllDescriptions"
+                      x-text="showAllDescriptions ? mp('hideAll') : mp('showAll')"></button>
+              <div class="mp-desc-table-wrap" x-show="showAllDescriptions" x-cloak>
+                <table class="mp-desc-table">
+                  <thead>
+                    <tr>
+                      <th x-text="mp('tableLevelLength')"></th>
+                      <template x-for="len in DESCRIPTION_LENGTHS" :key="len"><th x-text="len"></th></template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(lvlLabel, lvlIndex) in DESCRIPTION_LEVELS" :key="lvlLabel">
+                      <tr>
+                        <td x-text="lvlLabel"></td>
+                        <template x-for="(lenLabel, lenIndex) in DESCRIPTION_LENGTHS" :key="lenLabel">
+                          <td x-text="descCell(lvlIndex, lenIndex)"></td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- gallery -->
+            <div class="mp-panel" x-show="!isTextObject(selectedItem) && galleryImages.length > 0">
+              <p class="mp-panel-label" x-text="mp('imageGallery')"></p>
+              <div class="mp-gallery">
+                <img class="mp-gallery-main" :src="galleryImgSrc(galleryActiveImage)"
+                     :alt="(selectedItem?.nome || '') + ' ' + (galleryActiveImage?.tipo || '')" />
+                <div class="mp-gallery-nav">
+                  <button class="mp-gallery-arrow" @click="galleryPrev()">‹</button>
+                  <div class="mp-gallery-thumbs">
+                    <template x-for="(img, index) in galleryImages" :key="img.tipo">
+                      <button class="mp-gallery-thumb" :class="{ 'is-active': index === galleryActiveIndex }"
+                              @click="selectedGalleryIndex = index">
+                        <img :src="galleryImgSrc(img)" :alt="(selectedItem?.nome || '') + ' thumb'" />
+                      </button>
+                    </template>
+                  </div>
+                  <button class="mp-gallery-arrow" @click="galleryNext()">›</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
