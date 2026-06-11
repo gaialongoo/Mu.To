@@ -1,0 +1,293 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue]{hyperref}
+
+\definecolor{verde}{RGB}{46,125,80}
+\titleformat{\section}{\Large\bfseries\color{verde}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.5em}{}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\textbf{Relazione tecnica del progetto}\\[2pt]
+\large Architettura, tecnologie e scelte progettuali}
+\author{Gruppo Mu.To}
+\date{A.A. 2025--26}
+
+\begin{document}
+\maketitle
+
+\noindent
+Questo documento descrive le \emph{tecnologie}, l'\emph{architettura} e la
+\emph{struttura} del sito, motivando le scelte progettuali. Non descrive il
+dominio applicativo: l'obiettivo è spiegare \emph{come} il sistema è costruito e
+\emph{perché}, in funzione dei criteri di valutazione (generalità dei tool,
+flessibilità, usabilità, sofisticazione grafica).
+
+\tableofcontents
+\bigskip
+
+% =====================================================================
+\section{Visione d'insieme dell'architettura}
+
+Il sistema è organizzato a \textbf{livelli} (\emph{tiered}), con una netta
+separazione tra dato, logica applicativa e presentazione. I componenti
+comunicano esclusivamente via HTTP/JSON, così che ciascuno sia sostituibile in
+modo indipendente.
+
+\begin{verbatim}
+   Browser
+      |  HTTPS (terminato dal proxy del cluster)
+      v
++-----------------------+   serve le 3 SPA compilate (dist/)
+|  BFF  (Express)       |
+|  server_bff.js :8000  |---- proxy /api ----+
++-----------------------+   (HTTPS interno)  |
+      |  spawn interni                       v
+      |                          +----------------------+   driver   +----------------+
+      |                          |  openAPI (Express)   |  mongodb   |   MongoDB      |
+      |                          |  REST API :3000      |----------->| (container DB) |
+      v                          +----------+-----------+            +----------------+
++----------------------+                    |  ^
+| SVG server :3001     |<-------------------+  |
+| genera mappe SVG     |   HTTPS interno       v
++----------------------+              Provider IA (Groq, OpenAI-compatibile)
+\end{verbatim}
+
+\subsection{I componenti}
+\begin{description}[leftmargin=1.4em,style=nextline]
+  \item[openAPI (\code{server/openAPI})] È il cuore applicativo: una REST API in
+    \textbf{Node.js + Express} che possiede la logica di dominio (musei, oggetti,
+    percorsi, utenti, visite guidate, marketplace) e l'unico accesso a
+    \textbf{MongoDB}. Espone inoltre l'integrazione con l'IA.
+  \item[BFF (\code{navigator/UI/bff})] Il \emph{Backend-for-Frontend}: un secondo
+    server Express che (a)~serve le tre Single Page Application già compilate e
+    (b)~fa da \textbf{reverse proxy} verso l'API sul prefisso \code{/api},
+    iniettando la chiave applicativa. È l'unico processo esposto pubblicamente.
+  \item[SVG server (\code{map-creator/js\_server})] Servizio dedicato che, a
+    partire dal layout di un museo, costruisce la \textbf{mappa vettoriale SVG}
+    delle sale; è isolato perché la generazione grafica è una responsabilità
+    distinta dal resto della logica.
+  \item[Le tre SPA] \emph{marketplace} (catalogo, acquisti, visite),
+    \emph{viewer/navigator} (la visita vera e propria sulla mappa) ed
+    \emph{editor} (creazione/modifica dei musei).
+\end{description}
+
+Questa scomposizione è una scelta di \textbf{generalità}: ogni servizio fa una
+cosa sola, dialoga via JSON e potrebbe essere riscritto in un altro linguaggio
+senza toccare gli altri. Il BFF, in particolare, disaccoppia il browser
+dall'API: il client non conosce né l'indirizzo reale dell'API né la sua chiave.
+
+% =====================================================================
+\section{Stack tecnologico e motivazione delle scelte (generalità)}
+
+\subsection{Lato server}
+\begin{itemize}[leftmargin=1.3em]
+  \item \textbf{Node.js + Express} per API, BFF e SVG server: un unico runtime e
+    un unico modello di routing su tutti i servizi server, che riduce il costo
+    cognitivo e favorisce il riuso.
+  \item \textbf{MongoDB} tramite il \emph{driver nativo} (\code{mongodb}), non un
+    ORM. La scelta è deliberata: i documenti dei musei hanno una forma
+    annidata e variabile (sale, oggetti, descrizioni multidimensionali) che mal
+    si presta a uno schema rigido. Il modello a documenti rende naturale
+    rappresentare un museo come un singolo aggregato.
+  \item \textbf{Elaborazione media e QR}: \code{sharp} per ridimensionare e
+    normalizzare le immagini caricate, \code{qrcode} per generare i codici QR di
+    sblocco contenuti, \code{multer} per gli upload \emph{multipart}.
+  \item \textbf{IA}: provider \textbf{Groq} con modello
+    \code{llama-3.3-70b-versatile}, contattato tramite l'API
+    \emph{OpenAI-compatibile}. Usare un'interfaccia standard (non un SDK
+    proprietario) è una scelta di generalità: cambiare provider (OpenAI, Ollama
+    locale, \dots) richiede solo variabili d'ambiente, non codice.
+\end{itemize}
+
+\subsection{Lato client: tre SPA, due filosofie}
+La parte più significativa è la scelta differenziata del livello di
+presentazione, calibrata sulla complessità di ciascuna applicazione.
+
+\begin{itemize}[leftmargin=1.3em]
+  \item \textbf{viewer (navigator)} ed \textbf{editor} usano \textbf{React}
+    (il viewer in \textbf{TypeScript}). Sono applicazioni a stato ricco e
+    fortemente interattive --- la navigazione sulla mappa SVG con \emph{pathfinding},
+    la chat, l'editor di musei --- dove un framework a componenti con stato
+    reattivo e tipizzazione statica ripaga la sua complessità.
+  \item \textbf{marketplace} usa \textbf{Alpine.js} + JavaScript ``vanilla''.
+    È stato \emph{deliberatamente riscritto} per non dipendere da un framework
+    pesante: la reattività dichiarativa di Alpine (\code{x-data},
+    \code{x-for}, \code{x-model}) copre esattamente i bisogni di una vetrina con
+    filtri, modali e form, senza il peso di React. Il risultato è un bundle
+    circa il 60\% più leggero. Questo dimostra \textbf{uso corretto della
+    tecnologia minima sufficiente} invece di adottare un framework per inerzia.
+  \item \textbf{Build}: tutte e tre con \textbf{Vite}, usato solo come
+    bundler/dev-server (non è un framework UI). In sviluppo, il proxy di Vite
+    inoltra \code{/api} all'API iniettando la chiave, replicando il
+    comportamento del BFF in produzione.
+\end{itemize}
+
+% =====================================================================
+\section{Organizzazione del codice e flessibilità}
+
+\subsection{Struttura dei sorgenti}
+Ogni applicazione vive in una propria directory con sorgenti in \code{src/} e
+output di build in \code{dist/}. La separazione \code{src}/\code{dist} mantiene
+puliti i sorgenti versionati; il BFF serve i \code{dist/} come contenuto
+statico. La logica di rete (\code{api.js}) e la traduzione (\code{mpLocales.js})
+sono moduli \emph{framework-agnostic}: durante la migrazione del marketplace da
+React ad Alpine sono stati riusati invariati, segno di un buon disaccoppiamento.
+
+\subsection{Modello dei dati e delle annotazioni}
+Un oggetto museale non ha una singola descrizione, ma una \textbf{matrice di
+descrizioni} indicizzata su due dimensioni:
+\begin{itemize}[leftmargin=1.3em,nosep]
+  \item \textbf{livello} del visitatore (bambino, studente, esperto, avanzato);
+  \item \textbf{durata}/profondità desiderata (breve, media, lunga, estesa).
+\end{itemize}
+A ciò si aggiunge \code{descrizioniI18n}, che replica la matrice per lingua
+(\textbf{IT/EN/FR}). Questa struttura è la chiave della \textbf{flessibilità del
+modello di annotazione}: lo stesso oggetto si adatta automaticamente al profilo
+dell'utente e alla lingua, e aggiungere un livello o una lingua è un'estensione
+dei dati, non una modifica del codice. Gli oggetti hanno inoltre un campo
+\code{connessi} che definisce un \textbf{grafo} di adiacenze fra opere, usato per
+calcolare percorsi (visita una sala alla volta, minimizzando gli spostamenti).
+
+\subsection{Le collezioni MongoDB}
+Il dato è partizionato per responsabilità: \code{musei} e \code{musei\_layout}
+(struttura e mappa), \code{users} e \code{sessions} (identità), \code{professor\_codes}
+e \code{qr\_codes} (autorizzazioni), \code{guided\_visits} (visite di classe),
+\code{marketplace\_object\_requests} (richieste d'acquisto),
+\code{oggetti\_immagini}/\code{stanze\_immagini} (media). Le route REST riflettono
+questa organizzazione: gruppi \code{/musei}, \code{/users}, \code{/guided-visits},
+\code{/admin}, \code{/ai}, \code{/qr}.
+
+\subsection{Estendibilità}
+Le scelte rendono il sistema facilmente estensibile: un nuovo \emph{device} o
+browser è coperto dal layout responsive; un nuovo \emph{modello di dati} (es.
+nuovo tipo di oggetto) si aggiunge come campo del documento; un nuovo
+\emph{provider IA} o una nuova \emph{lingua} sono configurazioni. La presenza di
+percorsi di \emph{fallback} (vedi §\ref{sec:ia}) garantisce che il sistema
+degradi in modo controllato anziché rompersi.
+
+% =====================================================================
+\section{Comunicazione, autenticazione e sicurezza}
+
+\subsection{Tre livelli di autorizzazione}
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Chiave applicativa} (\code{X-API-Key}): ogni richiesta all'API la
+    deve portare. Il browser non la conosce: la inietta il BFF (o il proxy Vite
+    in sviluppo). Protegge l'API a livello di trasporto.
+  \item \textbf{Sessione utente}: dopo il login l'API rilascia un cookie
+    \code{muto\_auth} \textbf{HttpOnly} con \code{SameSite=Lax}; il token è
+    persistito in \code{sessions} con scadenza. Le password sono salvate come
+    hash \textbf{scrypt} con salt, mai in chiaro.
+  \item \textbf{Ruoli}: \code{utente}, \code{professore}, \code{admin}. Il ruolo
+    professore si ottiene in registrazione tramite un \textbf{codice} (verificato
+    come hash SHA-256 lato server); abilita la creazione di visite guidate.
+    L'admin accede alle funzioni di gestione del marketplace.
+\end{enumerate}
+In aggiunta, contenuti specifici si \textbf{sbloccano via QR}: il viewer ha un
+componente \code{QrGate} che scansiona il codice fisicamente presente in museo.
+
+\subsection{TLS interno e terminazione esterna}
+L'API espone HTTPS anche internamente (il BFF vi si connette in HTTPS, fidandosi
+del certificato self-signed). Verso l'esterno, invece, sul cluster di
+dipartimento il \textbf{TLS è terminato dal proxy}: il BFF serve HTTP semplice
+sulla porta richiesta. Questa distinzione è gestita da configurazione
+(\code{BFF\_FORCE\_HTTP}), un esempio di adattabilità all'ambiente di deploy
+senza modifiche al codice.
+
+% =====================================================================
+\section{Usabilità}
+
+L'attenzione all'utente che \emph{non conosce} il modello applicativo si vede in
+diversi punti:
+\begin{itemize}[leftmargin=1.3em]
+  \item \textbf{Internazionalizzazione completa} IT/EN/FR su tutte le interfacce,
+    con la lingua legata al profilo e propagata via evento globale.
+  \item \textbf{Adattamento al profilo}: descrizioni e percorsi si calibrano su
+    livello e durata scelti, così l'utente vede contenuti adatti senza dover
+    capire il modello sottostante.
+  \item \textbf{Guida e feedback}: schermate di \emph{briefing} a inizio percorso,
+    \emph{toast} non invasivi per esiti delle azioni, stati di caricamento
+    (\emph{skeleton}), e ``guardie'' che mostrano messaggi chiari quando manca
+    l'autenticazione o il museo.
+  \item \textbf{Attività altrui}: nelle visite guidate il professore vede in
+    tempo reale lo stato degli studenti (dashboard), e gli studenti seguono la
+    navigazione condivisa --- consapevolezza delle azioni altrui.
+  \item \textbf{Modalità d'accesso multiple}: chat in linguaggio naturale con
+    l'IA (su singolo oggetto o sull'intero museo) e \textbf{comandi vocali}
+    offline (riconoscimento con \emph{Vosk}, eseguito interamente nel browser),
+    che abbassano la barriera d'uso.
+\end{itemize}
+
+% =====================================================================
+\section{Sofisticazione grafica}
+
+La presentazione è governata da un \textbf{design system} coerente: un set di
+variabili CSS (palette, raggi, tipografia con i font \emph{Cinzel} e
+\emph{Raleway}) condiviso fra le SPA, che garantisce uniformità e rende banale un
+re-styling globale. Le scelte rilevanti rispetto al rapporto fra dati e
+maschere:
+\begin{itemize}[leftmargin=1.3em]
+  \item \textbf{Mappa vettoriale}: la sede della visita è un SVG generato dal
+    layout reale del museo, su cui il viewer disegna percorso, focus e
+    spostamenti --- la grafica \emph{è} il dato spaziale, non una decorazione.
+  \item \textbf{Differenziazione dei tipi}: oggetti ``normali'' e oggetti di solo
+    testo, opere acquistabili e incluse, percorsi standard e percorsi IA
+    personalizzati sono distinti visivamente (colore, etichette, badge), così
+    che il tipo di dato sia leggibile a colpo d'occhio.
+  \item \textbf{Rapporto maschera/dato}: liste con paginazione, gallerie
+    immagini con miniature, tabelle delle descrizioni (livello $\times$ durata)
+    presentano dati potenzialmente densi in maschere dimensionate al contenuto,
+    con \emph{label} comprensibili accanto ai valori formalizzati.
+  \item \textbf{Responsive design}: griglie fluide e \emph{breakpoint} adattano
+    le maschere a desktop, tablet e mobile.
+\end{itemize}
+
+% =====================================================================
+\section{Integrazione dell'IA}
+\label{sec:ia}
+
+L'IA è usata in modo \emph{assistivo} e sempre con rete di sicurezza:
+\begin{itemize}[leftmargin=1.3em]
+  \item \textbf{Percorsi personalizzati}: dato un museo e le preferenze
+    dell'utente (interessi, livello, durata) e un eventuale \textbf{vincolo in
+    linguaggio naturale} (``ho solo mezz'ora'', ``siamo con bambini di 5 e 8
+    anni''), il modello seleziona e ordina le opere e genera testi di
+    accompagnamento, tradotti nelle tre lingue.
+  \item \textbf{Chat contestuale}: domande su un singolo oggetto o sull'intero
+    museo, ancorate ai dati realmente presenti per ridurre le allucinazioni.
+  \item \textbf{Robustezza}: ogni chiamata IA ha \emph{timeout} e un
+    \emph{fallback} deterministico (selezione e descrizioni generate dai dati
+    locali). Se il provider è irraggiungibile, l'utente ottiene comunque un
+    percorso valido. È un esempio concreto di \emph{flessibilità}: la feature
+    degrada, non fallisce.
+\end{itemize}
+
+% =====================================================================
+\section{Build e deployment}
+
+La pipeline è semplice e riproducibile: \code{npm install} (le dipendenze non
+sono versionate) e \code{npm run build} compilano le tre SPA nei rispettivi
+\code{dist/}; \code{npm start} avvia il BFF, che a sua volta lancia i servizi
+interni (API e SVG server). In produzione sul cluster di dipartimento, il
+processo Node ascolta in HTTP sulla porta pubblica e il TLS è gestito a monte;
+MongoDB è un container raggiungibile solo dall'interno del cluster. La
+configurazione sensibile (chiavi, credenziali) vive in file \code{.env} non
+versionati, separando codice e segreti.
+
+\bigskip
+\noindent\textbf{In sintesi.} Il progetto privilegia la \emph{tecnologia minima
+adeguata} a ogni compito (Alpine dove basta, React dove serve), una netta
+separazione di responsabilità fra servizi che comunicano via JSON, un modello
+dei dati pensato per adattarsi a profili, lingue e annotazioni diverse, e un
+livello di presentazione coerente e consapevole del rapporto fra dati e
+maschere. Le soluzioni di compatibilità (HTTP/HTTPS, provider IA, chiave API)
+sono risolte per \emph{configurazione}, non forzate nel codice.
+
+\end{document}
