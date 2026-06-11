@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
+      [x-cloak] { display: none !important; }
       .skip-to-main {
         position: absolute;
         left: -9999px;
@@ -33,7 +34,94 @@
   </head>
   <body>
     <a class="skip-to-main" href="#marketplace-main">Salta al contenuto principale</a>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+
+    <div x-data="marketplace" x-cloak>
+      <main id="marketplace-main" class="mp-page" :aria-label="mp('ariaMainMarketplace')" tabindex="-1">
+        <div class="mp-shell">
+
+          <!-- ── HEADER ─────────────────────────────────────────── -->
+          <header class="mp-header">
+            <div class="mp-brand">
+              <div class="mp-brand-logo"><img src="/img/logo.jpg" alt="ArtAround logo" /></div>
+              <span class="mp-brand-name" x-text="mp('marketplaceTitle')"></span>
+            </div>
+
+            <div class="mp-museum">
+              <p class="mp-museum-label" x-text="mp('selectedMuseum')"></p>
+              <p class="mp-museum-name" x-text="MUSEO"></p>
+            </div>
+
+            <div class="mp-actions">
+              <button class="mp-btn-outline" @click="profileOpen = true" x-text="mp('profile')"></button>
+              <a class="mp-btn-green-outline" href="/" x-text="mp('home')"></a>
+              <template x-if="apiKeyActive">
+                <span class="mp-key-active">
+                  <span class="mp-key-active-txt" x-text="mp('keyActive')"></span>
+                  <button class="mp-btn-outline" @click="logoutApiKey()" x-text="mp('removeKey')"></button>
+                </span>
+              </template>
+            </div>
+          </header>
+
+          <!-- ── TAB NAV ────────────────────────────────────────── -->
+          <nav class="mp-nav" :aria-label="mp('ariaMarketplaceNav')">
+            <div class="mp-tabs">
+              <button class="mp-tab" :class="{ 'is-active': activeTab === 'items' }"
+                      @click="switchSection('items')" x-text="mp('tabItems')"></button>
+              <button class="mp-tab" :class="{ 'is-active': activeTab === 'visits' }"
+                      @click="switchSection('visits')" x-text="mp('tabPaths')"></button>
+            </div>
+            <button class="mp-btn-green-outline" x-show="activeTab === 'visits' && isProfessor"
+                    @click="openTeacherBuilder()" x-text="mp('createClassPath')"></button>
+          </nav>
+
+          <!-- ── TAB: catalogo oggetti (slice 2) ────────────────── -->
+          <section x-show="activeTab === 'items'" x-cloak>
+            <p class="mp-placeholder" x-show="loadingItems">…</p>
+            <p class="mp-placeholder" x-show="!loadingItems"
+               x-text="allOggetti.length + ' oggetti caricati (slice 2)'"></p>
+          </section>
+
+          <!-- ── TAB: visite (slice 3) ──────────────────────────── -->
+          <section x-show="activeTab === 'visits'" x-cloak>
+            <p class="mp-placeholder" x-show="loadingVisits">…</p>
+            <p class="mp-placeholder" x-show="!loadingVisits"
+               x-text="percorsi.length + ' percorsi caricati (slice 3)'"></p>
+          </section>
+
+        </div>
+      </main>
+
+      <!-- ── TOAST ──────────────────────────────────────────────── -->
+      <div class="mp-toast" :class="{ 'is-error': toast.type === 'error', 'is-shown': toast.show }"
+           x-text="toast.msg" aria-live="polite"></div>
+
+      <!-- ── MODALE API KEY ─────────────────────────────────────── -->
+      <div class="mp-modal-overlay" x-show="modalOpen" x-cloak
+           @click.self="modalOpen = false" @keydown.escape.window="modalOpen = false">
+        <div class="mp-modal" role="dialog" aria-modal="true">
+          <div class="mp-modal-rule"></div>
+          <button class="mp-modal-x" @click="modalOpen = false" aria-label="Chiudi">✕</button>
+          <h3 class="mp-modal-title">
+            <small>Autenticazione</small>
+            API Key
+          </h3>
+          <div style="margin-bottom:22px">
+            <label class="mp-field-label">X-API-Key</label>
+            <input type="password" class="mp-input" x-model="apiKeyDraft"
+                   @keydown.enter="confirmApiKey()" placeholder="Inserisci la chiave API" />
+          </div>
+          <button class="mp-btn-primary" @click="confirmApiKey()">Conferma</button>
+          <div class="mp-modal-info">
+            <strong>INFO</strong><br />
+            Inviata come header <code>X-API-Key</code> tramite proxy su <code>/api</code>.<br />
+            Non viene persistita oltre la sessione.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -1,5 +1,4 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import path from "path";
 import https from "https";
@@ -14,7 +13,6 @@ const API_KEY          = process.env.API_KEY          || "";
 
 export default defineConfig(({ mode }) => ({
   base: "/marketplace/",
-  plugins: [react()],
   define: {
     __API_KEY__: JSON.stringify(API_KEY),
   },
