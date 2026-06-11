@@ -417,6 +417,7 @@ export default function App() {
   const [aiLengthPreset, setAiLengthPreset] = useState("medio");
   const [generatingAiRoute, setGeneratingAiRoute] = useState(false);
   const [aiRouteNameDraft, setAiRouteNameDraft] = useState("");
+  const [aiConstraints, setAiConstraints] = useState("");
   const [showAiGenerateModal, setShowAiGenerateModal] = useState(false);
   const [purchasedKeys, setPurchasedKeys] = useState(new Set());
   const [objectPurchaseRequests, setObjectPurchaseRequests] = useState([]);
@@ -1226,7 +1227,7 @@ export default function App() {
       await api("/users/me/percorsi/personalizzati/genera", {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify({ museo: MUSEO, lengthPreset: aiLengthPreset, nome: aiRouteNameDraft.trim() }),
+        body: JSON.stringify({ museo: MUSEO, lengthPreset: aiLengthPreset, nome: aiRouteNameDraft.trim(), userConstraints: aiConstraints.trim() }),
       });
       showToast(mp("aiRouteCreated"));
       await loadPersonalRoutes();
@@ -1234,6 +1235,7 @@ export default function App() {
       setActiveTab("visits");
       setShowAiGenerateModal(false);
       setAiRouteNameDraft("");
+      setAiConstraints("");
     } catch (e) {
       showToast(`${mp("personalRouteGenFail")} ${e.message}`, "error");
     } finally {
@@ -2260,6 +2262,20 @@ export default function App() {
             </select>
             <p style={{ margin: "-4px 0 14px", color: "var(--text-faint)", fontSize: 11, lineHeight: 1.7 }}>
               {mp("aiLenExplain")}
+            </p>
+            <label style={{ display: "block", margin: "2px 0 6px", fontFamily: "var(--font-head)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-dim)" }}>
+              {mp("aiConstraintsLabel")}
+            </label>
+            <textarea
+              value={aiConstraints}
+              onChange={(e) => setAiConstraints(e.target.value)}
+              placeholder={mp("aiConstraintsPh")}
+              rows={4}
+              maxLength={600}
+              style={{ width: "100%", padding: "10px 12px", marginBottom: 6, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+            <p style={{ margin: "0 0 14px", color: "var(--text-faint)", fontSize: 11, lineHeight: 1.7 }}>
+              {mp("aiConstraintsHelp")}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setShowAiGenerateModal(false)} style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "transparent", color: "var(--text-dim)", cursor: "pointer" }}>Annulla</button>

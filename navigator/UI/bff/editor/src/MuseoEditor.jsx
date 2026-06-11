@@ -114,6 +114,10 @@ async function apiDecideMarketplaceRequest(id, status, note = "") {
   });
 }
 
+async function apiGenerateProfessorCode() {
+  return apiFetch(`/admin/professor-codes/genera`, { method: "POST" });
+}
+
 function roomBackgroundUrl(museo, stanza, tipo = "preview", v = 0) {
   const baseUrl = `/api/musei/${encodeURIComponent(museo)}/stanze/${encodeURIComponent(stanza)}/immagini/${encodeURIComponent(tipo)}`;
   return v > 0 ? `${baseUrl}?v=${v}` : baseUrl;
@@ -1220,6 +1224,8 @@ export default function MuseoEditor() {
   const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("pending");
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceActionId, setMarketplaceActionId] = useState("");
+  const [professorCode, setProfessorCode] = useState("");
+  const [generatingProfCode, setGeneratingProfCode] = useState(false);
 
   const showPrompt = (message, defaultValue = "") =>
     new Promise(resolve => setModal({ message, defaultValue, onConfirm: resolve }));
@@ -1385,6 +1391,24 @@ export default function MuseoEditor() {
       showToast(`Errore aggiornamento richiesta: ${e.message}`, false);
     } finally {
       setMarketplaceActionId("");
+    }
+  };
+
+  const generateProfessorCode = async () => {
+    if (generatingProfCode) return;
+    setGeneratingProfCode(true);
+    try {
+      const data = await apiGenerateProfessorCode();
+      const code = String(data?.code || "").trim();
+      setProfessorCode(code);
+      if (code && navigator.clipboard) {
+        navigator.clipboard.writeText(code).catch(() => {});
+      }
+      showToast("Codice PROF generato e copiato");
+    } catch (e) {
+      showToast(`Errore generazione codice PROF: ${e.message}`, false);
+    } finally {
+      setGeneratingProfCode(false);
     }
   };
 
@@ -2178,6 +2202,20 @@ export default function MuseoEditor() {
                   ))}
                 </div>
               </>}
+              {apiStatus==="ok"&&<div style={{marginTop:20,paddingTop:16,borderTop:`1px solid ${THEME.border}`}}>
+                <div style={{fontSize:10,letterSpacing:2,color:THEME.textFaint,marginBottom:10}}>ACCOUNT PROFESSORE</div>
+                <button onClick={generateProfessorCode} disabled={generatingProfCode}
+                  style={{width:"100%",padding:"12px 16px",borderRadius:8,border:`1px solid ${THEME.accent}`,background:THEME.accentSoft,color:THEME.accent,fontSize:13,fontWeight:"bold",cursor:generatingProfCode?"default":"pointer",opacity:generatingProfCode?0.6:1,textAlign:"left",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>🎓</span>
+                  <span>{generatingProfCode?"Generazione...":"Genera codice PROF"}</span>
+                </button>
+                {professorCode&&<div style={{marginTop:10,padding:"10px 12px",borderRadius:8,background:THEME.panel,border:`1px solid ${THEME.border}`}}>
+                  <div style={{fontSize:10,color:THEME.textFaint,marginBottom:6}}>Codice (copialo ora, non verrà più mostrato):</div>
+                  <div onClick={()=>{navigator.clipboard?.writeText(professorCode).catch(()=>{});showToast("Codice copiato");}}
+                    style={{fontFamily:"monospace",fontSize:15,fontWeight:"bold",color:THEME.text,letterSpacing:1,cursor:"pointer",userSelect:"all"}} title="Clicca per copiare">{professorCode}</div>
+                  <div style={{fontSize:11,color:THEME.textDim,marginTop:6}}>Lo studente lo inserisce nel campo "codice professore" in fase di registrazione.</div>
+                </div>}
+              </div>}
               {apiStatus==="err"&&<div style={{marginTop:16,padding:"12px 16px",borderRadius:8,background:"rgba(224,90,74,0.1)",border:`1px solid ${THEME.danger}`,color:THEME.danger,fontSize:12}}>
                 ⚠️ Impossibile raggiungere il server API.
                 <button onClick={()=>{setMuseo(MUSEO_VUOTO);setScreen("nuovo");}} style={{display:"block",marginTop:10,padding:"8px 16px",borderRadius:6,border:`1px solid ${THEME.danger}`,background:"transparent",color:THEME.danger,fontSize:12,cursor:"pointer"}}>Continua offline →</button>

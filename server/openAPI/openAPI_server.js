@@ -196,6 +196,38 @@ function hashProfessorCode(code) {
   return crypto.createHash("sha256").update(String(code || "").trim()).digest("hex");
 }
 
+function randomProfessorCodePart(len = 12) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // evita caratteri ambigui
+  const bytes = crypto.randomBytes(len);
+  let out = "";
+  for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
+function formatProfessorCode(prefix = "PROF", part) {
+  const chunks = String(part || "").match(/.{1,4}/g) || [part];
+  return `${prefix}-${chunks.join("-")}`;
+}
+
+// Genera un codice professore, lo salva su DB come hash e restituisce il plaintext (mostrato una volta sola).
+async function createProfessorCode() {
+  return withUsersDb(async (db) => {
+    const col = db.collection(PROFESSOR_CODES_COLLECTION);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = formatProfessorCode("PROF", randomProfessorCodePart(12));
+      const hash = hashProfessorCode(code);
+      try {
+        await col.insertOne({ hash, enabled: true, createdAt: new Date() });
+        return code;
+      } catch (err) {
+        if (err?.code === 11000) continue; // collisione hash improbabile: rigenera
+        throw err;
+      }
+    }
+    throw new Error("impossibile generare un codice univoco");
+  });
+}
+
 function hashQrCode(code) {
   return crypto.createHash("sha256").update(String(code || "").trim()).digest("hex");
 }
@@ -684,10 +716,14 @@ async function aiGeneratePersonalRoute({ museoNome, objectDocs, targetCount, use
     "Ogni textStep deve essere scritto come mini-racconto curatoriale di stanza, non come scheda tecnica.",
     "Ogni textStep deve includere: 1) un gancio narrativo, 2) almeno una curiosita concreta, 3) un collegamento a personaggi/eventi/opere celebri anche esterni al museo (esplicitando che e un confronto culturale), 4) una piccola domanda o spunto di osservazione personalizzato.",
     "Evita formule generiche ripetitive come 'In questa stanza trovi...'.",
-  ].join(" ");
+    userPrefs?.userConstraints
+      ? "PRIORITA MASSIMA: rispetta le richieste libere dell'utente nel campo userConstraints (es. tempo disponibile, eta dei partecipanti, livello di approfondimento, temi specifici); adatta selezione oggetti e textSteps di conseguenza."
+      : "",
+  ].filter(Boolean).join(" ");
   const user = JSON.stringify({
     museo: museoNome,
     targetCount,
+    userConstraints: userPrefs?.userConstraints || "",
     userPreferences: {
       interessi: userPrefs?.interessi || [],
       livello: userPrefs?.livello || "",
@@ -830,9 +866,13 @@ async function aiGeneratePersonalDescriptions({ museoNome, objectDocs, selectedO
     "Per ogni oggetto includi: 1) un gancio interpretativo, 2) almeno una curiosita o confronto culturale pertinente, 3) un aggancio esplicito agli interessi dell'utente, 4) uno spunto di osservazione finale.",
     "I confronti con artisti/opere/eventi famosi sono consentiti solo come parallelismi culturali plausibili, senza attribuire dati storici non presenti nel contesto.",
     "Evita frasi template ripetitive; ogni oggetto deve avere una voce distinta ma coerente ai dati.",
-  ].join(" ");
+    userPrefs?.userConstraints
+      ? "PRIORITA MASSIMA: adatta tono, lunghezza e contenuto alle richieste libere dell'utente nel campo userConstraints (es. tempo a disposizione, eta dei partecipanti, profondita, temi specifici)."
+      : "",
+  ].filter(Boolean).join(" ");
   const user = JSON.stringify({
     museo: museoNome,
+    userConstraints: userPrefs?.userConstraints || "",
     userPreferences: {
       interessi: userPrefs?.interessi || [],
       livello: userPrefs?.livello || "",
@@ -2173,11 +2213,13 @@ async function startServer(cliOptions) {
       if (objectDocs.length < 1) return res.status(400).json({ error: "museo senza oggetti utili" });
 
       const targetCount = personalRouteTargetCount(objectDocs.length, lengthPreset);
+      const userConstraints = String(req.body?.userConstraints || "").trim().slice(0, 600);
       const userPrefs = {
         interessi: Array.isArray(session.user.interessi) ? session.user.interessi : [],
         livello: session.user.livello || "studente",
         durata: session.user.durata || "medio",
         navLang: normalizeNavLang(session.user.navLang),
+        userConstraints,
       };
 
       const fallbackRoute = fallbackPersonalizedRoute({ objectDocs, targetCount, userPrefs });
@@ -2456,6 +2498,20 @@ async function startServer(cliOptions) {
     } catch (err) {
       console.error("Errore richiesta acquisto oggetto:", err.message);
       res.status(500).json({ error: "errore richiesta acquisto oggetto" });
+    }
+  });
+
+  app.post("/admin/professor-codes/genera", async (req, res) => {
+    try {
+      const session = await getSessionUser(req);
+      if (!session) return res.status(401).json({ error: "utente non autenticato" });
+      if (!isAdmin(session.user)) return res.status(403).json({ error: "solo admin" });
+
+      const code = await createProfessorCode();
+      res.json({ code });
+    } catch (err) {
+      console.error("Errore generazione codice professore:", err.message);
+      res.status(500).json({ error: "errore generazione codice professore" });
     }
   });
 
