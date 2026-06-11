@@ -182,11 +182,94 @@
             </nav>
           </section>
 
-          <!-- ── TAB: visite (slice 3) ──────────────────────────── -->
+          <!-- ── TAB: visite ────────────────────────────────────── -->
           <section x-show="activeTab === 'visits'" x-cloak>
-            <p class="mp-placeholder" x-show="loadingVisits">…</p>
-            <p class="mp-placeholder" x-show="!loadingVisits"
-               x-text="percorsi.length + ' percorsi caricati (slice 3)'"></p>
+
+            <!-- pannello IA -->
+            <div class="mp-ai-panel">
+              <p class="mp-ai-kicker" x-text="mp('aiRouteTitle')"></p>
+              <p class="mp-ai-hint" x-text="mp('aiRouteHint')"></p>
+              <p class="mp-ai-hint" x-text="mp('aiRouteWhatIs')"></p>
+              <div class="mp-ai-actions">
+                <button class="mp-btn-green-outline" :disabled="generatingAiRoute"
+                        @click="showAiGenerateModal = true"
+                        x-text="generatingAiRoute ? mp('aiRouteGenerating') : mp('aiRouteGenerate')"></button>
+              </div>
+              <div class="mp-ai-routes" x-show="personalRoutes.length > 0">
+                <p class="mp-ai-routes-label" x-text="mp('aiMyRoutes')"></p>
+                <template x-for="r in personalRoutes" :key="r.id">
+                  <div class="mp-ai-route-row">
+                    <span x-text="r.nome"></span>
+                    <button class="mp-mini-btn" @click="deleteAiRoute(r.id)" x-text="mp('aiRouteDelete')"></button>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- visite guidate salvate (professore) -->
+            <div class="mp-ai-panel" x-show="isProfessor && teacherSavedVisits.length > 0">
+              <p class="mp-ai-kicker" x-text="mp('myGuidedTours')"></p>
+              <div class="mp-saved-visits">
+                <template x-for="visit in teacherSavedVisits.slice(0, 6)" :key="visit.id">
+                  <div class="mp-saved-visit-row">
+                    <span class="mp-saved-visit-name" x-text="visit.nome"></span>
+                    <div class="mp-saved-visit-actions">
+                      <button class="mp-mini-btn" @click="copyToClipboard(visitStudentLink(visit), mp('linkStudentsCopied'))" x-text="mp('linkStudents')"></button>
+                      <button class="mp-mini-btn mp-mini-green" @click="window.open(visitDashboardLink(visit), '_blank', 'noopener,noreferrer')" x-text="mp('startVisit')"></button>
+                      <button class="mp-mini-btn" x-show="!visit.navigationStarted" @click="startEditTeacherVisit(visit)" x-text="mp('edit')"></button>
+                      <button class="mp-mini-btn mp-mini-danger" @click="deleteTeacherVisit(visit.id)" x-text="mp('delete')"></button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- griglia percorsi -->
+            <div class="mp-grid">
+              <template x-if="loadingVisits">
+                <template x-for="i in 6" :key="i"><div class="mp-skeleton"></div></template>
+              </template>
+              <template x-if="!loadingVisits && pagedVisits.length === 0">
+                <div class="mp-empty"><p x-text="mp('noPathsCreated')"></p></div>
+              </template>
+              <template x-if="!loadingVisits">
+                <template x-for="(p, i) in pagedVisits" :key="p.id || p.nome">
+                  <div class="mp-card mp-visit-card">
+                    <div class="mp-card-body">
+                      <div class="mp-card-title" x-text="displayPercorsoNome(p.nome) || p.nome"></div>
+                      <div class="mp-visit-meta">
+                        <span class="mp-visit-count" x-text="(p.oggetti || []).length + ' ' + mp('worksCount')"></span>
+                        <span class="mp-visit-price" :class="{ 'mp-green': visitIncluded(p) }" x-text="fmtPrezzo(p.prezzo)"></span>
+                      </div>
+                      <div class="mp-tags">
+                        <template x-for="n in (p.oggetti || []).slice(0, 3)" :key="n">
+                          <span class="mp-tag mp-tag-green" x-text="n"></span>
+                        </template>
+                        <template x-if="(p.oggetti ? p.oggetti.length : 0) > 3">
+                          <span class="mp-tag mp-tag-green" x-text="'+' + (p.oggetti.length - 3)"></span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="mp-card-foot">
+                      <div class="mp-visit-actions">
+                        <button class="mp-card-btn mp-card-btn-ghost" :disabled="!canAccessPath(p)" @click="openPathDetails(p)" x-text="mp('view')"></button>
+                        <button class="mp-card-btn" :class="visitCanStart(p) ? 'mp-card-btn-start' : 'mp-card-btn-ghost'"
+                                :disabled="!visitCanStart(p)" @click="startNavigatorForRoute(p)" x-text="mp('startRoute')"></button>
+                        <button class="mp-card-btn mp-card-btn-buy" x-show="visitShowBuy(p)"
+                                :disabled="buyingPath === p.nome" @click="requestBuyPath(p)"
+                                x-text="buyingPath === p.nome ? mp('buying') : mp('buy')"></button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </div>
+            <nav class="mp-pagination" :aria-label="mp('ariaPagination')" x-show="visitPages > 1">
+              <template x-for="p in visitPages" :key="p">
+                <button class="mp-page-btn" :class="{ 'is-active': p === visitPage }"
+                        @click="visitPage = p" x-text="p"></button>
+              </template>
+            </nav>
           </section>
 
         </div>
@@ -302,6 +385,76 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODALE DETTAGLIO PERCORSO ──────────────────────────── -->
+      <div class="mp-overlay" x-show="selectedPath" x-cloak
+           @click.self="closePathModal()" @keydown.escape.window="closePathModal()">
+        <div class="mp-dialog mp-dialog-narrow" role="dialog" aria-modal="true" x-show="selectedPath">
+          <button class="mp-dialog-x" @click="closePathModal()">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('pathLabel')"></p>
+          <h3 class="mp-dialog-title" x-text="displayPercorsoNome(selectedPath?.nome)"></h3>
+          <p class="mp-path-price">
+            <span x-text="mp('price')"></span>
+            <span class="mp-green" x-text="fmtPrezzo(selectedPath?.prezzo)"></span>
+          </p>
+          <div class="mp-panel">
+            <p class="mp-panel-label" x-text="mp('pathWorksOrder')"></p>
+            <ol class="mp-path-list">
+              <template x-for="name in (selectedPath?.oggetti || [])" :key="name">
+                <li>
+                  <span class="mp-path-name" x-text="name"></span>
+                  <span class="mp-path-room" x-text="pathObjectRoom(name)"></span>
+                </li>
+              </template>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODALE CONFERMA ACQUISTO PERCORSO ──────────────────── -->
+      <div class="mp-overlay" x-show="pathPurchaseConfirm" x-cloak
+           @click.self="if (!buyingPath) pathPurchaseConfirm = null">
+        <div class="mp-confirm" role="dialog" aria-modal="true" x-show="pathPurchaseConfirm">
+          <button class="mp-dialog-x" :disabled="!!buyingPath" @click="if (!buyingPath) pathPurchaseConfirm = null">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('pathPurchaseConfirmTitle')"></p>
+          <h3 class="mp-confirm-title" x-text="displayPercorsoNome(pathPurchaseConfirm?.nome) || pathPurchaseConfirm?.nome"></h3>
+          <p class="mp-confirm-body"
+             x-text="mp('pathPurchaseConfirmBody').replace('{name}', displayPercorsoNome(pathPurchaseConfirm?.nome) || pathPurchaseConfirm?.nome || '').replace('{price}', fmtPrezzo(pathPurchaseConfirm?.prezzo))"></p>
+          <div class="mp-confirm-actions">
+            <button class="mp-mini-btn" :disabled="!!buyingPath" @click="pathPurchaseConfirm = null" x-text="mp('pathPurchaseCancel')"></button>
+            <button class="mp-btn-primary mp-btn-inline" :disabled="!!buyingPath" @click="confirmBuyPath()"
+                    x-text="buyingPath === (pathPurchaseConfirm && pathPurchaseConfirm.nome) ? mp('buying') : mp('pathPurchaseConfirm')"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODALE GENERAZIONE VISITA IA ───────────────────────── -->
+      <div class="mp-overlay" x-show="showAiGenerateModal" x-cloak
+           @click.self="showAiGenerateModal = false" @keydown.escape.window="showAiGenerateModal = false">
+        <div class="mp-ai-modal" role="dialog" aria-modal="true">
+          <button class="mp-dialog-x" @click="showAiGenerateModal = false">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('aiRouteTitle')"></p>
+          <h3 class="mp-ai-modal-title" x-text="mp('aiRouteGenerate')"></h3>
+          <p class="mp-ai-modal-desc" x-text="mp('aiRouteWhatIs')"></p>
+          <input class="mp-input mp-mb10" x-model="aiRouteNameDraft" :placeholder="mp('aiRouteNamePh')" />
+          <label class="mp-field-label" x-text="mp('aiLenLabel')"></label>
+          <select class="mp-input mp-mb12" x-model="aiLengthPreset">
+            <option value="breve" x-text="mp('aiLenShort')"></option>
+            <option value="medio" x-text="mp('aiLenMedium')"></option>
+            <option value="lungo" x-text="mp('aiLenLong')"></option>
+          </select>
+          <p class="mp-ai-modal-note" x-text="mp('aiLenExplain')"></p>
+          <label class="mp-field-label" x-text="mp('aiConstraintsLabel')"></label>
+          <textarea class="mp-input mp-textarea" x-model="aiConstraints" rows="4" maxlength="600"
+                    :placeholder="mp('aiConstraintsPh')"></textarea>
+          <p class="mp-ai-modal-note" x-text="mp('aiConstraintsHelp')"></p>
+          <div class="mp-confirm-actions">
+            <button class="mp-mini-btn" @click="showAiGenerateModal = false">Annulla</button>
+            <button class="mp-btn-green-outline" :disabled="generatingAiRoute" @click="generateAiRoute()"
+                    x-text="generatingAiRoute ? (mp('aiRouteGenerating') + ' ⏳') : mp('aiRouteGenerate')"></button>
           </div>
         </div>
       </div>

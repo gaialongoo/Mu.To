@@ -83,8 +83,12 @@ export function marketplace() {
     teacherBuilderOpen: false,
     openTeacherBuilder() {
       // TODO slice 4: costruttore visite guidate
-      this.teacherBuilderOpen = true;
       this.showToast("Costruttore visite: in arrivo (slice 4)");
+    },
+    startEditTeacherVisit(visit) {
+      // TODO slice 4: apre il builder precompilato
+      if (visit?.navigationStarted) { this.showToast("Visita gia avviata: non modificabile", "error"); return; }
+      this.showToast("Modifica visita: in arrivo (slice 4)");
     },
 
     // ── navigazione tab ────────────────────────────────────────
@@ -122,6 +126,20 @@ export function marketplace() {
     loadingObjectRequests: false,
     requestingObjectName: null,
 
+    // ── visite / percorsi ──────────────────────────────────────
+    purchasedKeys: [],
+    buyingPath: null,
+    pathPurchaseConfirm: null,
+    selectedPath: null,
+    visitPage: 1,
+    teacherSavedVisits: [],
+    // popup IA
+    aiLengthPreset: "medio",
+    generatingAiRoute: false,
+    aiRouteNameDraft: "",
+    aiConstraints: "",
+    showAiGenerateModal: false,
+
     // ── etichette descrizioni (dipendono dalla lingua) ─────────
     get DESCRIPTION_LEVELS() {
       return [this.mp("lvlChild"), this.mp("lvlStudent"), this.mp("lvlExpert"), this.mp("lvlAdvanced")];
@@ -147,6 +165,9 @@ export function marketplace() {
         if (!this.authChecked || !this.MUSEO) return;
         this.loadMuseo();
         this.loadObjectPurchaseRequests();
+        this.loadPurchasedPaths();
+        this.loadPersonalRoutes();
+        if (this.isProfessor) this.loadTeacherSavedVisits();
       });
     },
 
@@ -412,6 +433,189 @@ export function marketplace() {
           : o.descrizioni;
       const group = Array.isArray(matrix?.[lvlIndex]) ? matrix[lvlIndex] : [];
       return group?.[lenIndex] || "—";
+    },
+
+    // ── visite / percorsi ──────────────────────────────────────
+    async loadPersonalRoutes() {
+      if (!this.MUSEO) return;
+      try {
+        const data = await api(`/users/me/percorsi/personalizzati?museo=${enc(this.MUSEO)}`, { credentials: "include" });
+        this.personalRoutes = Array.isArray(data.percorsiPersonalizzati) ? data.percorsiPersonalizzati : [];
+      } catch (e) {
+        this.personalRoutes = [];
+        this.showToast(`${this.mp("errLoadPersonalRoutes")} ${e.message}`, "error");
+      }
+    },
+    async loadPurchasedPaths() {
+      if (!this.MUSEO) return;
+      try {
+        const data = await api(`/users/me/percorsi?museo=${enc(this.MUSEO)}`, { credentials: "include" });
+        this.purchasedKeys = Array.isArray(data.chiaviAcquisto) ? data.chiaviAcquisto : [];
+      } catch (e) {
+        this.purchasedKeys = [];
+        this.showToast("Errore caricamento acquisti: " + e.message, "error");
+      }
+    },
+    get allVisitRoutes() {
+      return [
+        ...this.percorsi,
+        ...this.personalRoutes.map((r) => ({ ...r, oggetti: r.objectNodes || r.oggetti || [], prezzo: 0, isPersonalized: true })),
+      ];
+    },
+    get pagedVisits() {
+      return this.allVisitRoutes.slice((this.visitPage - 1) * PAGE_SIZE, this.visitPage * PAGE_SIZE);
+    },
+    get visitPages() { return Math.ceil(this.allVisitRoutes.length / PAGE_SIZE); },
+
+    makePurchaseKey(p) { return `${this.MUSEO}::${p.nome}`; },
+    canAccessPath(p) {
+      return Number(p?.prezzo || 0) <= 0 || this.purchasedKeys.includes(this.makePurchaseKey(p));
+    },
+    // helper VisitCard
+    visitIncluded(p) { return Number(p?.prezzo || 0) <= 0; },
+    visitCanStart(p) { return this.visitIncluded(p) || this.canAccessPath(p); },
+    visitShowBuy(p) { return !this.visitIncluded(p) && !this.canAccessPath(p); },
+
+    requestBuyPath(p) {
+      if (!p?.nome) return;
+      if (this.canAccessPath(p)) { this.showToast("Percorso gia disponibile"); return; }
+      this.pathPurchaseConfirm = p;
+    },
+    async confirmBuyPath() {
+      const p = this.pathPurchaseConfirm;
+      if (!p?.nome) return;
+      this.pathPurchaseConfirm = null;
+      this.buyingPath = p.nome;
+      try {
+        await api("/users/me/percorsi/acquista", {
+          method: "POST", credentials: "include",
+          body: JSON.stringify({ museo: this.MUSEO, percorso: p.nome }),
+        });
+        this.purchasedKeys = [...this.purchasedKeys, this.makePurchaseKey(p)];
+        this.showToast(this.mp("pathPurchaseSuccess").replace("{name}", this.displayPercorsoNome(p.nome) || p.nome));
+      } catch (e) {
+        this.showToast(`${this.mp("pathPurchaseError")} ${e.message}`, "error");
+      } finally {
+        this.buyingPath = null;
+      }
+    },
+
+    async generateAiRoute() {
+      if (!this.MUSEO || this.generatingAiRoute) return;
+      this.generatingAiRoute = true;
+      try {
+        await api("/users/me/percorsi/personalizzati/genera", {
+          method: "POST", credentials: "include",
+          body: JSON.stringify({
+            museo: this.MUSEO,
+            lengthPreset: this.aiLengthPreset,
+            nome: this.aiRouteNameDraft.trim(),
+            userConstraints: this.aiConstraints.trim(),
+          }),
+        });
+        this.showToast(this.mp("aiRouteCreated"));
+        await this.loadPersonalRoutes();
+        if (!this.percorsiLoaded) this.percorsiLoaded = true;
+        this.activeTab = "visits";
+        this.showAiGenerateModal = false;
+        this.aiRouteNameDraft = "";
+        this.aiConstraints = "";
+      } catch (e) {
+        this.showToast(`${this.mp("personalRouteGenFail")} ${e.message}`, "error");
+      } finally {
+        this.generatingAiRoute = false;
+      }
+    },
+    async deleteAiRoute(routeId) {
+      if (!window.confirm(this.mp("personalRouteDeleteConfirm"))) return;
+      try {
+        await api(`/users/me/percorsi/personalizzati/${enc(routeId)}`, { method: "DELETE", credentials: "include" });
+        this.loadPersonalRoutes();
+        this.showToast(this.mp("personalRouteDeleted"));
+      } catch (e) {
+        this.showToast(`${this.mp("personalRouteDeleteFail")} ${e.message}`, "error");
+      }
+    },
+
+    openPathDetails(p) {
+      if (this.generatingAiRoute) { this.showToast(this.mp("waitPersonalRouteGenerating"), "error"); return; }
+      if (!this.canAccessPath(p)) { this.showToast("Acquista il percorso per visualizzarlo", "error"); return; }
+      this.selectedPath = p;
+    },
+    closePathModal() { this.selectedPath = null; },
+    pathObjectRoom(name) {
+      const o = this.allOggetti.find((x) => x.nome === name);
+      return o?.stanza ? ` — ${this.mp("roomInline")} ${this.displayStanzaName(o.stanza)}` : "";
+    },
+
+    setMuseoSessionCookie(sessionObj) {
+      try {
+        const maxAgeSec = 24 * 60 * 60;
+        document.cookie = `museo_session=${encodeURIComponent(JSON.stringify(sessionObj))}; Path=/; SameSite=Lax; Max-Age=${maxAgeSec}`;
+      } catch { /* ignore */ }
+    },
+    startNavigatorForRoute(p) {
+      if (!this.MUSEO) return;
+      if (this.generatingAiRoute) { this.showToast(this.mp("waitPersonalRouteGeneratingNav"), "error"); return; }
+      if (!this.canAccessPath(p)) { this.showToast("Acquista il percorso per avviarlo", "error"); return; }
+      const isPersonalized = !!p?.isPersonalized || p?.source === "ai_personalized" || !!p?.id;
+      if (isPersonalized) {
+        const objectNodes = Array.isArray(p?.flowNodes) && p.flowNodes.length > 0
+          ? p.flowNodes
+          : (Array.isArray(p?.objectNodes) && p.objectNodes.length > 0
+            ? p.objectNodes
+            : (Array.isArray(p?.oggetti) ? p.oggetti : []));
+        const firstNode = objectNodes[0];
+        if (!firstNode) { this.showToast(this.mp("personalRouteEmpty"), "error"); return; }
+        const personalizedRouteId = String(p?.id || "").trim();
+        if (!personalizedRouteId) { this.showToast(this.mp("personalRouteIdMissing"), "error"); return; }
+        this.setMuseoSessionCookie({ museo: this.MUSEO, percorso: ["IN", "OUT"], createdAt: Date.now(), personalizedRouteId });
+        window.location.href = `/?stanza=${encodeURIComponent("IN")}/path/${encodeURIComponent("IN")}/${encodeURIComponent(firstNode)}`;
+        return;
+      }
+      const oggetti = Array.isArray(p?.oggetti) ? p.oggetti : [];
+      const firstObj = oggetti[0];
+      if (!firstObj) { this.showToast("Percorso vuoto", "error"); return; }
+      this.setMuseoSessionCookie({ museo: this.MUSEO, percorso: ["IN", ...oggetti, "OUT"], createdAt: Date.now() });
+      window.location.href = `/?stanza=${encodeURIComponent("IN")}/path/${encodeURIComponent("IN")}/${encodeURIComponent(firstObj)}`;
+    },
+
+    async copyToClipboard(value, successMessage) {
+      try {
+        await navigator.clipboard.writeText(value);
+        this.showToast(successMessage);
+      } catch {
+        window.prompt("Copia manualmente il link:", value);
+        this.showToast("Copia automatica non disponibile", "error");
+      }
+    },
+
+    // ── visite guidate salvate (professore) ────────────────────
+    async loadTeacherSavedVisits() {
+      if (!this.isProfessor) return;
+      try {
+        const data = await api("/users/me/guided-visits", { credentials: "include" });
+        this.teacherSavedVisits = Array.isArray(data.visits) ? data.visits : [];
+      } catch (e) {
+        this.teacherSavedVisits = [];
+        this.showToast("Errore caricamento visite guidate: " + e.message, "error");
+      }
+    },
+    visitStudentLink(visit) {
+      return `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=student`;
+    },
+    visitDashboardLink(visit) {
+      return `${window.location.origin}/?guidedVisit=${encodeURIComponent(visit.id)}&role=teacher&directNavigator=1&dashboard=1`;
+    },
+    async deleteTeacherVisit(visitId) {
+      if (!window.confirm("Eliminare questa visita guidata?")) return;
+      try {
+        await api(`/guided-visits/${enc(visitId)}`, { method: "DELETE", credentials: "include" });
+        this.showToast("Visita guidata eliminata");
+        this.loadTeacherSavedVisits();
+      } catch (e) {
+        this.showToast("Errore eliminazione visita guidata: " + e.message, "error");
+      }
     },
 
     // helper formattazione esposti al markup
