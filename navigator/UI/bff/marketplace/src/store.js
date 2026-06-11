@@ -76,8 +76,79 @@ export function marketplace() {
     authChecked: false,
     currentUser: null,
     profileOpen: false,
+    profileForm: {
+      nome: "", cognome: "", email: "", eta: "", ruolo: "",
+      livello: "", durata: "", interessi: [], navLang: readStoredNavLang(),
+    },
     get isProfessor() {
       return String(this.currentUser?.ruolo || "").toLowerCase() === "professore";
+    },
+    get PROFILE_INTERESTS() {
+      return [
+        ["storia", this.mp("interestHistory")],
+        ["storia_arte", this.mp("interestArtHistory")],
+        ["vita_artista", this.mp("interestArtistLife")],
+        ["tecniche_materiali", this.mp("interestTech")],
+        ["estetica", this.mp("interestAesthetic")],
+        ["sensorialita", this.mp("interestSensorial")],
+        ["filosofia_significato", this.mp("interestPhilosophy")],
+        ["moda_costumi", this.mp("interestFashion")],
+      ];
+    },
+    openProfile() {
+      const u = this.currentUser;
+      if (u) {
+        this.profileForm = {
+          nome: u.nome || "", cognome: u.cognome || "", email: u.email || "",
+          eta: u.eta ?? "", ruolo: u.ruolo || "", livello: u.livello || "",
+          durata: u.durata || "", interessi: Array.isArray(u.interessi) ? [...u.interessi] : [],
+          navLang: normalizeNavLang(u.navLang),
+        };
+      }
+      this.profileOpen = true;
+    },
+    closeProfile() { this.profileOpen = false; },
+    toggleInterest(value) {
+      const has = this.profileForm.interessi.includes(value);
+      this.profileForm.interessi = has
+        ? this.profileForm.interessi.filter((x) => x !== value)
+        : [...this.profileForm.interessi, value];
+    },
+    onProfileLangChange() {
+      const v = normalizeNavLang(this.profileForm.navLang);
+      this.profileForm.navLang = v;
+      this.setLang(v);
+    },
+    async saveProfile() {
+      if (this.profileForm.interessi.length < 1) { this.showToast("Seleziona almeno un interesse", "error"); return; }
+      try {
+        const res = await fetch("/api/users/me", {
+          method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: this.profileForm.nome.trim(), cognome: this.profileForm.cognome.trim(),
+            eta: Number(this.profileForm.eta), livello: this.profileForm.livello,
+            durata: this.profileForm.durata, interessi: this.profileForm.interessi,
+            navLang: normalizeNavLang(this.profileForm.navLang),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { this.showToast(data.error || "Aggiornamento profilo fallito", "error"); return; }
+        const u = data.user || null;
+        this.currentUser = u;
+        const nl = normalizeNavLang(u?.navLang);
+        this.lang = nl;
+        writeStoredNavLang(nl);
+        window.dispatchEvent(new CustomEvent("mu-nav-lang-changed", { detail: nl }));
+        this.profileForm = {
+          nome: u?.nome || "", cognome: u?.cognome || "", email: u?.email || "", eta: u?.eta ?? "",
+          ruolo: u?.ruolo || "", livello: u?.livello || "", durata: u?.durata || "",
+          interessi: u?.interessi || [], navLang: nl,
+        };
+        this.showToast("Profilo aggiornato");
+        this.profileOpen = false;
+      } catch {
+        this.showToast("Impossibile aggiornare il profilo", "error");
+      }
     },
 
     // ── teacher builder (visite guidate) ───────────────────────
@@ -416,6 +487,12 @@ export function marketplace() {
           this.lang = nl;
           writeStoredNavLang(nl);
         }
+        this.profileForm = {
+          nome: user?.nome || "", cognome: user?.cognome || "", email: user?.email || "",
+          eta: user?.eta ?? "", ruolo: user?.ruolo || "", livello: user?.livello || "",
+          durata: user?.durata || "", interessi: user?.interessi || [],
+          navLang: normalizeNavLang(user?.navLang),
+        };
         this.authChecked = true;
       } catch {
         window.location.replace("/");

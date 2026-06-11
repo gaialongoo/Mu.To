@@ -340,6 +340,24 @@ select.mp-filter-input { padding-right: 32px; appearance: none; }
   .mp-dialog-builder { width: min(760px, 100%); }
 }
 
+/* ─── Profilo ─────────────────────────────────────────────────── */
+.mp-dialog-profile { width: min(620px, 90vw); }
+.mp-profile-form { display: grid; gap: 12px; }
+.mp-profile-form .mp-input { width: 100%; background: var(--bg-card); border-radius: 8px; }
+.mp-input-disabled { background: #111 !important; color: var(--text-dim); }
+.mp-profile-section { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; font-family: var(--font-head); }
+.mp-profile-lang { width: calc(50% - 6px); }
+.mp-interests { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-interest { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer; font-size: 11px; letter-spacing: 0.05em; }
+.mp-interest.is-on { border-color: var(--green); background: var(--green-dim); color: var(--green); }
+.mp-profile-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+@media (max-width: 768px) {
+  .mp-dialog-profile { width: min(620px, 100%); }
+  .mp-profile-lang { width: 100%; }
+  .mp-interests { justify-content: center; }
+  .mp-profile-actions { flex-direction: column; }
+}
+
 /* ─── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .mp-shell { padding: 0 22px 70px; }

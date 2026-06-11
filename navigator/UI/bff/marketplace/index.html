@@ -62,7 +62,7 @@
             </div>
 
             <div class="mp-actions">
-              <button class="mp-btn-outline" @click="profileOpen = true" x-text="mp('profile')"></button>
+              <button class="mp-btn-outline" @click="openProfile()" x-text="mp('profile')"></button>
               <a class="mp-btn-green-outline" href="/" x-text="mp('home')"></a>
               <template x-if="apiKeyActive">
                 <span class="mp-key-active">
@@ -300,6 +300,64 @@
             Inviata come header <code>X-API-Key</code> tramite proxy su <code>/api</code>.<br />
             Non viene persistita oltre la sessione.
           </div>
+        </div>
+      </div>
+
+      <!-- ── MODALE PROFILO ─────────────────────────────────────── -->
+      <div class="mp-overlay" x-show="profileOpen" x-cloak
+           @click.self="closeProfile()" @keydown.escape.window="closeProfile()">
+        <div class="mp-dialog mp-dialog-profile" role="dialog" aria-modal="true">
+          <button class="mp-dialog-x" @click="closeProfile()">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('account')"></p>
+          <h3 class="mp-dialog-title" x-text="mp('profileTitle')"></h3>
+          <form class="mp-profile-form" @submit.prevent="saveProfile()">
+            <div class="mp-builder-row2">
+              <input class="mp-input" x-model="profileForm.nome" :placeholder="mp('phFirstName')" />
+              <input class="mp-input" x-model="profileForm.cognome" :placeholder="mp('phLastName')" />
+            </div>
+            <div class="mp-builder-row2">
+              <input class="mp-input mp-input-disabled" x-model="profileForm.email" disabled :placeholder="mp('phEmail')" />
+              <input class="mp-input" type="number" min="1" max="120" x-model="profileForm.eta" :placeholder="mp('phAge')" />
+            </div>
+            <div class="mp-builder-row2">
+              <select class="mp-input" x-model="profileForm.livello">
+                <option value="" x-text="mp('levelPlaceholder')"></option>
+                <option value="bambino" x-text="mp('lvlChild')"></option>
+                <option value="studente" x-text="mp('lvlStudent')"></option>
+                <option value="esperto" x-text="mp('lvlExpert')"></option>
+                <option value="avanzato" x-text="mp('lvlAdvanced')"></option>
+              </select>
+              <select class="mp-input" x-model="profileForm.durata">
+                <option value="" x-text="mp('durationExpl')"></option>
+                <option value="corto" x-text="mp('durOptShort')"></option>
+                <option value="medio" x-text="mp('durOptMed')"></option>
+                <option value="lungo" x-text="mp('durOptLong')"></option>
+                <option value="esteso" x-text="mp('durOptExt')"></option>
+              </select>
+            </div>
+            <div>
+              <p class="mp-profile-section" x-text="mp('langLabel')"></p>
+              <select class="mp-input mp-profile-lang" x-model="profileForm.navLang" @change="onProfileLangChange()">
+                <template x-for="opt in LANG_OPTIONS" :key="opt.value">
+                  <option :value="opt.value" x-text="opt.label"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <p class="mp-profile-section" x-text="mp('interests')"></p>
+              <div class="mp-interests">
+                <template x-for="pair in PROFILE_INTERESTS" :key="pair[0]">
+                  <button type="button" class="mp-interest"
+                          :class="{ 'is-on': profileForm.interessi.includes(pair[0]) }"
+                          @click="toggleInterest(pair[0])" x-text="pair[1]"></button>
+                </template>
+              </div>
+            </div>
+            <div class="mp-profile-actions">
+              <button type="button" class="mp-btn-outline" @click="closeProfile()" x-text="mp('close')"></button>
+              <button type="submit" class="mp-btn-green-outline" x-text="mp('saveProfile')"></button>
+            </div>
+          </form>
         </div>
       </div>
 
