@@ -10,6 +10,7 @@ import { readStoredNavLang, writeStoredNavLang, MP_LANG_OPTIONS, mpT, normalizeN
 import {
   PAGE_SIZE, displayI18nMapLookup, formatPrezzo, formatEuroAmount,
   parseAnnoValue, yearInputToSigned, LEVEL_KEY_TO_INDEX, DURATION_KEY_TO_INDEX,
+  extractDefaultDescription,
 } from "./helpers";
 
 export function marketplace() {
@@ -79,16 +80,231 @@ export function marketplace() {
       return String(this.currentUser?.ruolo || "").toLowerCase() === "professore";
     },
 
-    // ── teacher builder (slice 4) ──────────────────────────────
+    // ── teacher builder (visite guidate) ───────────────────────
     teacherBuilderOpen: false,
     openTeacherBuilder() {
-      // TODO slice 4: costruttore visite guidate
-      this.showToast("Costruttore visite: in arrivo (slice 4)");
+      this.teacherSelectedObjects = [];
+      this.teacherOptimizedOrder = [];
+      this.teacherEditingVisitId = "";
+      this.teacherVisitName = "";
+      this.teacherObjectDescriptions = {};
+      this.teacherTextItems = [];
+      this.teacherTextDraft = { name: "", room: "", text: "", insertAfterObject: "" };
+      this.teacherEditingTextItemId = null;
+      this.teacherQuizTitle = "";
+      this.teacherQuizTimeLimit = 120;
+      this.teacherQuizQuestions = [{ id: "q1", question: "", options: ["", ""], correctIndex: 0 }];
+      this.teacherStudentLink = "";
+      this.teacherDashboardLink = "";
+      this.teacherBuilderOpen = true;
+    },
+    closeTeacherBuilder() {
+      this.teacherBuilderOpen = false;
+      this.teacherOptimizedOrder = [];
+      this.teacherStudentLink = "";
+      this.teacherDashboardLink = "";
+      this.teacherEditingTextItemId = null;
+      this.teacherEditingVisitId = "";
+    },
+    toggleTeacherObject(name) {
+      if (this.teacherSelectedObjects.includes(name)) {
+        this.teacherSelectedObjects = this.teacherSelectedObjects.filter((x) => x !== name);
+      } else {
+        this.teacherSelectedObjects = [...this.teacherSelectedObjects, name];
+      }
+      if (this.teacherObjectDescriptions[name] == null) {
+        const oggetto = this.allOggetti.find((item) => item.nome === name);
+        this.teacherObjectDescriptions[name] = extractDefaultDescription(oggetto);
+      }
+    },
+    moveTeacherObject(name, direction) {
+      const prev = this.teacherSelectedObjects;
+      const idx = prev.indexOf(name);
+      if (idx < 0) return;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= prev.length) return;
+      const copy = [...prev];
+      [copy[idx], copy[nextIdx]] = [copy[nextIdx], copy[idx]];
+      this.teacherSelectedObjects = copy;
+    },
+    get selectedObjectRooms() {
+      return Array.from(new Set(
+        this.teacherSelectedObjects
+          .map((name) => this.allOggetti.find((o) => o.nome === name)?.stanza)
+          .filter(Boolean)
+      ));
+    },
+    get availableTextRooms() {
+      return this.selectedObjectRooms.filter((room) =>
+        !this.teacherTextItems.some((item) => item.room === room && item.id !== this.teacherEditingTextItemId)
+      );
+    },
+    get availableInsertAfterObjects() {
+      return this.teacherSelectedObjects.filter((name) => {
+        const obj = this.allOggetti.find((o) => o.nome === name);
+        return String(obj?.stanza || "") === String(this.teacherTextDraft.room || "");
+      });
+    },
+    addTeacherTextItem() {
+      const name = String(this.teacherTextDraft.name || "").trim();
+      const room = String(this.teacherTextDraft.room || "").trim();
+      const text = String(this.teacherTextDraft.text || "").trim();
+      const insertAfterObject = String(this.teacherTextDraft.insertAfterObject || "").trim();
+      if (!name) { this.showToast("Inserisci un nome per l'item testo", "error"); return; }
+      if (!room) { this.showToast("Seleziona una stanza per l'item testo", "error"); return; }
+      if (this.teacherTextItems.some((item) => item.room === room && item.id !== this.teacherEditingTextItemId)) {
+        this.showToast("In questa stanza c'e gia un item testo", "error"); return;
+      }
+      if (!text) { this.showToast("Inserisci il testo dell'item", "error"); return; }
+      const roomObjects = this.teacherSelectedObjects.filter((n) => {
+        const obj = this.allOggetti.find((o) => o.nome === n);
+        return String(obj?.stanza || "") === room;
+      });
+      if (roomObjects.length < 1) { this.showToast("Nella stanza selezionata non ci sono oggetti del percorso", "error"); return; }
+      if (!insertAfterObject) { this.showToast("Scegli dopo quale oggetto inserire l'item testo", "error"); return; }
+      if (!roomObjects.includes(insertAfterObject)) { this.showToast("L'oggetto scelto deve appartenere alla stanza selezionata", "error"); return; }
+      if (this.teacherEditingTextItemId) {
+        this.teacherTextItems = this.teacherTextItems.map((item) =>
+          item.id === this.teacherEditingTextItemId ? { ...item, name, room, text, insertAfterObject } : item);
+      } else {
+        this.teacherTextItems = [...this.teacherTextItems,
+          { id: `txt_${Date.now()}_${this.teacherTextItems.length}`, name, room, text, insertAfterObject }];
+      }
+      this.teacherTextDraft = { name: "", room: "", text: "", insertAfterObject: "" };
+      this.teacherEditingTextItemId = null;
+    },
+    removeTeacherTextItem(id) {
+      this.teacherTextItems = this.teacherTextItems.filter((item) => item.id !== id);
+      if (this.teacherEditingTextItemId === id) {
+        this.teacherEditingTextItemId = null;
+        this.teacherTextDraft = { name: "", room: "", text: "", insertAfterObject: "" };
+      }
+    },
+    editTeacherTextItem(id) {
+      const item = this.teacherTextItems.find((x) => x.id === id);
+      if (!item) return;
+      this.teacherEditingTextItemId = id;
+      this.teacherTextDraft = {
+        name: item.name || "", room: item.room || "", text: item.text || "", insertAfterObject: item.insertAfterObject || "",
+      };
+    },
+    textItemSummary(item) {
+      return `${item.name ? item.name + ": " : ""}${item.room ? "[" + item.room + "] " : ""}${item.text}` +
+        (item.insertAfterObject ? ` (${this.mp("afterObjectParen")} ${item.insertAfterObject})` : "");
+    },
+    // quiz
+    addQuizQuestion() {
+      this.teacherQuizQuestions = [...this.teacherQuizQuestions,
+        { id: `q${Date.now()}`, question: "", options: ["", ""], correctIndex: 0 }];
+    },
+    removeQuizQuestion(id) {
+      if (this.teacherQuizQuestions.length <= 1) return;
+      this.teacherQuizQuestions = this.teacherQuizQuestions.filter((q) => q.id !== id);
+    },
+    quizAddOption(question) { question.options.push(""); },
+    quizRemoveOption(question, optIdx) {
+      if (question.options.length <= 2) return;
+      question.options.splice(optIdx, 1);
+      if (question.correctIndex >= question.options.length) question.correctIndex = question.options.length - 1;
+    },
+    async saveTeacherGuidedVisit() {
+      if (!this.MUSEO) return;
+      const nome = String(this.teacherVisitName || "").trim();
+      if (!nome) { this.showToast("Inserisci il nome della visita", "error"); return; }
+      const orderedObjects = this.teacherSelectedObjects;
+      if (orderedObjects.length < 1) { this.showToast("Seleziona almeno un oggetto", "error"); return; }
+
+      const quizQuestions = this.teacherQuizQuestions.map((q, idx) => ({
+        id: q.id || `q_${idx + 1}`,
+        question: String(q.question || "").trim(),
+        options: Array.isArray(q.options) ? q.options.map((opt) => String(opt || "").trim()).filter(Boolean) : [],
+        correctIndex: Number(q.correctIndex),
+      }));
+      const hasAnyQuizContent = quizQuestions.some((q) => q.question || q.options.some((opt) => opt));
+      const validQuizQuestions = quizQuestions.filter((q) => q.question && q.options.length >= 2 && q.correctIndex >= 0 && q.correctIndex < q.options.length);
+      if (hasAnyQuizContent && validQuizQuestions.length !== quizQuestions.length) {
+        this.showToast("Completa tutte le domande del quiz (almeno 2 opzioni e risposta corretta)", "error"); return;
+      }
+
+      const objectSteps = orderedObjects.map((objectName, idx) => ({
+        id: `obj_${idx + 1}`, type: "object", objectName, room: "", label: objectName,
+        customDescription: String(this.teacherObjectDescriptions[objectName] || "").trim(),
+      }));
+      const textSteps = this.teacherTextItems.map((item, idx) => ({
+        id: `txt_${idx + 1}`, type: "text", label: String(item.name || "").trim(),
+        room: item.room || "", text: item.text, customDescription: "",
+        insertAfterObject: String(item.insertAfterObject || ""),
+      }));
+      const invalidTextRoom = textSteps.find((t) => !this.selectedObjectRooms.includes(t.room));
+      if (invalidTextRoom) { this.showToast("Ogni item testo deve usare una stanza degli oggetti selezionati", "error"); return; }
+      const orderedFlowSteps = [];
+      for (const objectStep of objectSteps) {
+        orderedFlowSteps.push(objectStep);
+        const afterSteps = textSteps.filter((t) => t.insertAfterObject === objectStep.objectName);
+        orderedFlowSteps.push(...afterSteps.map(({ insertAfterObject, ...rest }) => rest));
+      }
+      const finalSteps = [...orderedFlowSteps];
+      const flowPreview = finalSteps.map((s) => s.type === "text" ? `${s.label || "Item testo"} (${s.room || "stanza"})` : s.objectName);
+
+      try {
+        const isEditing = !!this.teacherEditingVisitId;
+        const data = await api(isEditing ? `/guided-visits/${enc(this.teacherEditingVisitId)}` : "/guided-visits", {
+          method: isEditing ? "PUT" : "POST",
+          credentials: "include",
+          body: JSON.stringify({
+            museo: this.MUSEO, nome, steps: finalSteps,
+            quiz: {
+              title: this.teacherQuizTitle,
+              questions: hasAnyQuizContent ? validQuizQuestions : [],
+              timeLimitSec: Number(this.teacherQuizTimeLimit) || 120,
+            },
+          }),
+        });
+        const id = data?.visit?.id;
+        if (!id) throw new Error("ID visita non restituito");
+        this.teacherStudentLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(id)}&role=student`;
+        this.teacherDashboardLink = `${window.location.origin}/?guidedVisit=${encodeURIComponent(id)}&role=teacher&directNavigator=1&dashboard=1`;
+        this.teacherOptimizedOrder = flowPreview;
+        this.showToast(isEditing ? "Visita guidata aggiornata" : "Visita guidata salvata");
+        this.loadTeacherSavedVisits();
+      } catch (e) {
+        this.showToast("Errore salvataggio visita guidata: " + e.message, "error");
+      }
     },
     startEditTeacherVisit(visit) {
-      // TODO slice 4: apre il builder precompilato
       if (visit?.navigationStarted) { this.showToast("Visita gia avviata: non modificabile", "error"); return; }
-      this.showToast("Modifica visita: in arrivo (slice 4)");
+      const steps = Array.isArray(visit?.steps) ? visit.steps : [];
+      const objectSteps = steps.filter((s) => s.type === "object" && s.objectName);
+      const textSteps = steps.filter((s) => s.type === "text");
+      this.teacherEditingVisitId = String(visit.id || "");
+      this.teacherVisitName = String(visit.nome || "");
+      this.teacherSelectedObjects = objectSteps.map((s) => String(s.objectName || "").trim()).filter(Boolean);
+      this.teacherObjectDescriptions = objectSteps.reduce((acc, s) => {
+        const name = String(s.objectName || "").trim();
+        if (name) acc[name] = String(s.customDescription || "");
+        return acc;
+      }, {});
+      this.teacherTextItems = textSteps.map((s, idx) => ({
+        id: String(s.id || `txt_${idx + 1}`),
+        name: String(s.label || ""), room: String(s.room || ""),
+        text: String(s.text || ""), insertAfterObject: String(s.insertAfterObject || ""),
+      }));
+      const quiz = visit.quiz || {};
+      const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+      this.teacherQuizTitle = String(quiz.title || "");
+      this.teacherQuizTimeLimit = Number(quiz.timeLimitSec) || 120;
+      this.teacherQuizQuestions = questions.length > 0
+        ? questions.map((q, idx) => ({
+            id: String(q.id || `q_${idx + 1}`),
+            question: String(q.question || ""),
+            options: Array.isArray(q.options) && q.options.length >= 2 ? q.options.map((opt) => String(opt || "")) : ["", ""],
+            correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+          }))
+        : [{ id: "q1", question: "", options: ["", ""], correctIndex: 0 }];
+      this.teacherStudentLink = "";
+      this.teacherDashboardLink = "";
+      this.teacherOptimizedOrder = [];
+      this.teacherBuilderOpen = true;
     },
 
     // ── navigazione tab ────────────────────────────────────────
@@ -139,6 +355,23 @@ export function marketplace() {
     aiRouteNameDraft: "",
     aiConstraints: "",
     showAiGenerateModal: false,
+
+    // ── teacher builder (visite guidate) ───────────────────────
+    teacherSelectedObjects: [],
+    teacherLevel: "studente",
+    teacherDuration: "medio",
+    teacherOptimizedOrder: [],
+    teacherVisitName: "",
+    teacherObjectDescriptions: {},
+    teacherTextItems: [],
+    teacherTextDraft: { name: "", room: "", text: "", insertAfterObject: "" },
+    teacherEditingTextItemId: null,
+    teacherQuizTitle: "",
+    teacherQuizTimeLimit: 120,
+    teacherQuizQuestions: [{ id: "q1", question: "", options: ["", ""], correctIndex: 0 }],
+    teacherStudentLink: "",
+    teacherDashboardLink: "",
+    teacherEditingVisitId: "",
 
     // ── etichette descrizioni (dipendono dalla lingua) ─────────
     get DESCRIPTION_LEVELS() {

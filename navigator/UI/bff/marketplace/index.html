@@ -459,6 +459,137 @@
         </div>
       </div>
 
+      <!-- ── MODALE TEACHER BUILDER (visite guidate) ────────────── -->
+      <div class="mp-overlay" x-show="teacherBuilderOpen" x-cloak
+           @click.self="closeTeacherBuilder()" @keydown.escape.window="closeTeacherBuilder()">
+        <div class="mp-dialog mp-dialog-builder" role="dialog" aria-modal="true">
+          <button class="mp-dialog-x" @click="closeTeacherBuilder()">×</button>
+          <p class="mp-dialog-kicker" x-text="mp('professor')"></p>
+          <h3 class="mp-dialog-title" x-text="teacherEditingVisitId ? mp('editGuidedClass') : mp('createGuidedClass')"></h3>
+
+          <input class="mp-input mp-mb12" x-model="teacherVisitName" :placeholder="mp('phVisitName')" />
+
+          <div class="mp-builder-row2">
+            <select class="mp-input" x-model="teacherLevel">
+              <option value="bambino" x-text="mp('lvlChild')"></option>
+              <option value="studente" x-text="mp('lvlStudent')"></option>
+              <option value="esperto" x-text="mp('lvlExpert')"></option>
+              <option value="avanzato" x-text="mp('lvlAdvanced')"></option>
+            </select>
+            <select class="mp-input" x-model="teacherDuration">
+              <option value="corto" x-text="mp('durOptShort')"></option>
+              <option value="medio" x-text="mp('durOptMed')"></option>
+              <option value="lungo" x-text="mp('durOptLong')"></option>
+              <option value="esteso" x-text="mp('durOptExt')"></option>
+            </select>
+          </div>
+
+          <p class="mp-builder-hint"
+             x-text="mp('selectObjectsHint') + ' ' + teacherSelectedObjects.length + ' ' + mp('selectedCount') + '.'"></p>
+          <div class="mp-builder-objects">
+            <template x-for="obj in allOggetti" :key="obj.nome">
+              <button type="button" class="mp-obj-btn"
+                      :class="{ 'is-on': teacherSelectedObjects.includes(obj.nome) }"
+                      @click="toggleTeacherObject(obj.nome)" x-text="obj.nome"></button>
+            </template>
+          </div>
+
+          <!-- ordine + descrizioni -->
+          <div class="mp-builder-block" x-show="teacherSelectedObjects.length > 0">
+            <p class="mp-builder-label" x-text="mp('orderAndDesc')"></p>
+            <template x-for="objName in teacherSelectedObjects" :key="'desc-' + objName">
+              <div class="mp-builder-card">
+                <div class="mp-builder-card-head">
+                  <strong x-text="objName"></strong>
+                  <div class="mp-builder-card-moves">
+                    <button type="button" class="mp-mini-btn" @click="moveTeacherObject(objName, -1)" x-text="mp('up')"></button>
+                    <button type="button" class="mp-mini-btn" @click="moveTeacherObject(objName, 1)" x-text="mp('down')"></button>
+                  </div>
+                </div>
+                <textarea class="mp-input mp-input-dark mp-builder-textarea"
+                          x-model="teacherObjectDescriptions[objName]"
+                          :placeholder="mp('phDescFor') + ' ' + objName"></textarea>
+              </div>
+            </template>
+          </div>
+
+          <!-- item testo -->
+          <div class="mp-builder-block">
+            <p class="mp-builder-label" x-text="mp('textItemSection')"></p>
+            <select class="mp-input mp-input-dark mp-mb8" x-model="teacherTextDraft.room"
+                    @change="teacherTextDraft.insertAfterObject = ''">
+              <option value="" x-text="mp('selectRoomOpt')"></option>
+              <template x-for="room in availableTextRooms" :key="room"><option :value="room" x-text="room"></option></template>
+            </select>
+            <select class="mp-input mp-input-dark mp-mb8" x-model="teacherTextDraft.insertAfterObject">
+              <option value="" x-text="mp('selectObjectRoom')"></option>
+              <template x-for="objName in availableInsertAfterObjects" :key="'after-' + objName">
+                <option :value="objName" x-text="mp('afterObject') + ' ' + objName"></option>
+              </template>
+            </select>
+            <p class="mp-builder-faint" x-text="mp('textItemHint')"></p>
+            <input class="mp-input mp-input-dark mp-mb8" x-model="teacherTextDraft.name" :placeholder="mp('phTextItemName')" />
+            <textarea class="mp-input mp-input-dark mp-builder-textarea mp-mb8" x-model="teacherTextDraft.text" :placeholder="mp('phTextItemBody')"></textarea>
+            <button type="button" class="mp-btn-green-outline mp-btn-inline" @click="addTeacherTextItem()"
+                    x-text="teacherEditingTextItemId ? mp('saveTextItem') : mp('addTextItem')"></button>
+            <div class="mp-builder-textlist" x-show="teacherTextItems.length > 0">
+              <template x-for="item in teacherTextItems" :key="item.id">
+                <div class="mp-builder-textrow">
+                  <span x-text="textItemSummary(item)"></span>
+                  <div class="mp-builder-card-moves">
+                    <button type="button" class="mp-mini-btn" @click="editTeacherTextItem(item.id)" x-text="mp('edit')"></button>
+                    <button type="button" class="mp-mini-btn" @click="removeTeacherTextItem(item.id)" x-text="mp('remove')"></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- quiz -->
+          <div class="mp-builder-block">
+            <p class="mp-builder-label" x-text="mp('quizBlockTitle')"></p>
+            <input class="mp-input mp-input-dark" x-model="teacherQuizTitle" :placeholder="mp('quizTitlePh')" />
+            <input class="mp-input mp-input-dark" type="number" min="10" x-model.number="teacherQuizTimeLimit" :placeholder="mp('timeLimitSec')" />
+            <template x-for="(question, qIdx) in teacherQuizQuestions" :key="question.id">
+              <div class="mp-quiz-q">
+                <div class="mp-quiz-q-head">
+                  <span class="mp-green" x-text="mp('questionLabel') + ' ' + (qIdx + 1)"></span>
+                  <button type="button" class="mp-mini-btn" @click="removeQuizQuestion(question.id)" x-text="mp('remove')"></button>
+                </div>
+                <input class="mp-input mp-input-darker mp-mb8" x-model="question.question" :placeholder="mp('questionTextPh')" />
+                <template x-for="(option, optIdx) in question.options" :key="optIdx">
+                  <div class="mp-quiz-opt">
+                    <input class="mp-input mp-input-darker" x-model="question.options[optIdx]" :placeholder="mp('optionPh') + ' ' + (optIdx + 1)" />
+                    <button type="button" class="mp-mini-btn" @click="quizRemoveOption(question, optIdx)">X</button>
+                  </div>
+                </template>
+                <div class="mp-quiz-q-foot">
+                  <button type="button" class="mp-mini-btn" @click="quizAddOption(question)" x-text="mp('addOption')"></button>
+                  <select class="mp-input mp-input-darker mp-quiz-correct" x-model.number="question.correctIndex">
+                    <template x-for="(option, idx) in question.options" :key="idx">
+                      <option :value="idx" x-text="mp('correctIsOption') + ' ' + (idx + 1)"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+            </template>
+            <button type="button" class="mp-btn-green-outline mp-btn-inline" @click="addQuizQuestion()" x-text="mp('addQuestion')"></button>
+          </div>
+
+          <div class="mp-builder-save">
+            <button type="button" class="mp-btn-outline" @click="saveTeacherGuidedVisit()"
+                    x-text="teacherEditingVisitId ? mp('saveVisitChanges') : mp('saveGuidedVisitBtn')"></button>
+          </div>
+
+          <p class="mp-builder-flow" x-show="teacherOptimizedOrder.length > 0">
+            <span x-text="mp('visitFlowFinal')"></span>
+            <span class="mp-green" x-text="teacherOptimizedOrder.join(' -> ')"></span>
+          </p>
+          <input class="mp-input mp-input-dark mp-builder-link" x-show="teacherStudentLink" readonly :value="teacherStudentLink" />
+          <input class="mp-input mp-input-dark mp-builder-link" x-show="teacherDashboardLink" readonly :value="teacherDashboardLink" />
+        </div>
+      </div>
+
     </div>
 
     <script type="module" src="/src/main.js"></script>
